@@ -32,7 +32,7 @@ public class Condominium {
     private CondominiumBillingPlan billingPlan;
 
     @Column(nullable = false)
-    private Boolean active;
+    private Boolean isActive;
 
     @OneToMany(mappedBy = "condominium", fetch = FetchType.LAZY)
     private Set<Sector> sectors = new HashSet<>();

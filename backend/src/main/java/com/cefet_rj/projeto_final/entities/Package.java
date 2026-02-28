@@ -20,8 +20,26 @@ public class Package {
     @JoinColumn(name = "recipient_id")
     private User recipient;
 
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "unit_id")
+    private Unit unit;
+
     @Enumerated(EnumType.STRING)
     private PackageStatus status;
+
+    @Column(columnDefinition = "TIMESTAMP WITHOUT TIME ZONE")
     private LocalDateTime arrivalAt;
+
+    @Column(columnDefinition = "TIMESTAMP WITHOUT TIME ZONE")
     private LocalDateTime pickedUpAt;
+
+    @PrePersist
+    public void prePersist() {
+        arrivalAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    public void preUpdate(){
+        pickedUpAt = LocalDateTime.now();
+    }
 }
