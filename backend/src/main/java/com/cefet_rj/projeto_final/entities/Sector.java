@@ -38,6 +38,4 @@ public class Sector {
     @JoinColumn(name = "condominium_id", nullable = false)
     private Condominium condominium;
 
-    @OneToMany(mappedBy = "sector", fetch = FetchType.LAZY)
-    private Set<Unit> units = new HashSet<>();
 }
