@@ -7,7 +7,7 @@ public record CondominiumUserDTO (
 		Long id,
 		Long userId,
 		Long condominiumId,
-		Long roleId
+		String authority
 
 ) {
 
@@ -16,7 +16,7 @@ public record CondominiumUserDTO (
 				entity.getId(),
 				entity.getUser().getId(),
 				entity.getCondominium().getId(),
-				entity.getRole().getId()
+				entity.getRole().getAuthority()
 		);
 	}
 }

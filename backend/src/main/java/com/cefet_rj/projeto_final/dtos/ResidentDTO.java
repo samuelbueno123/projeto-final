@@ -7,7 +7,7 @@ public record ResidentDTO (
 		Long id,
 		Long userId,
 		Long unitId,
-		Long typeId
+		String type
 
 ){
 
@@ -16,7 +16,7 @@ public record ResidentDTO (
 				entity.getId(),
 				entity.getUser().getId(),
 				entity.getUnit().getId(),
-				entity.getType().getId()
+				entity.getType().toString()
 		    );
 	}
 
