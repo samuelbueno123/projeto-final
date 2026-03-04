@@ -1,10 +1,16 @@
 package com.cefet_rj.projeto_final.services;
 
+import com.cefet_rj.projeto_final.dtos.RoleDTO;
 import com.cefet_rj.projeto_final.dtos.UserDTO;
+import com.cefet_rj.projeto_final.entities.Role;
 import com.cefet_rj.projeto_final.entities.User;
+import com.cefet_rj.projeto_final.repositories.RoleRepository;
 import com.cefet_rj.projeto_final.repositories.UserRepository;
 import com.cefet_rj.projeto_final.services.exceptions.ResourceNotFoundException;
+
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -18,6 +24,8 @@ public class UserService {
 
     private final UserRepository userRepository;
 
+	private final RoleRepository roleRepository;
+
     @Transactional(readOnly = true)
     public Page<UserDTO> findAllPaged(Pageable pageable) {
         Page<User> list = userRepository.findAll(pageable);
@@ -30,4 +38,29 @@ public class UserService {
         User entity = obj.orElseThrow(() -> new ResourceNotFoundException("Entity not found"));
         return new UserDTO(entity);
     }
+
+	@Transactional
+	public UserDTO update(Long id, UserDTO dto){
+		try {
+			User entity = userRepository.getReferenceById(id);
+			copyDtoToEntity(dto, entity);
+			entity = userRepository.save(entity);
+			return new UserDTO(entity);
+		}
+		catch (EntityNotFoundException e) {
+			throw new ResourceNotFoundException("Id " + id + " not found");
+		}
+	}
+
+	private void copyDtoToEntity(UserDTO dto, User entity) {
+		entity.setFirstName(dto.firstName());
+		entity.setLastName(dto.lastName());
+		entity.setEmail(dto.email());
+
+		entity.getRoles().clear();
+		for (RoleDTO roleDto : dto.roles()) {
+			Role role = roleRepository.getReferenceById(roleDto.id());
+			entity.getRoles().add(role);
+		}
+	}
 }

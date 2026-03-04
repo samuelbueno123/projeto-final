@@ -19,7 +19,7 @@ public class CondominiumUserService {
 	private final CondominiumUserRepository condominiumUserRepository;
 
 	@Transactional(readOnly = true)
-	public Page <CondominiumUserDTO> findAllPaged(Pageable pageable) {
+	public Page<CondominiumUserDTO> findAllPaged(Pageable pageable) {
 		Page<CondominiumUser> list = condominiumUserRepository.findAll(pageable);
 		return list.map(CondominiumUserDTO::new);
 	}
