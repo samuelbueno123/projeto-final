@@ -1,15 +1,14 @@
 package com.cefet_rj.projeto_final.controllers;
 
+import com.cefet_rj.projeto_final.dtos.PackageDTO;
 import com.cefet_rj.projeto_final.dtos.ResidentDTO;
 import com.cefet_rj.projeto_final.services.ResidentService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/residents")
@@ -28,5 +27,11 @@ public class ResidentController {
 	public ResponseEntity<ResidentDTO> findById(@PathVariable Long id) {
 		ResidentDTO dto = residentService.findById(id);
 		return ResponseEntity.ok().body(dto);
+	}
+
+	@PutMapping ("/{id}")
+	public ResponseEntity<ResidentDTO> update(@PathVariable Long id, @Valid @RequestBody ResidentDTO dto){
+		ResidentDTO newDto = residentService.update(id, dto);
+		return ResponseEntity.ok().body(newDto);
 	}
 }

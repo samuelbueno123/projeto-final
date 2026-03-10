@@ -52,7 +52,7 @@ public class UserService {
 		}
 	}
 
-	private void copyDtoToEntity(UserDTO dto, User entity) {
+	public void copyDtoToEntity(UserDTO dto, User entity) {
 		entity.setFirstName(dto.firstName());
 		entity.setLastName(dto.lastName());
 		entity.setEmail(dto.email());
