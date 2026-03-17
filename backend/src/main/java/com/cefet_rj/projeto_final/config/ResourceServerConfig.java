@@ -8,10 +8,12 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
@@ -35,7 +37,7 @@ public class ResourceServerConfig {
         http
                 .securityMatcher(PathRequest.toH2Console())
                 .csrf(AbstractHttpConfigurer::disable)
-                .headers(headers -> headers.frameOptions(frame -> frame.disable()));
+                .headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::disable));
 
         return http.build();
     }
@@ -48,7 +50,10 @@ public class ResourceServerConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(authorize -> authorize
-                        .anyRequest().permitAll()
+                        .requestMatchers("/h2-console/**").permitAll()
+                        .requestMatchers("/oauth2/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/users").permitAll()
+                        .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
@@ -64,7 +69,7 @@ public class ResourceServerConfig {
                 new JwtGrantedAuthoritiesConverter();
 
         authoritiesConverter.setAuthoritiesClaimName("authorities");
-        authoritiesConverter.setAuthorityPrefix("");
+        authoritiesConverter.setAuthorityPrefix("ROLE_");
 
         JwtAuthenticationConverter jwtConverter =
                 new JwtAuthenticationConverter();

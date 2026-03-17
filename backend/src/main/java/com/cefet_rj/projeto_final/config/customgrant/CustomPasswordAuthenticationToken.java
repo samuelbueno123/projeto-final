@@ -5,20 +5,19 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import lombok.Getter;
 import org.springframework.lang.Nullable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationGrantAuthenticationToken;
 import org.springframework.util.Assert;
 
+@Getter
 public class CustomPasswordAuthenticationToken
         extends OAuth2AuthorizationGrantAuthenticationToken {
 
     private static final AuthorizationGrantType PASSWORD_GRANT_TYPE =
             new AuthorizationGrantType("password");
-
-    private static final String USERNAME_PARAMETER = "username";
-    private static final String PASSWORD_PARAMETER = "password";
 
     private final String username;
     private final String password;
@@ -27,29 +26,21 @@ public class CustomPasswordAuthenticationToken
     public CustomPasswordAuthenticationToken(
             Authentication clientPrincipal,
             @Nullable Set<String> scopes,
-            @Nullable Map<String, Object> additionalParameters) {
+            @Nullable Map<String, Object> additionalParameters,
+            String username,
+            String password) {
 
         super(PASSWORD_GRANT_TYPE, clientPrincipal, additionalParameters);
 
-        Assert.notNull(additionalParameters, "additionalParameters cannot be null");
+        Assert.notNull(clientPrincipal, "clientPrincipal cannot be null");
+        Assert.hasText(username, "username cannot be empty");
+        Assert.hasText(password, "password cannot be empty");
 
-        this.username = (String) additionalParameters.get(USERNAME_PARAMETER);
-        this.password = (String) additionalParameters.get(PASSWORD_PARAMETER);
+        this.username = username;
+        this.password = password;
 
         this.scopes = Collections.unmodifiableSet(
                 scopes != null ? new HashSet<>(scopes) : Collections.emptySet()
         );
-    }
-
-    public String getUsername() {
-        return this.username;
-    }
-
-    public String getPassword() {
-        return this.password;
-    }
-
-    public Set<String> getScopes() {
-        return this.scopes;
     }
 }

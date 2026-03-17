@@ -35,38 +35,43 @@ public class CustomPasswordAuthenticationConverter implements AuthenticationConv
 
         String grantType = request.getParameter(OAuth2ParameterNames.GRANT_TYPE);
 
+        // ✔ Só processa password grant
         if (!PASSWORD_GRANT_TYPE.getValue().equals(grantType)) {
             return null;
         }
 
         MultiValueMap<String, String> parameters = getParameters(request);
 
+        // 🔴 scope (opcional, mas validado corretamente)
         String scope = parameters.getFirst(OAuth2ParameterNames.SCOPE);
         if (StringUtils.hasText(scope) &&
                 parameters.get(OAuth2ParameterNames.SCOPE).size() != 1) {
             throw invalidRequest(OAuth2ParameterNames.SCOPE);
         }
 
+        // 🔴 username obrigatório
         String username = parameters.getFirst(USERNAME_PARAMETER);
         if (!StringUtils.hasText(username) ||
                 parameters.get(USERNAME_PARAMETER).size() != 1) {
             throw invalidRequest(USERNAME_PARAMETER);
         }
 
+        // 🔴 password obrigatório
         String password = parameters.getFirst(PASSWORD_PARAMETER);
         if (!StringUtils.hasText(password) ||
                 parameters.get(PASSWORD_PARAMETER).size() != 1) {
             throw invalidRequest(PASSWORD_PARAMETER);
         }
 
-        Set<String> requestedScopes = null;
-
+        // 🔑 scopes
+        Set<String> requestedScopes = new HashSet<>();
         if (StringUtils.hasText(scope)) {
             requestedScopes = new HashSet<>(
                     Arrays.asList(StringUtils.delimitedListToStringArray(scope, " "))
             );
         }
 
+        // 🔑 parâmetros adicionais
         Map<String, Object> additionalParameters = new HashMap<>();
 
         parameters.forEach((key, values) -> {
@@ -76,13 +81,21 @@ public class CustomPasswordAuthenticationConverter implements AuthenticationConv
             }
         });
 
+        // 🔴 client autenticado (vem do filtro do Authorization Server)
         Authentication clientPrincipal =
                 SecurityContextHolder.getContext().getAuthentication();
 
+        if (clientPrincipal == null || !clientPrincipal.isAuthenticated()) {
+            throw new OAuth2AuthenticationException(OAuth2ErrorCodes.INVALID_CLIENT);
+        }
+
+        // 🔥 IMPORTANTE: garantir que username e password vão no token
         return new CustomPasswordAuthenticationToken(
                 clientPrincipal,
                 requestedScopes,
-                additionalParameters
+                additionalParameters,
+                username,
+                password
         );
     }
 

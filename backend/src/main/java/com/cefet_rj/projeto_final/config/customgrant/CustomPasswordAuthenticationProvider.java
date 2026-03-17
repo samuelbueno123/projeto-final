@@ -3,7 +3,6 @@ package com.cefet_rj.projeto_final.config.customgrant;
 import java.security.Principal;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.core.Authentication;
@@ -73,19 +72,26 @@ public class CustomPasswordAuthenticationProvider implements AuthenticationProvi
 
         RegisteredClient registeredClient = clientPrincipal.getRegisteredClient();
 
+        assert registeredClient != null;
+        if (!registeredClient.getAuthorizationGrantTypes().contains(PASSWORD_GRANT_TYPE)) {
+            throw new OAuth2AuthenticationException(OAuth2ErrorCodes.UNAUTHORIZED_CLIENT);
+        }
+
         String username = authRequest.getUsername();
         String password = authRequest.getPassword();
 
-        UserDetails user = userDetailsService.loadUserByUsername(username);
+        UserDetails user;
+        try {
+            user = userDetailsService.loadUserByUsername(username);
+        } catch (Exception e) {
+            throw invalidGrant("Invalid credentials");
+        }
 
         if (!passwordEncoder.matches(password, user.getPassword())) {
             throw invalidGrant("Invalid credentials");
         }
 
-        Set<String> authorizedScopes = user.getAuthorities().stream()
-                .map(a -> a.getAuthority())
-                .filter(registeredClient.getScopes()::contains)
-                .collect(Collectors.toCollection(HashSet::new));
+        Set<String> authorizedScopes = new HashSet<>(registeredClient.getScopes());
 
         CustomUserAuthorities customUser =
                 new CustomUserAuthorities(username, user.getAuthorities());
@@ -114,7 +120,9 @@ public class CustomPasswordAuthenticationProvider implements AuthenticationProvi
                         .attribute(Principal.class.getName(), clientPrincipal);
 
         OAuth2TokenContext tokenContext =
-                tokenContextBuilder.tokenType(OAuth2TokenType.ACCESS_TOKEN).build();
+                tokenContextBuilder
+                        .tokenType(OAuth2TokenType.ACCESS_TOKEN)
+                        .build();
 
         OAuth2Token generatedToken = tokenGenerator.generate(tokenContext);
 
@@ -132,7 +140,7 @@ public class CustomPasswordAuthenticationProvider implements AuthenticationProvi
                 generatedToken.getTokenValue(),
                 generatedToken.getIssuedAt(),
                 generatedToken.getExpiresAt(),
-                tokenContext.getAuthorizedScopes()
+                authorizedScopes
         );
 
         if (generatedToken instanceof ClaimAccessor accessor) {

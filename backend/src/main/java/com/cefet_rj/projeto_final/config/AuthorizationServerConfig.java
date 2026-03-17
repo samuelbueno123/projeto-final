@@ -14,6 +14,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
@@ -169,7 +170,7 @@ public class AuthorizationServerConfig {
 
             List<String> authorities = user.getAuthorities()
                     .stream()
-                    .map(a -> a.getAuthority())
+                    .map(GrantedAuthority::getAuthority)
                     .toList();
 
             if ("access_token".equals(context.getTokenType().getValue())) {

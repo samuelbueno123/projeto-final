@@ -1,11 +1,14 @@
 package com.cefet_rj.projeto_final.config.customgrant;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Objects;
 
+import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.util.Assert;
 
+@Getter
 public final class CustomUserAuthorities {
 
     private final String username;
@@ -18,15 +21,8 @@ public final class CustomUserAuthorities {
         Assert.notNull(authorities, "authorities must not be null");
 
         this.username = username;
-        this.authorities = authorities;
-    }
 
-    public String getUsername() {
-        return username;
-    }
-
-    public Collection<? extends GrantedAuthority> getAuthorities() {
-        return authorities;
+        this.authorities = Collections.unmodifiableCollection(authorities);
     }
 
     @Override

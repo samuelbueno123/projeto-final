@@ -12,7 +12,7 @@
 		<relativePath/>
 	</parent>
 
-	<groupId>com.devsuperior</groupId>
+	<groupId>com.cefet-rj</groupId>
 	<artifactId>projeto-final</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>projeto-final</name>
