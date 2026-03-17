@@ -5,6 +5,7 @@ import com.cefet_rj.projeto_final.dtos.PackageDTO;
 import com.cefet_rj.projeto_final.entities.*;
 import com.cefet_rj.projeto_final.entities.Package;
 import com.cefet_rj.projeto_final.entities.enums.PackageStatus;
+import com.cefet_rj.projeto_final.mapper.UserMapper;
 import com.cefet_rj.projeto_final.repositories.PackageRepository;
 import com.cefet_rj.projeto_final.services.exceptions.ResourceNotFoundException;
 import jakarta.persistence.EntityNotFoundException;
@@ -22,6 +23,7 @@ public class PackageService {
 
     private final PackageRepository packageRepository;
 	private final UserService userService;
+	private final UserMapper userMapper;
 	private final UnitService unitService;
 
 	@Transactional(readOnly = true)
@@ -57,7 +59,7 @@ public class PackageService {
 		UserDTO recipient = userService.findById(dto.recipientId());
 		UnitDTO unit = unitService.findById(dto.unitId());
 
-		userService.copyDtoToEntity(recipient, userEntity);
+		userMapper.copyDtoToEntity(recipient, userEntity);
 		unitService.copyDtoToEntity(unit, unitEntity);
 
 		entity.setDescription(dto.description());

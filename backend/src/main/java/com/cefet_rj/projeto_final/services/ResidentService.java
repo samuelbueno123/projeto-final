@@ -7,6 +7,7 @@ import com.cefet_rj.projeto_final.entities.Resident;
 import com.cefet_rj.projeto_final.entities.Unit;
 import com.cefet_rj.projeto_final.entities.User;
 import com.cefet_rj.projeto_final.entities.enums.ResidentType;
+import com.cefet_rj.projeto_final.mapper.UserMapper;
 import com.cefet_rj.projeto_final.repositories.ResidentRepository;
 import com.cefet_rj.projeto_final.services.exceptions.ResourceNotFoundException;
 import jakarta.persistence.EntityNotFoundException;
@@ -24,6 +25,7 @@ public class ResidentService {
 
     private final ResidentRepository residentRepository;
 	private final UserService userService;
+	private final UserMapper userMapper;
 	private final UnitService unitService;
 
 	@Transactional(readOnly = true)
@@ -59,7 +61,7 @@ public class ResidentService {
 		UserDTO user = userService.findById(dto.userId());
 		UnitDTO unit = unitService.findById(dto.unitId());
 
-		userService.copyDtoToEntity(user, userEntity);
+		userMapper.copyDtoToEntity(user, userEntity);
 		unitService.copyDtoToEntity(unit, unitEntity);
 
 		entity.setUser(userEntity);

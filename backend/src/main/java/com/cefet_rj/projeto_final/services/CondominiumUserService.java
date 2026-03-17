@@ -2,12 +2,12 @@ package com.cefet_rj.projeto_final.services;
 
 import com.cefet_rj.projeto_final.dtos.CondominiumDTO;
 import com.cefet_rj.projeto_final.dtos.CondominiumUserDTO;
-import com.cefet_rj.projeto_final.dtos.RoleDTO;
 import com.cefet_rj.projeto_final.dtos.UserDTO;
 import com.cefet_rj.projeto_final.entities.Condominium;
 import com.cefet_rj.projeto_final.entities.CondominiumUser;
 import com.cefet_rj.projeto_final.entities.Role;
 import com.cefet_rj.projeto_final.entities.User;
+import com.cefet_rj.projeto_final.mapper.UserMapper;
 import com.cefet_rj.projeto_final.repositories.CondominiumUserRepository;
 import com.cefet_rj.projeto_final.repositories.RoleRepository;
 import com.cefet_rj.projeto_final.services.exceptions.ResourceNotFoundException;
@@ -27,6 +27,7 @@ public class CondominiumUserService {
 	private final CondominiumUserRepository condominiumUserRepository;
 
 	private final UserService userService;
+	private final UserMapper userMapper;
 	private final CondominiumService condominiumService;
 	private final RoleRepository roleRepository;
 
@@ -64,7 +65,7 @@ public class CondominiumUserService {
 		CondominiumDTO condominium = condominiumService.findById(dto.condominiumId());
 		Role role = roleRepository.findByAuthority(dto.authority());
 
-		userService.copyDtoToEntity(user, userEntity);
+		userMapper.copyDtoToEntity(user, userEntity);
 		condominiumService.copyDtoToEntity(condominium, condominiumEntity);
 
 		entity.setUser(userEntity);
