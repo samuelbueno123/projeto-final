@@ -1,6 +1,8 @@
 package com.cefet_rj.projeto_final.services;
 
+import com.cefet_rj.projeto_final.dtos.CondominiumDTO;
 import com.cefet_rj.projeto_final.dtos.SectorDTO;
+import com.cefet_rj.projeto_final.entities.Condominium;
 import com.cefet_rj.projeto_final.entities.Sector;
 import com.cefet_rj.projeto_final.entities.enums.SectorStructuralType;
 import com.cefet_rj.projeto_final.repositories.CondominiumRepository;
@@ -23,6 +25,8 @@ public class SectorService {
 	private final SectorRepository sectorRepository;
 
 	private final CondominiumRepository condominiumRepository;
+
+	private final CondominiumService condominiumService;
 
 	@Transactional(readOnly = true)
 	public Page<SectorDTO> findAllPaged(Pageable pageable) {
@@ -47,6 +51,18 @@ public class SectorService {
 
 		entity = sectorRepository.save(entity);
 		return new SectorDTO(entity);
+	}
+
+	public void copyDtoToEntity(SectorDTO dto, Sector entity) {
+		Condominium condominiumEntity = new Condominium();
+
+		CondominiumDTO condominium = condominiumService.findById(dto.condominiumId());
+
+		condominiumService.copyDtoToEntity(condominium, condominiumEntity);
+
+		entity.setName(dto.name());
+		entity.setStructuralType(SectorStructuralType.valueOf(dto.structuralType()));
+		entity.setCondominium(condominiumEntity);
 	}
 
 }

@@ -74,4 +74,16 @@ public class UserService {
 			throw new ResourceNotFoundException("Id " + id + " not found");
 		}
 	}
+
+	public void copyDtoToEntity(UserDTO dto, User entity) {
+		entity.setFirstName(dto.firstName());
+		entity.setLastName(dto.lastName());
+		entity.setEmail(dto.email());
+
+		entity.getRoles().clear();
+		for (RoleDTO roleDto : dto.roles()) {
+			Role role = roleRepository.getReferenceById(roleDto.id());
+			entity.getRoles().add(role);
+		}
+	}
 }

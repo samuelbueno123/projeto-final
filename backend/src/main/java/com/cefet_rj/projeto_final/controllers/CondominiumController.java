@@ -1,7 +1,10 @@
 package com.cefet_rj.projeto_final.controllers;
 
 import com.cefet_rj.projeto_final.dtos.CondominiumDTO;
+import com.cefet_rj.projeto_final.dtos.CondominiumUserDTO;
+import com.cefet_rj.projeto_final.dtos.UserDTO;
 import com.cefet_rj.projeto_final.services.CondominiumService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -29,6 +32,13 @@ public class CondominiumController {
         CondominiumDTO dto = condominiumService.findById(id);
         return ResponseEntity.ok().body(dto);
     }
+
+	@PutMapping ("/{id}")
+	public ResponseEntity<CondominiumDTO> update(@PathVariable Long id, @Valid @RequestBody CondominiumDTO dto){
+		CondominiumDTO newDto = condominiumService.update(id, dto);
+		return ResponseEntity.ok().body(newDto);
+	}
+
 // implementar autorização de role
 	@PostMapping
 	public ResponseEntity<CondominiumDTO> insert(@RequestBody CondominiumDTO dto){
