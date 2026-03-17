@@ -1,12 +1,14 @@
 package com.cefet_rj.projeto_final.dtos;
 
 import com.cefet_rj.projeto_final.entities.User;
+import com.cefet_rj.projeto_final.services.validation.UserInsertValid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 import java.util.HashSet;
 import java.util.Set;
 
+@UserInsertValid
 public record UserInsertDTO(
 
         Long id,

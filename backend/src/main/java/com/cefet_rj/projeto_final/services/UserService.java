@@ -3,6 +3,7 @@ package com.cefet_rj.projeto_final.services;
 import com.cefet_rj.projeto_final.dtos.RoleDTO;
 import com.cefet_rj.projeto_final.dtos.UserDTO;
 import com.cefet_rj.projeto_final.dtos.UserInsertDTO;
+import com.cefet_rj.projeto_final.dtos.UserUpdateDTO;
 import com.cefet_rj.projeto_final.entities.Role;
 import com.cefet_rj.projeto_final.entities.User;
 import com.cefet_rj.projeto_final.mapper.UserMapper;
@@ -62,10 +63,10 @@ public class UserService {
 	}
 
 	@Transactional
-	public UserDTO update(Long id, UserDTO dto) {
+	public UserDTO update(Long id, UserUpdateDTO dto) {
 		try {
 			User entity = userRepository.getReferenceById(id);
-			userMapper.copyDtoToEntity(dto, entity);
+			userMapper.copyUpdateDtoToEntity(dto, entity);
 			entity = userRepository.save(entity);
 			return new UserDTO(entity);
 		}

@@ -2,6 +2,7 @@ package com.cefet_rj.projeto_final.controllers;
 
 import com.cefet_rj.projeto_final.dtos.UserDTO;
 import com.cefet_rj.projeto_final.dtos.UserInsertDTO;
+import com.cefet_rj.projeto_final.dtos.UserUpdateDTO;
 import com.cefet_rj.projeto_final.entities.User;
 import com.cefet_rj.projeto_final.services.UserService;
 import jakarta.validation.Valid;
@@ -42,9 +43,8 @@ public class UserController {
         return ResponseEntity.created(uri).body(newDto);
     }
 
-
     @PutMapping ("/{id}")
-	public ResponseEntity<UserDTO> update(@PathVariable Long id, @Valid @RequestBody UserDTO dto){
+	public ResponseEntity<UserDTO> update(@PathVariable Long id, @Valid @RequestBody UserUpdateDTO dto){
 		UserDTO newDto = userService.update(id, dto);
 		return ResponseEntity.ok().body(newDto);
 	}
