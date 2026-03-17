@@ -42,7 +42,6 @@ public class UnitService {
 
 		SectorDTO sector = sectorService.findById(dto.sectorId());
 
-		//Need to create method
 		sectorService.copyDtoToEntity(sector, sectorEntity);
 
 		entity.setIdentifier(dto.identifier());
