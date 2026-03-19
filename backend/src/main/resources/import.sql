@@ -51,16 +51,16 @@ INSERT INTO tb_unit (identifier, sector_id) VALUES ('107', 3);
 INSERT INTO tb_unit (identifier, sector_id) VALUES ('108', 3);
 
 -- USERS
-INSERT INTO tb_user (first_name, last_name, email, password) VALUES ('Marcus', 'Vinicius', 'admin@email.com', '123');
-INSERT INTO tb_user (first_name, last_name, email, password) VALUES ('Carlos', 'Ferro','sindico@email.com', '123');
-INSERT INTO tb_user (first_name, last_name, email, password) VALUES ('Joao', 'Pedro','morador1@email.com', '123');
-INSERT INTO tb_user (first_name, last_name, email, password) VALUES ('Ana', 'Paula','morador2@email.com', '123');
-INSERT INTO tb_user (first_name, last_name, email, password) VALUES ('Pedro', 'Lima','porteiro1@email.com', '123');
-INSERT INTO tb_user (first_name, last_name, email, password) VALUES ('Lucas','Augusto', 'porteiro2@email.com', '123');
-INSERT INTO tb_user (first_name, last_name, email, password) VALUES ('Fernanda', 'Souza', 'morador3@email.com', '123');
-INSERT INTO tb_user (first_name, last_name, email, password) VALUES ('Ricardo', 'Almeida', 'morador4@email.com', '123');
-INSERT INTO tb_user (first_name, last_name, email, password) VALUES ('Juliana', 'Rocha', 'morador5@email.com', '123');
-INSERT INTO tb_user (first_name, last_name, email, password) VALUES ('Marcos', 'Silva', 'morador6@email.com', '123');
+INSERT INTO tb_user (first_name, last_name, email, password) VALUES ('Marcus', 'Vinicius', 'admin@email.com', '$2a$10$7X.JEwyz7/XA64D/8uC1auUrRRRc/nrVFG63fUF/YenN9Td9JTDvW');
+INSERT INTO tb_user (first_name, last_name, email, password) VALUES ('Carlos', 'Ferro','sindico@email.com', '$2a$10$7X.JEwyz7/XA64D/8uC1auUrRRRc/nrVFG63fUF/YenN9Td9JTDvW');
+INSERT INTO tb_user (first_name, last_name, email, password) VALUES ('Joao', 'Pedro','morador1@email.com', '$2a$10$7X.JEwyz7/XA64D/8uC1auUrRRRc/nrVFG63fUF/YenN9Td9JTDvW');
+INSERT INTO tb_user (first_name, last_name, email, password) VALUES ('Ana', 'Paula','morador2@email.com', '$2a$10$7X.JEwyz7/XA64D/8uC1auUrRRRc/nrVFG63fUF/YenN9Td9JTDvW');
+INSERT INTO tb_user (first_name, last_name, email, password) VALUES ('Pedro', 'Lima','porteiro1@email.com', '$2a$10$7X.JEwyz7/XA64D/8uC1auUrRRRc/nrVFG63fUF/YenN9Td9JTDvW');
+INSERT INTO tb_user (first_name, last_name, email, password) VALUES ('Lucas','Augusto', 'porteiro2@email.com', '$2a$10$7X.JEwyz7/XA64D/8uC1auUrRRRc/nrVFG63fUF/YenN9Td9JTDvW');
+INSERT INTO tb_user (first_name, last_name, email, password) VALUES ('Fernanda', 'Souza', 'morador3@email.com', '$2a$10$7X.JEwyz7/XA64D/8uC1auUrRRRc/nrVFG63fUF/YenN9Td9JTDvW');
+INSERT INTO tb_user (first_name, last_name, email, password) VALUES ('Ricardo', 'Almeida', 'morador4@email.com', '$2a$10$7X.JEwyz7/XA64D/8uC1auUrRRRc/nrVFG63fUF/YenN9Td9JTDvW');
+INSERT INTO tb_user (first_name, last_name, email, password) VALUES ('Juliana', 'Rocha', 'morador5@email.com', '$2a$10$7X.JEwyz7/XA64D/8uC1auUrRRRc/nrVFG63fUF/YenN9Td9JTDvW');
+INSERT INTO tb_user (first_name, last_name, email, password) VALUES ('Marcos', 'Silva', 'morador6@email.com', '$2a$10$7X.JEwyz7/XA64D/8uC1auUrRRRc/nrVFG63fUF/YenN9Td9JTDvW');
 
 -- USER_ROLE
 INSERT INTO tb_user_role (user_id, role_id) VALUES (1, 1);
