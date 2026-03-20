@@ -11,8 +11,6 @@ import java.util.Set;
 @UserInsertValid
 public record UserInsertDTO(
 
-        Long id,
-
         @NotBlank(message = "Campo obrigatório")
         String firstName,
 
@@ -31,7 +29,6 @@ public record UserInsertDTO(
 
     public UserInsertDTO(User entity) {
         this(
-                entity.getId(),
                 entity.getFirstName(),
                 entity.getLastName(),
                 entity.getEmail(),

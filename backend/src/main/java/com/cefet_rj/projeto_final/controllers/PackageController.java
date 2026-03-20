@@ -8,6 +8,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+
+import java.net.URI;
 
 @RestController
 @RequestMapping("/packages")
@@ -26,6 +29,15 @@ public class PackageController {
     public ResponseEntity<PackageDTO> findById(@PathVariable Long id){
         PackageDTO dto = packageService.findById(id);
         return ResponseEntity.ok().body(dto);
+    }
+
+    @PostMapping
+    public ResponseEntity<PackageDTO> insert(@RequestBody PackageDTO dto){
+        dto = packageService.insert(dto);
+        URI uri = ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}")
+                .buildAndExpand(dto.id()).toUri();
+
+        return ResponseEntity.created(uri).body(dto);
     }
 
 	@PutMapping ("/{id}")

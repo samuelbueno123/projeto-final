@@ -11,8 +11,6 @@ import java.util.Set;
 @UserUpdateValid
 public record UserUpdateDTO(
 
-        Long id,
-
         @NotBlank(message = "Campo obrigatório")
         String firstName,
 
@@ -21,9 +19,6 @@ public record UserUpdateDTO(
         @NotBlank(message = "Favor entrar com um email válido")
         String email,
 
-        @NotBlank(message = "Campo obrigatório")
-        @Size(min = 8, message = "Deve ter no mínimo 8 caracteres")
-        String password,
 
         Set<RoleDTO> roles
 
@@ -31,11 +26,9 @@ public record UserUpdateDTO(
 
     public UserUpdateDTO(User entity) {
         this(
-                entity.getId(),
                 entity.getFirstName(),
                 entity.getLastName(),
                 entity.getEmail(),
-                entity.getPassword(),
                 entity.getRoles()
                         .stream()
                         .map(RoleDTO::new)

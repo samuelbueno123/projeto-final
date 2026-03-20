@@ -1,7 +1,10 @@
 package com.cefet_rj.projeto_final.controllers;
 
 import com.cefet_rj.projeto_final.dtos.SectorDTO;
+import com.cefet_rj.projeto_final.dtos.SectorInsertDTO;
+import com.cefet_rj.projeto_final.dtos.SectorUpdateDTO;
 import com.cefet_rj.projeto_final.services.SectorService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -29,13 +32,19 @@ public class SectorController {
 		SectorDTO dto = sectorService.findById(id);
 		return ResponseEntity.ok().body(dto);
 	}
-	// implementar autorização de role
+	
 	@PostMapping
-	public ResponseEntity<SectorDTO> insert(@RequestBody SectorDTO dto){
-		dto = sectorService.insert(dto);
+	public ResponseEntity<SectorDTO> insert(@RequestBody SectorInsertDTO dto){
+		SectorDTO newDto = sectorService.insert(dto);
 		URI uri = ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}")
-		                                     .buildAndExpand(dto.id()).toUri();
+		                                     .buildAndExpand(newDto.id()).toUri();
 
-		return ResponseEntity.created(uri).body(dto);
+		return ResponseEntity.created(uri).body(newDto);
+	}
+
+	@PutMapping ("/{id}")
+	public ResponseEntity<SectorDTO> update(@PathVariable Long id, @Valid @RequestBody SectorUpdateDTO dto){
+		SectorDTO newDto = sectorService.update(id, dto);
+		return ResponseEntity.ok().body(newDto);
 	}
 }

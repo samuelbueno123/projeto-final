@@ -1,12 +1,12 @@
 package com.cefet_rj.projeto_final.services;
 
 import com.cefet_rj.projeto_final.dtos.UnitDTO;
-import com.cefet_rj.projeto_final.dtos.SectorDTO;
 import com.cefet_rj.projeto_final.entities.Unit;
-import com.cefet_rj.projeto_final.entities.Sector;
+import com.cefet_rj.projeto_final.mapper.UnitMapper;
 import com.cefet_rj.projeto_final.repositories.UnitRepository;
 import com.cefet_rj.projeto_final.services.exceptions.ResourceNotFoundException;
 
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.data.domain.Page;
@@ -20,31 +20,41 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class UnitService {
 
-	private final UnitRepository UnitRepository;
-
-	private final SectorService sectorService;
-
+	private final UnitRepository unitRepository;
+	
+	private final UnitMapper unitMapper;
+	
 	@Transactional (readOnly = true)
 	public Page <UnitDTO> findAllPaged(Pageable pageable) {
-		Page <Unit> list = UnitRepository.findAll(pageable);
+		Page <Unit> list = unitRepository.findAll(pageable);
 		return list.map(UnitDTO::new);
 	}
 
 	@Transactional (readOnly = true)
 	public UnitDTO findById(Long id) {
-		Optional <Unit> obj = UnitRepository.findById(id);
+		Optional <Unit> obj = unitRepository.findById(id);
 		Unit entity = obj.orElseThrow(() -> new ResourceNotFoundException("Entity not found"));
 		return new UnitDTO(entity);
 	}
 
-	public void copyDtoToEntity(UnitDTO dto, Unit entity) {
-		Sector sectorEntity = new Sector();
+	@Transactional
+	public UnitDTO insert(UnitDTO dto) {
+		Unit entity = new Unit();
+		unitMapper.copyDtoToEntity(dto, entity);
+		entity = unitRepository.save(entity);
+		return new UnitDTO(entity);
+	}
 
-		SectorDTO sector = sectorService.findById(dto.sectorId());
-
-		sectorService.copyDtoToEntity(sector, sectorEntity);
-
-		entity.setIdentifier(dto.identifier());
-		entity.setSector(sectorEntity);
+	@Transactional
+	public UnitDTO update(Long id, UnitDTO dto){
+		try {
+			Unit entity = unitRepository.getReferenceById(id);
+			unitMapper.copyDtoToEntity(dto, entity);
+			entity = unitRepository.save(entity);
+			return new UnitDTO(entity);
+		}
+		catch (EntityNotFoundException e) {
+			throw new ResourceNotFoundException("Id " + id + " not found");
+		}
 	}
 }

@@ -1,14 +1,16 @@
 package com.cefet_rj.projeto_final.services;
 
-import com.cefet_rj.projeto_final.dtos.CondominiumDTO;
 import com.cefet_rj.projeto_final.dtos.SectorDTO;
+import com.cefet_rj.projeto_final.dtos.SectorInsertDTO;
+import com.cefet_rj.projeto_final.dtos.SectorUpdateDTO;
 import com.cefet_rj.projeto_final.entities.Condominium;
 import com.cefet_rj.projeto_final.entities.Sector;
-import com.cefet_rj.projeto_final.entities.enums.SectorStructuralType;
+import com.cefet_rj.projeto_final.mapper.SectorMapper;
 import com.cefet_rj.projeto_final.repositories.CondominiumRepository;
 import com.cefet_rj.projeto_final.repositories.SectorRepository;
 import com.cefet_rj.projeto_final.services.exceptions.ResourceNotFoundException;
 
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.data.domain.Page;
@@ -25,8 +27,8 @@ public class SectorService {
 	private final SectorRepository sectorRepository;
 
 	private final CondominiumRepository condominiumRepository;
-
-	private final CondominiumService condominiumService;
+	
+	private final SectorMapper sectorMapper;
 
 	@Transactional(readOnly = true)
 	public Page<SectorDTO> findAllPaged(Pageable pageable) {
@@ -42,27 +44,25 @@ public class SectorService {
 	}
 
 	@Transactional
-	public SectorDTO insert(SectorDTO dto) {
+	public SectorDTO insert(SectorInsertDTO dto) {
 		Sector entity = new Sector();
-
-		entity.setName(dto.name());
-		entity.setStructuralType(SectorStructuralType.valueOf(dto.structuralType()));
-		entity.setCondominium(condominiumRepository.getReferenceById(dto.condominiumId()));
-
+		sectorMapper.copyInsertDtoToEntity(dto, entity);
+		Condominium condominium = condominiumRepository.getReferenceById(dto.condominiumId());
+		entity.setCondominium(condominium);
 		entity = sectorRepository.save(entity);
 		return new SectorDTO(entity);
 	}
 
-	public void copyDtoToEntity(SectorDTO dto, Sector entity) {
-		Condominium condominiumEntity = new Condominium();
-
-		CondominiumDTO condominium = condominiumService.findById(dto.condominiumId());
-
-		condominiumService.copyDtoToEntity(condominium, condominiumEntity);
-
-		entity.setName(dto.name());
-		entity.setStructuralType(SectorStructuralType.valueOf(dto.structuralType()));
-		entity.setCondominium(condominiumEntity);
+	@Transactional
+	public SectorDTO update(Long id, SectorUpdateDTO dto){
+		try {
+			Sector entity = sectorRepository.getReferenceById(id);
+			sectorMapper.copyUpdateDtoToEntity(dto, entity);
+			entity = sectorRepository.save(entity);
+			return new SectorDTO(entity);
+		}
+		catch (EntityNotFoundException e) {
+			throw new ResourceNotFoundException("Id " + id + " not found");
+		}
 	}
-
 }

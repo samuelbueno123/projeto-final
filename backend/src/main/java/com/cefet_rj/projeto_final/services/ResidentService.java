@@ -1,13 +1,8 @@
 package com.cefet_rj.projeto_final.services;
 
 import com.cefet_rj.projeto_final.dtos.ResidentDTO;
-import com.cefet_rj.projeto_final.dtos.UnitDTO;
-import com.cefet_rj.projeto_final.dtos.UserDTO;
 import com.cefet_rj.projeto_final.entities.Resident;
-import com.cefet_rj.projeto_final.entities.Unit;
-import com.cefet_rj.projeto_final.entities.User;
-import com.cefet_rj.projeto_final.entities.enums.ResidentType;
-import com.cefet_rj.projeto_final.mapper.UserMapper;
+import com.cefet_rj.projeto_final.mapper.ResidentMapper;
 import com.cefet_rj.projeto_final.repositories.ResidentRepository;
 import com.cefet_rj.projeto_final.services.exceptions.ResourceNotFoundException;
 import jakarta.persistence.EntityNotFoundException;
@@ -24,9 +19,8 @@ import java.util.Optional;
 public class ResidentService {
 
     private final ResidentRepository residentRepository;
-	private final UserService userService;
-	private final UserMapper userMapper;
-	private final UnitService unitService;
+
+	private final ResidentMapper residentMapper;
 
 	@Transactional(readOnly = true)
 	public Page<ResidentDTO> findAllPaged(Pageable pageable) {
@@ -42,30 +36,23 @@ public class ResidentService {
 	}
 
 	@Transactional
+	public ResidentDTO insert(ResidentDTO dto) {
+		Resident entity = new Resident();
+		residentMapper.copyDtoToEntity(dto, entity);
+		entity = residentRepository.save(entity);
+		return new ResidentDTO(entity);
+	}
+
+	@Transactional
 	public ResidentDTO update(Long id, ResidentDTO dto){
 		try {
 			Resident entity = residentRepository.getReferenceById(id);
-			copyDtoToEntity(dto, entity);
+			residentMapper.copyDtoToEntity(dto, entity);
 			entity = residentRepository.save(entity);
 			return new ResidentDTO(entity);
 		}
 		catch (EntityNotFoundException e) {
 			throw new ResourceNotFoundException("Id " + id + " not found");
 		}
-	}
-
-	public void copyDtoToEntity(ResidentDTO dto, Resident entity) {
-		User userEntity = new User();
-		Unit unitEntity = new Unit();
-
-		UserDTO user = userService.findById(dto.userId());
-		UnitDTO unit = unitService.findById(dto.unitId());
-
-		userMapper.copyDtoToEntity(user, userEntity);
-		unitService.copyDtoToEntity(unit, unitEntity);
-
-		entity.setUser(userEntity);
-		entity.setUnit(unitEntity);
-		entity.setType(ResidentType.valueOf(dto.type()));
 	}
 }

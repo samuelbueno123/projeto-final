@@ -1,6 +1,5 @@
 package com.cefet_rj.projeto_final.services;
 
-import com.cefet_rj.projeto_final.dtos.RoleDTO;
 import com.cefet_rj.projeto_final.dtos.UserDTO;
 import com.cefet_rj.projeto_final.dtos.UserInsertDTO;
 import com.cefet_rj.projeto_final.dtos.UserUpdateDTO;
@@ -51,11 +50,12 @@ public class UserService {
 	public UserDTO insert(UserInsertDTO dto) {
 		User entity = new User();
 		userMapper.copyInsertDtoToEntity(dto, entity);
-		entity.getRoles().clear();
 
+		entity.getRoles().clear();
 		Role role = roleRepository.findByAuthority("ROLE_RESIDENT");
 		entity.getRoles().add(role);
 		entity.setPassword(passwordEncoder.encode(dto.password()));
+
 		entity = userRepository.save(entity);
 
 		return new UserDTO(entity);
@@ -71,18 +71,6 @@ public class UserService {
 		}
 		catch (EntityNotFoundException e) {
 			throw new ResourceNotFoundException("Id " + id + " not found");
-		}
-	}
-
-	public void copyDtoToEntity(UserDTO dto, User entity) {
-		entity.setFirstName(dto.firstName());
-		entity.setLastName(dto.lastName());
-		entity.setEmail(dto.email());
-
-		entity.getRoles().clear();
-		for (RoleDTO roleDto : dto.roles()) {
-			Role role = roleRepository.getReferenceById(roleDto.id());
-			entity.getRoles().add(role);
 		}
 	}
 }
