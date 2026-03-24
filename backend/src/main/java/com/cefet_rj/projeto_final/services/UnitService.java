@@ -1,8 +1,12 @@
 package com.cefet_rj.projeto_final.services;
 
 import com.cefet_rj.projeto_final.dtos.UnitDTO;
+import com.cefet_rj.projeto_final.dtos.UnitInsertDTO;
+import com.cefet_rj.projeto_final.dtos.UnitUpdateDTO;
+import com.cefet_rj.projeto_final.entities.Sector;
 import com.cefet_rj.projeto_final.entities.Unit;
 import com.cefet_rj.projeto_final.mapper.UnitMapper;
+import com.cefet_rj.projeto_final.repositories.SectorRepository;
 import com.cefet_rj.projeto_final.repositories.UnitRepository;
 import com.cefet_rj.projeto_final.services.exceptions.ResourceNotFoundException;
 
@@ -23,6 +27,8 @@ public class UnitService {
 	private final UnitRepository unitRepository;
 	
 	private final UnitMapper unitMapper;
+
+	private final SectorRepository sectorRepository;
 	
 	@Transactional (readOnly = true)
 	public Page <UnitDTO> findAllPaged(Pageable pageable) {
@@ -38,18 +44,20 @@ public class UnitService {
 	}
 
 	@Transactional
-	public UnitDTO insert(UnitDTO dto) {
+	public UnitDTO insert(UnitInsertDTO dto) {
 		Unit entity = new Unit();
-		unitMapper.copyDtoToEntity(dto, entity);
+		unitMapper.copyInsertDtoToEntity(dto, entity);
+		Sector sector = sectorRepository.getReferenceById(dto.sectorId());
+		entity.setSector(sector);
 		entity = unitRepository.save(entity);
 		return new UnitDTO(entity);
 	}
 
 	@Transactional
-	public UnitDTO update(Long id, UnitDTO dto){
+	public UnitDTO update(Long id, UnitUpdateDTO dto){
 		try {
 			Unit entity = unitRepository.getReferenceById(id);
-			unitMapper.copyDtoToEntity(dto, entity);
+			unitMapper.copyUpdateDtoToEntity(dto, entity);
 			entity = unitRepository.save(entity);
 			return new UnitDTO(entity);
 		}
