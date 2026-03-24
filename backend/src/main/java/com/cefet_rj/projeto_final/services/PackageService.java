@@ -6,6 +6,8 @@ import com.cefet_rj.projeto_final.entities.*;
 import com.cefet_rj.projeto_final.entities.Package;
 import com.cefet_rj.projeto_final.mapper.PackageMapper;
 import com.cefet_rj.projeto_final.repositories.PackageRepository;
+import com.cefet_rj.projeto_final.repositories.UnitRepository;
+import com.cefet_rj.projeto_final.repositories.UserRepository;
 import com.cefet_rj.projeto_final.services.exceptions.ResourceNotFoundException;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +26,11 @@ public class PackageService {
 
 	private final PackageMapper packageMapper;
 
+	private final UserRepository userRepository;
+
+	private final UnitRepository unitRepository;
+
+
 	@Transactional(readOnly = true)
     public Page<PackageDTO> findAllPaged(Pageable pageable) {
         Page<Package> list = packageRepository.findAll(pageable);
@@ -38,18 +45,22 @@ public class PackageService {
     }
 
 	@Transactional
-	public PackageDTO insert(PackageDTO dto) {
+	public PackageDTO insert(PackageInsertDTO dto) {
 		Package entity = new Package();
-		packageMapper.copyDtoToEntity(dto, entity);
+		packageMapper.copyInsertDtoToEntity(dto, entity);
+		User recipient = userRepository.getReferenceById(dto.recipientId());
+		entity.setRecipient(recipient);
+		Unit unit = unitRepository.getReferenceById(dto.unitId());
+		entity.setUnit(unit);
 		entity = packageRepository.save(entity);
 		return new PackageDTO(entity);
 	}
 
 	@Transactional
-	public PackageDTO update(Long id, PackageDTO dto){
+	public PackageDTO update(Long id, PackageUpdateDTO dto){
 		try {
 			Package entity = packageRepository.getReferenceById(id);
-			packageMapper.copyDtoToEntity(dto, entity);
+			packageMapper.copyUpdateDtoToEntity(dto, entity);
 			entity = packageRepository.save(entity);
 			return new PackageDTO(entity);
 		}
