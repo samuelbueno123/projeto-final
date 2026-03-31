@@ -49,10 +49,7 @@ public class PackageService {
 	public PackageDTO insert(PackageInsertDTO dto) {
 		Package entity = new Package();
 		packageMapper.copyInsertDtoToEntity(dto, entity);
-		User recipient = userRepository.getReferenceById(dto.recipientId());
-		entity.setRecipient(recipient);
-		Unit unit = unitRepository.getReferenceById(dto.unitId());
-		entity.setUnit(unit);
+		linkAssociations(dto.recipientId(), entity, dto.unitId());
 		entity = packageRepository.save(entity);
 		return new PackageDTO(entity);
 	}
@@ -62,15 +59,19 @@ public class PackageService {
 		try {
 			Package entity = packageRepository.getReferenceById(id);
 			packageMapper.copyUpdateDtoToEntity(dto, entity);
-			User recipient = userRepository.getReferenceById(dto.recipientId());
-			entity.setRecipient(recipient);
-			Unit unit = unitRepository.getReferenceById(dto.unitId());
-			entity.setUnit(unit);
+			linkAssociations(dto.recipientId(), entity, dto.unitId());
 			entity = packageRepository.save(entity);
 			return new PackageDTO(entity);
 		}
 		catch (EntityNotFoundException e) {
 			throw new ResourceNotFoundException("Id " + id + " not found");
 		}
+	}
+
+	private void linkAssociations(Long dto, Package entity, Long dto1) {
+		User recipient = userRepository.getReferenceById(dto);
+		entity.setRecipient(recipient);
+		Unit unit = unitRepository.getReferenceById(dto1);
+		entity.setUnit(unit);
 	}
 }

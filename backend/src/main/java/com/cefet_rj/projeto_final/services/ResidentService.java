@@ -50,10 +50,7 @@ public class ResidentService {
 	public ResidentDTO insert(ResidentInsertDTO dto) {
 		Resident entity = new Resident();
 		residentMapper.copyInsertDtoToEntity(dto, entity);
-		Unit unit = unitRepository.getReferenceById(dto.unitId());
-		entity.setUnit(unit);
-		User user = userRepository.getReferenceById(dto.userId());
-		entity.setUser(user);
+		linkAssociations(dto.unitId(), entity, dto.userId());
 		entity = residentRepository.save(entity);
 		return new ResidentDTO(entity);
 	}
@@ -63,15 +60,19 @@ public class ResidentService {
 		try {
 			Resident entity = residentRepository.getReferenceById(id);
 			residentMapper.copyUpdateDtoToEntity(dto, entity);
-			Unit unit = unitRepository.getReferenceById(dto.unitId());
-			entity.setUnit(unit);
-			User user = userRepository.getReferenceById(dto.userId());
-			entity.setUser(user);
+			linkAssociations(dto.unitId(), entity, dto.userId());
 			entity = residentRepository.save(entity);
 			return new ResidentDTO(entity);
 		}
 		catch (EntityNotFoundException e) {
 			throw new ResourceNotFoundException("Id " + id + " not found");
 		}
+	}
+
+	private void linkAssociations(Long dto, Resident entity, Long dto1) {
+		Unit unit = unitRepository.getReferenceById(dto);
+		entity.setUnit(unit);
+		User user = userRepository.getReferenceById(dto1);
+		entity.setUser(user);
 	}
 }

@@ -47,8 +47,7 @@ public class SectorService {
 	public SectorDTO insert(SectorInsertDTO dto) {
 		Sector entity = new Sector();
 		sectorMapper.copyInsertDtoToEntity(dto, entity);
-		Condominium condominium = condominiumRepository.getReferenceById(dto.condominiumId());
-		entity.setCondominium(condominium);
+		linkAssociations(dto.condominiumId(), entity);
 		entity = sectorRepository.save(entity);
 		return new SectorDTO(entity);
 	}
@@ -58,13 +57,17 @@ public class SectorService {
 		try {
 			Sector entity = sectorRepository.getReferenceById(id);
 			sectorMapper.copyUpdateDtoToEntity(dto, entity);
-			Condominium condominium = condominiumRepository.getReferenceById(dto.condominiumId());
-			entity.setCondominium(condominium);
+			linkAssociations(dto.condominiumId(), entity);
 			entity = sectorRepository.save(entity);
 			return new SectorDTO(entity);
 		}
 		catch (EntityNotFoundException e) {
 			throw new ResourceNotFoundException("Id " + id + " not found");
 		}
+	}
+
+	private void linkAssociations(Long dto, Sector entity) {
+		Condominium condominium = condominiumRepository.getReferenceById(dto);
+		entity.setCondominium(condominium);
 	}
 }

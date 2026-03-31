@@ -47,8 +47,7 @@ public class UnitService {
 	public UnitDTO insert(UnitInsertDTO dto) {
 		Unit entity = new Unit();
 		unitMapper.copyInsertDtoToEntity(dto, entity);
-		Sector sector = sectorRepository.getReferenceById(dto.sectorId());
-		entity.setSector(sector);
+		linkAssociations(dto.sectorId(), entity);
 		entity = unitRepository.save(entity);
 		return new UnitDTO(entity);
 	}
@@ -58,13 +57,17 @@ public class UnitService {
 		try {
 			Unit entity = unitRepository.getReferenceById(id);
 			unitMapper.copyUpdateDtoToEntity(dto, entity);
-			Sector sector = sectorRepository.getReferenceById(dto.sectorId());
-			entity.setSector(sector);
+			linkAssociations(dto.sectorId(), entity);
 			entity = unitRepository.save(entity);
 			return new UnitDTO(entity);
 		}
 		catch (EntityNotFoundException e) {
 			throw new ResourceNotFoundException("Id " + id + " not found");
 		}
+	}
+
+	private void linkAssociations(Long dto, Unit entity) {
+		Sector sector = sectorRepository.getReferenceById(dto);
+		entity.setSector(sector);
 	}
 }
