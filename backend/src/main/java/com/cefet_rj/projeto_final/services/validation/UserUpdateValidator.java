@@ -12,7 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.servlet.HandlerMapping;
 
 import com.cefet_rj.projeto_final.controllers.exceptions.FieldMessage;
-import com.cefet_rj.projeto_final.dtos.UserUpdateDTO;
+import com.cefet_rj.projeto_final.dtos.update.UserUpdateDTO;
 import com.cefet_rj.projeto_final.entities.User;
 import com.cefet_rj.projeto_final.repositories.UserRepository;
 

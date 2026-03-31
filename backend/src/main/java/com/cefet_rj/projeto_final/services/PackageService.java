@@ -1,7 +1,8 @@
 package com.cefet_rj.projeto_final.services;
 
-import com.cefet_rj.projeto_final.dtos.*;
 import com.cefet_rj.projeto_final.dtos.PackageDTO;
+import com.cefet_rj.projeto_final.dtos.insert.PackageInsertDTO;
+import com.cefet_rj.projeto_final.dtos.update.PackageUpdateDTO;
 import com.cefet_rj.projeto_final.entities.*;
 import com.cefet_rj.projeto_final.entities.Package;
 import com.cefet_rj.projeto_final.mapper.PackageMapper;
@@ -61,6 +62,10 @@ public class PackageService {
 		try {
 			Package entity = packageRepository.getReferenceById(id);
 			packageMapper.copyUpdateDtoToEntity(dto, entity);
+			User recipient = userRepository.getReferenceById(dto.recipientId());
+			entity.setRecipient(recipient);
+			Unit unit = unitRepository.getReferenceById(dto.unitId());
+			entity.setUnit(unit);
 			entity = packageRepository.save(entity);
 			return new PackageDTO(entity);
 		}

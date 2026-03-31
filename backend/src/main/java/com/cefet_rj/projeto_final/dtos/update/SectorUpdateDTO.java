@@ -1,14 +1,14 @@
-package com.cefet_rj.projeto_final.dtos;
+package com.cefet_rj.projeto_final.dtos.update;
 
 import com.cefet_rj.projeto_final.entities.Sector;
 
-public record SectorInsertDTO(
+public record SectorUpdateDTO(
         String name,
 		String structuralType,
         Long condominiumId
 ) {
 
-    public SectorInsertDTO(Sector entity) {
+    public SectorUpdateDTO(Sector entity) {
         this(
                 entity.getName(),
 				entity.getStructuralType().toString(),

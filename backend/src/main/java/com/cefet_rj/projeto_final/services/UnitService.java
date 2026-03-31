@@ -1,8 +1,8 @@
 package com.cefet_rj.projeto_final.services;
 
 import com.cefet_rj.projeto_final.dtos.UnitDTO;
-import com.cefet_rj.projeto_final.dtos.UnitInsertDTO;
-import com.cefet_rj.projeto_final.dtos.UnitUpdateDTO;
+import com.cefet_rj.projeto_final.dtos.insert.UnitInsertDTO;
+import com.cefet_rj.projeto_final.dtos.update.UnitUpdateDTO;
 import com.cefet_rj.projeto_final.entities.Sector;
 import com.cefet_rj.projeto_final.entities.Unit;
 import com.cefet_rj.projeto_final.mapper.UnitMapper;
@@ -58,6 +58,8 @@ public class UnitService {
 		try {
 			Unit entity = unitRepository.getReferenceById(id);
 			unitMapper.copyUpdateDtoToEntity(dto, entity);
+			Sector sector = sectorRepository.getReferenceById(dto.sectorId());
+			entity.setSector(sector);
 			entity = unitRepository.save(entity);
 			return new UnitDTO(entity);
 		}

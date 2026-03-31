@@ -1,13 +1,13 @@
-package com.cefet_rj.projeto_final.dtos;
+package com.cefet_rj.projeto_final.dtos.insert;
 
 import com.cefet_rj.projeto_final.entities.Unit;
 
-public record UnitUpdateDTO(
+public record UnitInsertDTO(
 		String identifier,
 		Long sectorId
 ) {
 
-	public UnitUpdateDTO(Unit entity) {
+	public UnitInsertDTO(Unit entity) {
 		this(
 				entity.getIdentifier(),
 				entity.getSector().getId()

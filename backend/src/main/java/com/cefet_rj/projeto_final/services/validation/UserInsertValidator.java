@@ -9,7 +9,7 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import com.cefet_rj.projeto_final.controllers.exceptions.FieldMessage;
-import com.cefet_rj.projeto_final.dtos.UserInsertDTO;
+import com.cefet_rj.projeto_final.dtos.insert.UserInsertDTO;
 import com.cefet_rj.projeto_final.entities.User;
 import com.cefet_rj.projeto_final.repositories.UserRepository;
 

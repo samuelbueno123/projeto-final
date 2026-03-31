@@ -1,10 +1,10 @@
-package com.cefet_rj.projeto_final.dtos;
+package com.cefet_rj.projeto_final.dtos.insert;
 
 import com.cefet_rj.projeto_final.entities.Package;
 
 import java.time.LocalDateTime;
 
-public record PackageUpdateDTO(
+public record PackageInsertDTO(
         String description,
         Long recipientId,
         Long unitId,
@@ -13,7 +13,7 @@ public record PackageUpdateDTO(
         LocalDateTime pickedUpAt
 ) {
 
-    public PackageUpdateDTO(Package entity) {
+    public PackageInsertDTO(Package entity) {
         this(
                 entity.getDescription(),
                 entity.getRecipient().getId(),

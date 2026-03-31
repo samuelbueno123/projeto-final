@@ -1,5 +1,6 @@
-package com.cefet_rj.projeto_final.dtos;
+package com.cefet_rj.projeto_final.dtos.insert;
 
+import com.cefet_rj.projeto_final.dtos.RoleDTO;
 import com.cefet_rj.projeto_final.entities.User;
 import com.cefet_rj.projeto_final.services.validation.UserInsertValid;
 import jakarta.validation.constraints.NotBlank;

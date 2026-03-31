@@ -1,14 +1,21 @@
 package com.cefet_rj.projeto_final.services;
 
 import com.cefet_rj.projeto_final.dtos.ResidentDTO;
+import com.cefet_rj.projeto_final.dtos.insert.ResidentInsertDTO;
+import com.cefet_rj.projeto_final.dtos.update.ResidentUpdateDTO;
 import com.cefet_rj.projeto_final.entities.Resident;
+import com.cefet_rj.projeto_final.entities.Unit;
+import com.cefet_rj.projeto_final.entities.User;
 import com.cefet_rj.projeto_final.mapper.ResidentMapper;
 import com.cefet_rj.projeto_final.repositories.ResidentRepository;
+import com.cefet_rj.projeto_final.repositories.UnitRepository;
+import com.cefet_rj.projeto_final.repositories.UserRepository;
 import com.cefet_rj.projeto_final.services.exceptions.ResourceNotFoundException;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +28,10 @@ public class ResidentService {
     private final ResidentRepository residentRepository;
 
 	private final ResidentMapper residentMapper;
+
+	private final UnitRepository unitRepository;
+
+	private final UserRepository userRepository;
 
 	@Transactional(readOnly = true)
 	public Page<ResidentDTO> findAllPaged(Pageable pageable) {
@@ -36,18 +47,26 @@ public class ResidentService {
 	}
 
 	@Transactional
-	public ResidentDTO insert(ResidentDTO dto) {
+	public ResidentDTO insert(ResidentInsertDTO dto) {
 		Resident entity = new Resident();
-		residentMapper.copyDtoToEntity(dto, entity);
+		residentMapper.copyInsertDtoToEntity(dto, entity);
+		Unit unit = unitRepository.getReferenceById(dto.unitId());
+		entity.setUnit(unit);
+		User user = userRepository.getReferenceById(dto.userId());
+		entity.setUser(user);
 		entity = residentRepository.save(entity);
 		return new ResidentDTO(entity);
 	}
 
 	@Transactional
-	public ResidentDTO update(Long id, ResidentDTO dto){
+	public ResidentDTO update(Long id, ResidentUpdateDTO dto){
 		try {
 			Resident entity = residentRepository.getReferenceById(id);
-			residentMapper.copyDtoToEntity(dto, entity);
+			residentMapper.copyUpdateDtoToEntity(dto, entity);
+			Unit unit = unitRepository.getReferenceById(dto.unitId());
+			entity.setUnit(unit);
+			User user = userRepository.getReferenceById(dto.userId());
+			entity.setUser(user);
 			entity = residentRepository.save(entity);
 			return new ResidentDTO(entity);
 		}

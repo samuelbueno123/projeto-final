@@ -1,8 +1,8 @@
 package com.cefet_rj.projeto_final.mapper;
 
 import com.cefet_rj.projeto_final.dtos.UnitDTO;
-import com.cefet_rj.projeto_final.dtos.UnitInsertDTO;
-import com.cefet_rj.projeto_final.dtos.UnitUpdateDTO;
+import com.cefet_rj.projeto_final.dtos.insert.UnitInsertDTO;
+import com.cefet_rj.projeto_final.dtos.update.UnitUpdateDTO;
 import com.cefet_rj.projeto_final.entities.Unit;
 import org.mapstruct.Mapper;
 import org.mapstruct.MappingTarget;

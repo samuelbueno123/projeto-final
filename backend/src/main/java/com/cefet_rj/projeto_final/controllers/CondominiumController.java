@@ -1,8 +1,8 @@
 package com.cefet_rj.projeto_final.controllers;
 
 import com.cefet_rj.projeto_final.dtos.CondominiumDTO;
-import com.cefet_rj.projeto_final.dtos.CondominiumInsertDTO;
-import com.cefet_rj.projeto_final.dtos.CondominiumUpdateDTO;
+import com.cefet_rj.projeto_final.dtos.insert.CondominiumInsertDTO;
+import com.cefet_rj.projeto_final.dtos.update.CondominiumUpdateDTO;
 import com.cefet_rj.projeto_final.services.CondominiumService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

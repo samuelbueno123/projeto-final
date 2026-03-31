@@ -1,11 +1,12 @@
-package com.cefet_rj.projeto_final.dtos;
+package com.cefet_rj.projeto_final.dtos.insert;
 
+import com.cefet_rj.projeto_final.dtos.SectorDTO;
 import com.cefet_rj.projeto_final.entities.Condominium;
 
 import java.util.Set;
 import java.util.stream.Collectors;
 
-public record CondominiumUpdateDTO(
+public record CondominiumInsertDTO(
         String name,
         String address,
         String billingPlan,
@@ -13,7 +14,7 @@ public record CondominiumUpdateDTO(
         Set<SectorDTO> sectors
 ) {
 
-    public CondominiumUpdateDTO(Condominium entity) {
+    public CondominiumInsertDTO(Condominium entity) {
         this(
                 entity.getName(),
                 entity.getAddress(),

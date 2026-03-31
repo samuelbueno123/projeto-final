@@ -1,8 +1,8 @@
 package com.cefet_rj.projeto_final.dtos;
 
-import com.cefet_rj.projeto_final.entities.CondominiumUser;
+import com.cefet_rj.projeto_final.entities.Membership;
 
-public record CondominiumUserDTO (
+public record MembershipDTO(
 
 		Long id,
 		Long userId,
@@ -11,7 +11,7 @@ public record CondominiumUserDTO (
 
 ) {
 
-	public CondominiumUserDTO(CondominiumUser entity) {
+	public MembershipDTO(Membership entity) {
 		this(
 				entity.getId(),
 				entity.getUser().getId(),

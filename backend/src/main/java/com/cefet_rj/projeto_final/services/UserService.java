@@ -1,8 +1,8 @@
 package com.cefet_rj.projeto_final.services;
 
 import com.cefet_rj.projeto_final.dtos.UserDTO;
-import com.cefet_rj.projeto_final.dtos.UserInsertDTO;
-import com.cefet_rj.projeto_final.dtos.UserUpdateDTO;
+import com.cefet_rj.projeto_final.dtos.insert.UserInsertDTO;
+import com.cefet_rj.projeto_final.dtos.update.UserUpdateDTO;
 import com.cefet_rj.projeto_final.entities.Role;
 import com.cefet_rj.projeto_final.entities.User;
 import com.cefet_rj.projeto_final.mapper.UserMapper;

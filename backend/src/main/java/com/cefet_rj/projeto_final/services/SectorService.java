@@ -1,8 +1,8 @@
 package com.cefet_rj.projeto_final.services;
 
 import com.cefet_rj.projeto_final.dtos.SectorDTO;
-import com.cefet_rj.projeto_final.dtos.SectorInsertDTO;
-import com.cefet_rj.projeto_final.dtos.SectorUpdateDTO;
+import com.cefet_rj.projeto_final.dtos.insert.SectorInsertDTO;
+import com.cefet_rj.projeto_final.dtos.update.SectorUpdateDTO;
 import com.cefet_rj.projeto_final.entities.Condominium;
 import com.cefet_rj.projeto_final.entities.Sector;
 import com.cefet_rj.projeto_final.mapper.SectorMapper;
@@ -58,6 +58,8 @@ public class SectorService {
 		try {
 			Sector entity = sectorRepository.getReferenceById(id);
 			sectorMapper.copyUpdateDtoToEntity(dto, entity);
+			Condominium condominium = condominiumRepository.getReferenceById(dto.condominiumId());
+			entity.setCondominium(condominium);
 			entity = sectorRepository.save(entity);
 			return new SectorDTO(entity);
 		}

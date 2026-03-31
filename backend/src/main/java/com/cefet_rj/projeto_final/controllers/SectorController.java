@@ -1,8 +1,8 @@
 package com.cefet_rj.projeto_final.controllers;
 
 import com.cefet_rj.projeto_final.dtos.SectorDTO;
-import com.cefet_rj.projeto_final.dtos.SectorInsertDTO;
-import com.cefet_rj.projeto_final.dtos.SectorUpdateDTO;
+import com.cefet_rj.projeto_final.dtos.insert.SectorInsertDTO;
+import com.cefet_rj.projeto_final.dtos.update.SectorUpdateDTO;
 import com.cefet_rj.projeto_final.services.SectorService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
