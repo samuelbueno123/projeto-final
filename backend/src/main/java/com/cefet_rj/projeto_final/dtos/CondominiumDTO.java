@@ -1,5 +1,6 @@
 package com.cefet_rj.projeto_final.dtos;
 
+import com.cefet_rj.projeto_final.contracts.BillingPlanInterface;
 import com.cefet_rj.projeto_final.entities.Condominium;
 
 import java.util.Set;
@@ -9,7 +10,7 @@ public record CondominiumDTO(
         Long id,
         String name,
         String address,
-        String billingPlan,
+        BillingPlanInterface billingPlan,
         Boolean isActive,
         Set<SectorDTO> sectors
 ) {
@@ -19,7 +20,7 @@ public record CondominiumDTO(
                 entity.getId(),
                 entity.getName(),
                 entity.getAddress(),
-                entity.getBillingPlan().name(),
+                entity.getBillingPlan(),
                 entity.getIsActive(),
                 entity.getSectors()
                         .stream()

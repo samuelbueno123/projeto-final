@@ -1,6 +1,6 @@
 package com.cefet_rj.projeto_final.entities;
 
-import com.cefet_rj.projeto_final.entities.enums.PackageStatus;
+import com.cefet_rj.projeto_final.entities.enums.Package.PackageStatus;
 import jakarta.persistence.*;
 import lombok.Data;
 
