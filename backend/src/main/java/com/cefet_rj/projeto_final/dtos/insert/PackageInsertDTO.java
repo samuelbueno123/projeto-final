@@ -1,5 +1,6 @@
 package com.cefet_rj.projeto_final.dtos.insert;
 
+import com.cefet_rj.projeto_final.contracts.PackageStatusInterface;
 import com.cefet_rj.projeto_final.entities.Package;
 
 import java.time.LocalDateTime;
@@ -8,7 +9,7 @@ public record PackageInsertDTO(
         String description,
         Long recipientId,
         Long unitId,
-        String status,
+        PackageStatusInterface status,
         LocalDateTime arrivalAt,
         LocalDateTime pickedUpAt
 ) {
@@ -18,7 +19,7 @@ public record PackageInsertDTO(
                 entity.getDescription(),
                 entity.getRecipient().getId(),
                 entity.getUnit().getId(),
-                entity.getStatus().name(),
+                entity.getStatus(),
                 entity.getArrivalAt(),
                 entity.getPickedUpAt()
         );

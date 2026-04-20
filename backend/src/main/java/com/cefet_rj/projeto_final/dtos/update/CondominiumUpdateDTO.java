@@ -1,5 +1,6 @@
 package com.cefet_rj.projeto_final.dtos.update;
 
+import com.cefet_rj.projeto_final.contracts.BillingPlanInterface;
 import com.cefet_rj.projeto_final.dtos.SectorDTO;
 import com.cefet_rj.projeto_final.entities.Condominium;
 
@@ -9,7 +10,7 @@ import java.util.stream.Collectors;
 public record CondominiumUpdateDTO(
         String name,
         String address,
-        String billingPlan,
+        BillingPlanInterface billingPlan,
         Boolean isActive,
         Set<SectorDTO> sectors
 ) {
@@ -18,7 +19,7 @@ public record CondominiumUpdateDTO(
         this(
                 entity.getName(),
                 entity.getAddress(),
-                entity.getBillingPlan().name(),
+                entity.getBillingPlan(),
                 entity.getIsActive(),
                 entity.getSectors()
                         .stream()

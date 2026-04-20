@@ -1,8 +1,10 @@
-package com.cefet_rj.projeto_final.contracts;
+package com.cefet_rj.projeto_final.strategies;
+
+import com.cefet_rj.projeto_final.contracts.BillingPlanInterface;
 
 import java.math.BigDecimal;
 
-public class BASIC implements BillingPlanInterface {
+public class BasicBillingPlan implements BillingPlanInterface {
 
 	@Override
 	public String getPlanName() {

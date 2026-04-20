@@ -1,8 +1,8 @@
 package com.cefet_rj.projeto_final.controllers;
 
-import com.cefet_rj.projeto_final.contracts.BASIC;
+import com.cefet_rj.projeto_final.strategies.BasicBillingPlan;
+import com.cefet_rj.projeto_final.strategies.PremiumBillingPlan;
 import com.cefet_rj.projeto_final.contracts.BillingPlanInterface;
-import com.cefet_rj.projeto_final.contracts.PREMIUM;
 import com.cefet_rj.projeto_final.dtos.CondominiumDTO;
 import com.cefet_rj.projeto_final.services.BillingPlanService;
 import lombok.RequiredArgsConstructor;
@@ -19,8 +19,8 @@ public class BillingPlanController {
 	public ResponseEntity<BillingPlanService> calculate(CondominiumDTO condominiumDTO) {
 
 		BillingPlanInterface billingPlan = switch (condominiumDTO.billingPlan().getPlanName()) {
-			case "BASIC" -> new BASIC();
-			case "PREMIUM" -> new PREMIUM();
+			case "BASIC" -> new BasicBillingPlan();
+			case "PREMIUM" -> new PremiumBillingPlan();
 			default -> throw new IllegalArgumentException("Invalid billing plan: " + condominiumDTO.billingPlan().getPlanName());
 		};
 

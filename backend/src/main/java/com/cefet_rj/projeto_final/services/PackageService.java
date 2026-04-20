@@ -68,6 +68,20 @@ public class PackageService {
 		}
 	}
 
+//	public PackageDTO patch(Long id, PackageUpdateDTO dto) {
+//		try {
+//			Package entity = packageRepository.getReferenceById(id);
+//
+//
+//
+//
+//
+//		}
+//		catch (EntityNotFoundException e) {
+//			throw new ResourceNotFoundException("Id " + id + " not found");
+//		}
+//	}
+
 	private void linkAssociations(Long dto, Package entity, Long dto1) {
 		User recipient = userRepository.getReferenceById(dto);
 		entity.setRecipient(recipient);
