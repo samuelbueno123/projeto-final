@@ -1,6 +1,7 @@
 package com.cefet_rj.projeto_final.entities;
 
 import com.cefet_rj.projeto_final.contracts.BillingPlanInterface;
+import com.cefet_rj.projeto_final.entities.enums.CondominiumBillingPlan;
 import jakarta.persistence.*;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -28,7 +29,8 @@ public class Condominium {
     private String address;
 
     @Column(nullable = false)
-    private BillingPlanInterface billingPlan;
+    @Enumerated(EnumType.STRING)
+    private CondominiumBillingPlan billingPlan;
 
     @Column(nullable = false)
     private Boolean isActive;

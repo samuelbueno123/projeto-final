@@ -18,10 +18,10 @@ public class BillingPlanController {
 
 	public ResponseEntity<BillingPlanService> calculate(CondominiumDTO condominiumDTO) {
 
-		BillingPlanInterface billingPlan = switch (condominiumDTO.billingPlan().getPlanName()) {
+		BillingPlanInterface billingPlan = switch (condominiumDTO.billingPlan().name()) {
 			case "BASIC" -> new BasicBillingPlan();
 			case "PREMIUM" -> new PremiumBillingPlan();
-			default -> throw new IllegalArgumentException("Invalid billing plan: " + condominiumDTO.billingPlan().getPlanName());
+			default -> throw new IllegalArgumentException("Invalid billing plan: " + condominiumDTO.billingPlan().name());
 		};
 
 		return billingPlanService.calculateMonthlyFee(billingPlan);

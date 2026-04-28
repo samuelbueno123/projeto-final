@@ -2,6 +2,7 @@ package com.cefet_rj.projeto_final.states;
 
 import com.cefet_rj.projeto_final.entities.Package;
 import com.cefet_rj.projeto_final.contracts.PackageStatusInterface;
+import com.cefet_rj.projeto_final.entities.enums.PackageStatus;
 
 public class PackageExpectedState implements PackageStatusInterface {
 
@@ -12,7 +13,7 @@ public class PackageExpectedState implements PackageStatusInterface {
 
 	@Override
 	public void raiseToNextState(Package pkg) {
-		pkg.setStatus(new PackagePendingState());
+		pkg.setStatus(PackageStatus.PENDING);
 	}
 
 }

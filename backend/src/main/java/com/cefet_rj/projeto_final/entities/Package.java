@@ -1,6 +1,7 @@
 package com.cefet_rj.projeto_final.entities;
 
 import com.cefet_rj.projeto_final.contracts.PackageStatusInterface;
+import com.cefet_rj.projeto_final.entities.enums.PackageStatus;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.Getter;
@@ -27,7 +28,8 @@ public class Package {
     @JoinColumn(name = "unit_id")
     private Unit unit;
 
-    private PackageStatusInterface status;
+	@Enumerated(EnumType.STRING)
+    private PackageStatus status;
 
     @Column(columnDefinition = "TIMESTAMP WITHOUT TIME ZONE")
     private LocalDateTime arrivalAt;
