@@ -2,6 +2,7 @@ package com.cefet_rj.projeto_final.entities;
 
 import com.cefet_rj.projeto_final.contracts.PackageStatusInterface;
 import com.cefet_rj.projeto_final.entities.enums.PackageStatus;
+import com.cefet_rj.projeto_final.services.PackageStateFactory;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.Getter;
@@ -31,6 +32,11 @@ public class Package {
 	@Enumerated(EnumType.STRING)
     private PackageStatus status;
 
+	public void advanceStatus() {
+		PackageStatusInterface state = PackageStateFactory.getState(this.status);
+		state.raiseToNextState(this);
+	}
+
     @Column(columnDefinition = "TIMESTAMP WITHOUT TIME ZONE")
     private LocalDateTime arrivalAt;
 
@@ -39,11 +45,13 @@ public class Package {
 
     @PrePersist
     public void prePersist() {
-        arrivalAt = LocalDateTime.now();
+		if (this.status == PackageStatus.PENDING) arrivalAt = LocalDateTime.now();
+		else arrivalAt = null;
     }
 
     @PreUpdate
     public void preUpdate(){
-        pickedUpAt = LocalDateTime.now();
+		if (this.status == PackageStatus.PICKED_UP) pickedUpAt = LocalDateTime.now();
+		else pickedUpAt = null;
     }
 }
