@@ -7,7 +7,6 @@ import com.cefet_rj.projeto_final.entities.Condominium;
 import com.cefet_rj.projeto_final.entities.Membership;
 import com.cefet_rj.projeto_final.entities.Role;
 import com.cefet_rj.projeto_final.entities.User;
-import com.cefet_rj.projeto_final.mapper.MembershipMapper;
 import com.cefet_rj.projeto_final.repositories.CondominiumRepository;
 import com.cefet_rj.projeto_final.repositories.MembershipRepository;
 import com.cefet_rj.projeto_final.repositories.RoleRepository;
@@ -27,8 +26,6 @@ import java.util.Optional;
 public class MembershipService {
 
 	private final MembershipRepository membershipRepository;
-
-	private final MembershipMapper membershipMapper;
 
 	private final CondominiumRepository condominiumRepository;
 
@@ -52,7 +49,6 @@ public class MembershipService {
 	@Transactional
 	public MembershipDTO insert(MembershipInsertDTO dto) {
 		Membership entity = new Membership();
-		membershipMapper.copyInsertDtoToEntity(dto, entity);
 		linkAssociations(dto.condominiumId(), entity, dto.authority(), dto.userId());
 		entity = membershipRepository.save(entity);
 		return new MembershipDTO(entity);
@@ -62,7 +58,6 @@ public class MembershipService {
 	public MembershipDTO update(Long id, MembershipUpdateDTO dto){
 		try {
 			Membership entity = membershipRepository.getReferenceById(id);
-			membershipMapper.copyUpdateDtoToEntity(dto, entity);
 			linkAssociations(dto.condominiumId(), entity, dto.authority(), dto.userId());
 			entity = membershipRepository.save(entity);
 			return new MembershipDTO(entity);

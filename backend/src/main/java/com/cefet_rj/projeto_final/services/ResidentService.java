@@ -6,7 +6,7 @@ import com.cefet_rj.projeto_final.dtos.update.ResidentUpdateDTO;
 import com.cefet_rj.projeto_final.entities.Resident;
 import com.cefet_rj.projeto_final.entities.Unit;
 import com.cefet_rj.projeto_final.entities.User;
-import com.cefet_rj.projeto_final.mapper.ResidentMapper;
+import com.cefet_rj.projeto_final.entities.enums.ResidentType;
 import com.cefet_rj.projeto_final.repositories.ResidentRepository;
 import com.cefet_rj.projeto_final.repositories.UnitRepository;
 import com.cefet_rj.projeto_final.repositories.UserRepository;
@@ -15,7 +15,6 @@ import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,8 +25,6 @@ import java.util.Optional;
 public class ResidentService {
 
     private final ResidentRepository residentRepository;
-
-	private final ResidentMapper residentMapper;
 
 	private final UnitRepository unitRepository;
 
@@ -49,8 +46,7 @@ public class ResidentService {
 	@Transactional
 	public ResidentDTO insert(ResidentInsertDTO dto) {
 		Resident entity = new Resident();
-		residentMapper.copyInsertDtoToEntity(dto, entity);
-		linkAssociations(dto.unitId(), entity, dto.userId());
+		linkAssociations(dto.type(), dto.unitId(), dto.userId(), entity);
 		entity = residentRepository.save(entity);
 		return new ResidentDTO(entity);
 	}
@@ -59,8 +55,7 @@ public class ResidentService {
 	public ResidentDTO update(Long id, ResidentUpdateDTO dto){
 		try {
 			Resident entity = residentRepository.getReferenceById(id);
-			residentMapper.copyUpdateDtoToEntity(dto, entity);
-			linkAssociations(dto.unitId(), entity, dto.userId());
+			linkAssociations(dto.type(), dto.unitId(), dto.userId(), entity);
 			entity = residentRepository.save(entity);
 			return new ResidentDTO(entity);
 		}
@@ -69,10 +64,11 @@ public class ResidentService {
 		}
 	}
 
-	private void linkAssociations(Long dto, Resident entity, Long dto1) {
-		Unit unit = unitRepository.getReferenceById(dto);
+	private void linkAssociations(String type, Long unitId, Long userId, Resident entity) {
+		entity.setType(ResidentType.valueOf(type));
+		Unit unit = unitRepository.getReferenceById(unitId);
 		entity.setUnit(unit);
-		User user = userRepository.getReferenceById(dto1);
+		User user = userRepository.getReferenceById(userId);
 		entity.setUser(user);
 	}
 }

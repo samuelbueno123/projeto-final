@@ -4,7 +4,6 @@ import com.cefet_rj.projeto_final.dtos.CondominiumDTO;
 import com.cefet_rj.projeto_final.dtos.insert.CondominiumInsertDTO;
 import com.cefet_rj.projeto_final.dtos.update.CondominiumUpdateDTO;
 import com.cefet_rj.projeto_final.entities.Condominium;
-import com.cefet_rj.projeto_final.mapper.CondominiumMapper;
 import com.cefet_rj.projeto_final.repositories.CondominiumRepository;
 import com.cefet_rj.projeto_final.services.exceptions.ResourceNotFoundException;
 
@@ -24,8 +23,6 @@ public class CondominiumService {
 
     private final CondominiumRepository condominiumRepository;
 
-	private final CondominiumMapper condominiumMapper;
-
     @Transactional(readOnly = true)
     public Page<CondominiumDTO> findAllPaged(Pageable pageable) {
         Page<Condominium> list = condominiumRepository.findAll(pageable);
@@ -42,7 +39,7 @@ public class CondominiumService {
 	@Transactional
 	public CondominiumDTO insert(CondominiumInsertDTO dto) {
 		Condominium entity = new Condominium();
-		condominiumMapper.copyInsertDtoToEntity(dto, entity);
+		linkAssociations(dto.name(), dto.address(), dto.billingPlan(), dto.isActive(), entity);
 		entity = condominiumRepository.save(entity);
 		return new CondominiumDTO(entity);
 	}
@@ -51,12 +48,20 @@ public class CondominiumService {
 	public CondominiumDTO update(Long id, CondominiumUpdateDTO dto){
 		try {
 			Condominium entity = condominiumRepository.getReferenceById(id);
-			condominiumMapper.copyUpdateDtoToEntity(dto, entity);
+			linkAssociations(dto.name(), dto.address(), dto.billingPlan(), dto.isActive(), entity);
 			entity = condominiumRepository.save(entity);
 			return new CondominiumDTO(entity);
 		}
 		catch (EntityNotFoundException e) {
 			throw new ResourceNotFoundException("Id " + id + " not found");
 		}
+	}
+
+	private void linkAssociations(String name, String address, com.cefet_rj.projeto_final.entities.enums.CondominiumBillingPlan billingPlan,
+								  Boolean isActive, Condominium entity) {
+		entity.setName(name);
+		entity.setAddress(address);
+		entity.setBillingPlan(billingPlan);
+		entity.setIsActive(isActive);
 	}
 }
