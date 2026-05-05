@@ -5,7 +5,6 @@ import com.cefet_rj.projeto_final.dtos.insert.UserInsertDTO;
 import com.cefet_rj.projeto_final.dtos.update.UserUpdateDTO;
 import com.cefet_rj.projeto_final.entities.Role;
 import com.cefet_rj.projeto_final.entities.User;
-import com.cefet_rj.projeto_final.mapper.UserMapper;
 import com.cefet_rj.projeto_final.repositories.RoleRepository;
 import com.cefet_rj.projeto_final.repositories.UserRepository;
 import com.cefet_rj.projeto_final.services.exceptions.ResourceNotFoundException;
@@ -24,8 +23,6 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 public class UserService {
-
-	private final UserMapper userMapper;
 
 	private final PasswordEncoder passwordEncoder;
 
@@ -49,7 +46,7 @@ public class UserService {
 	@Transactional
 	public UserDTO insert(UserInsertDTO dto) {
 		User entity = new User();
-		userMapper.copyInsertDtoToEntity(dto, entity);
+		linkAssociations(dto.firstName(), dto.lastName(), dto.email(), entity);
 
 		entity.getRoles().clear();
 		Role role = roleRepository.findByAuthority("ROLE_RESIDENT");
@@ -65,12 +62,18 @@ public class UserService {
 	public UserDTO update(Long id, UserUpdateDTO dto) {
 		try {
 			User entity = userRepository.getReferenceById(id);
-			userMapper.copyUpdateDtoToEntity(dto, entity);
+			linkAssociations(dto.firstName(), dto.lastName(), dto.email(), entity);
 			entity = userRepository.save(entity);
 			return new UserDTO(entity);
 		}
 		catch (EntityNotFoundException e) {
 			throw new ResourceNotFoundException("Id " + id + " not found");
 		}
+	}
+
+	private void linkAssociations(String firstName, String lastName, String email, User entity) {
+		entity.setFirstName(firstName);
+		entity.setLastName(lastName);
+		entity.setEmail(email);
 	}
 }

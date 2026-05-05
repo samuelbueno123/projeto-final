@@ -5,7 +5,7 @@ import com.cefet_rj.projeto_final.dtos.insert.SectorInsertDTO;
 import com.cefet_rj.projeto_final.dtos.update.SectorUpdateDTO;
 import com.cefet_rj.projeto_final.entities.Condominium;
 import com.cefet_rj.projeto_final.entities.Sector;
-import com.cefet_rj.projeto_final.mapper.SectorMapper;
+import com.cefet_rj.projeto_final.entities.enums.SectorStructuralType;
 import com.cefet_rj.projeto_final.repositories.CondominiumRepository;
 import com.cefet_rj.projeto_final.repositories.SectorRepository;
 import com.cefet_rj.projeto_final.services.exceptions.ResourceNotFoundException;
@@ -28,8 +28,6 @@ public class SectorService {
 
 	private final CondominiumRepository condominiumRepository;
 	
-	private final SectorMapper sectorMapper;
-
 	@Transactional(readOnly = true)
 	public Page<SectorDTO> findAllPaged(Pageable pageable) {
 		Page<Sector> list = sectorRepository.findAll(pageable);
@@ -46,8 +44,7 @@ public class SectorService {
 	@Transactional
 	public SectorDTO insert(SectorInsertDTO dto) {
 		Sector entity = new Sector();
-		sectorMapper.copyInsertDtoToEntity(dto, entity);
-		linkAssociations(dto.condominiumId(), entity);
+		linkAssociations(dto.name(), dto.structuralType(), dto.condominiumId(), entity);
 		entity = sectorRepository.save(entity);
 		return new SectorDTO(entity);
 	}
@@ -56,8 +53,7 @@ public class SectorService {
 	public SectorDTO update(Long id, SectorUpdateDTO dto){
 		try {
 			Sector entity = sectorRepository.getReferenceById(id);
-			sectorMapper.copyUpdateDtoToEntity(dto, entity);
-			linkAssociations(dto.condominiumId(), entity);
+			linkAssociations(dto.name(), dto.structuralType(), dto.condominiumId(), entity);
 			entity = sectorRepository.save(entity);
 			return new SectorDTO(entity);
 		}
@@ -66,8 +62,10 @@ public class SectorService {
 		}
 	}
 
-	private void linkAssociations(Long dto, Sector entity) {
-		Condominium condominium = condominiumRepository.getReferenceById(dto);
+	private void linkAssociations(String name, String structuralType, Long condominiumId, Sector entity) {
+		entity.setName(name);
+		entity.setStructuralType(SectorStructuralType.valueOf(structuralType));
+		Condominium condominium = condominiumRepository.getReferenceById(condominiumId);
 		entity.setCondominium(condominium);
 	}
 }
