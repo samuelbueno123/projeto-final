@@ -47,4 +47,10 @@ public class PackageController {
 		PackageDTO newDto = packageService.update(id, dto);
 		return ResponseEntity.ok().body(newDto);
 	}
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable Long id){
+        packageService.delete(id);
+        return ResponseEntity.noContent().build();
+    }
 }

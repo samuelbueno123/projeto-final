@@ -8,12 +8,15 @@ import com.cefet_rj.projeto_final.entities.Package;
 import com.cefet_rj.projeto_final.repositories.PackageRepository;
 import com.cefet_rj.projeto_final.repositories.UnitRepository;
 import com.cefet_rj.projeto_final.repositories.UserRepository;
+import com.cefet_rj.projeto_final.services.exceptions.DatabaseException;
 import com.cefet_rj.projeto_final.services.exceptions.ResourceNotFoundException;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
@@ -27,7 +30,6 @@ public class PackageService {
 	private final UserRepository userRepository;
 
 	private final UnitRepository unitRepository;
-
 
 	@Transactional(readOnly = true)
     public Page<PackageDTO> findAllPaged(Pageable pageable) {
@@ -63,19 +65,18 @@ public class PackageService {
 		}
 	}
 
-//	public PackageDTO patch(Long id, PackageUpdateDTO dto) {
-//		try {
-//			Package entity = packageRepository.getReferenceById(id);
-//
-//
-//
-//
-//
-//		}
-//		catch (EntityNotFoundException e) {
-//			throw new ResourceNotFoundException("Id " + id + " not found");
-//		}
-//	}
+	@Transactional(propagation = Propagation.SUPPORTS)
+	public void delete(Long id) {
+		if (!packageRepository.existsById(id)) {
+			throw new ResourceNotFoundException("Resource not found");
+		}
+		try {
+			packageRepository.deleteById(id);
+		}
+		catch (DataIntegrityViolationException e) {
+			throw new DatabaseException("Integrity violation");
+		}
+	}
 
 	private void linkAssociations(String description, com.cefet_rj.projeto_final.entities.enums.PackageStatus status,
 								  java.time.LocalDateTime arrivalAt, java.time.LocalDateTime pickedUpAt,

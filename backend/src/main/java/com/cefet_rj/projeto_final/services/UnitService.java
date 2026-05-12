@@ -7,14 +7,17 @@ import com.cefet_rj.projeto_final.entities.Sector;
 import com.cefet_rj.projeto_final.entities.Unit;
 import com.cefet_rj.projeto_final.repositories.SectorRepository;
 import com.cefet_rj.projeto_final.repositories.UnitRepository;
+import com.cefet_rj.projeto_final.services.exceptions.DatabaseException;
 import com.cefet_rj.projeto_final.services.exceptions.ResourceNotFoundException;
 
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
@@ -58,6 +61,19 @@ public class UnitService {
 		}
 		catch (EntityNotFoundException e) {
 			throw new ResourceNotFoundException("Id " + id + " not found");
+		}
+	}
+
+	@Transactional(propagation = Propagation.SUPPORTS)
+	public void delete(Long id) {
+		if (!unitRepository.existsById(id)) {
+			throw new ResourceNotFoundException("Resource not found");
+		}
+		try {
+			unitRepository.deleteById(id);
+		}
+		catch (DataIntegrityViolationException e) {
+			throw new DatabaseException("Integrity violation");
 		}
 	}
 

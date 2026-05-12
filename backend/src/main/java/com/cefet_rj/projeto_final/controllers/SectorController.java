@@ -47,4 +47,10 @@ public class SectorController {
 		SectorDTO newDto = sectorService.update(id, dto);
 		return ResponseEntity.ok().body(newDto);
 	}
+
+	@DeleteMapping("/{id}")
+	public ResponseEntity<Void> delete(@PathVariable Long id){
+		sectorService.delete(id);
+		return ResponseEntity.noContent().build();
+	}
 }

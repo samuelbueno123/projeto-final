@@ -2,9 +2,8 @@ package com.cefet_rj.projeto_final.entities;
 
 import com.cefet_rj.projeto_final.contracts.PackageStatusInterface;
 import com.cefet_rj.projeto_final.entities.enums.PackageStatus;
-import com.cefet_rj.projeto_final.services.PackageStateFactory;
+import com.cefet_rj.projeto_final.factories.PackageStateFactory;
 import jakarta.persistence.*;
-import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 

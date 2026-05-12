@@ -47,4 +47,10 @@ public class UnitController {
 		UnitDTO newDto = unitService.update(id, dto);
 		return ResponseEntity.ok().body(newDto);
 	}
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable Long id){
+        unitService.delete(id);
+        return ResponseEntity.noContent().build();
+    }
 }

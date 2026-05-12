@@ -47,4 +47,10 @@ public class MembershipController {
 		MembershipDTO newDto = membershipService.update(id, dto);
 		return ResponseEntity.ok().body(newDto);
 	}
+
+	@DeleteMapping("/{id}")
+	public ResponseEntity<Void> delete(@PathVariable Long id){
+		membershipService.delete(id);
+		return ResponseEntity.noContent().build();
+	}
 }

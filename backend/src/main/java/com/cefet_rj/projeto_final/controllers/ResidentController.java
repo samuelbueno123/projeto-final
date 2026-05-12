@@ -47,4 +47,10 @@ public class ResidentController {
 		ResidentDTO newDto = residentService.update(id, dto);
 		return ResponseEntity.ok().body(newDto);
 	}
+
+	@DeleteMapping("/{id}")
+	public ResponseEntity<Void> delete(@PathVariable Long id){
+		residentService.delete(id);
+		return ResponseEntity.noContent().build();
+	}
 }

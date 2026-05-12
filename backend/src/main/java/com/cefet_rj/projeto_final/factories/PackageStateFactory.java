@@ -1,4 +1,4 @@
-package com.cefet_rj.projeto_final.services;
+package com.cefet_rj.projeto_final.factories;
 
 import com.cefet_rj.projeto_final.contracts.PackageStatusInterface;
 import com.cefet_rj.projeto_final.entities.enums.PackageStatus;
