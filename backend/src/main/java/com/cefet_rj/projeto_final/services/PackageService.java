@@ -5,6 +5,7 @@ import com.cefet_rj.projeto_final.dtos.insert.PackageInsertDTO;
 import com.cefet_rj.projeto_final.dtos.update.PackageUpdateDTO;
 import com.cefet_rj.projeto_final.entities.*;
 import com.cefet_rj.projeto_final.entities.Package;
+import com.cefet_rj.projeto_final.entities.enums.PackageStatus;
 import com.cefet_rj.projeto_final.projections.PackageProjection;
 import com.cefet_rj.projeto_final.repositories.PackageRepository;
 import com.cefet_rj.projeto_final.repositories.UnitRepository;
@@ -84,9 +85,19 @@ public class PackageService {
 
 	@SuppressWarnings(value = "unchecked")
 	@Transactional(readOnly = true)
-	public Page<PackageDTO> findAllPaged(String search, Pageable pageable) {
+	public Page<PackageDTO> findAllPaged(String search, String status, Pageable pageable) {
 
-		Page<PackageProjection> page = packageRepository.searchPackages(search, pageable);
+		PackageStatus packageStatus = null;
+
+		if (!status.isBlank()) {
+			packageStatus = PackageStatus.fromString(status);
+		}
+
+		Page<PackageProjection> page = packageRepository.searchPackages(
+				search,
+				packageStatus == null ? null : packageStatus.name(),
+				pageable
+		);
 
 		List<Long> packageIds = page.map(PackageProjection::getId).toList();
 

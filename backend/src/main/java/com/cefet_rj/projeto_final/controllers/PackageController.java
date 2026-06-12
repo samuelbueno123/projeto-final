@@ -3,6 +3,7 @@ package com.cefet_rj.projeto_final.controllers;
 import com.cefet_rj.projeto_final.dtos.PackageDTO;
 import com.cefet_rj.projeto_final.dtos.insert.PackageInsertDTO;
 import com.cefet_rj.projeto_final.dtos.update.PackageUpdateDTO;
+import com.cefet_rj.projeto_final.entities.enums.PackageStatus;
 import com.cefet_rj.projeto_final.services.PackageService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -24,9 +25,10 @@ public class PackageController {
     @GetMapping
     public ResponseEntity<Page<PackageDTO>> findAll(
             @RequestParam(value = "search", defaultValue = "") String search,
+            @RequestParam(value = "status", defaultValue = "") String status,
             Pageable pageable
     ) {
-        Page<PackageDTO> list = packageService.findAllPaged(search, pageable);
+        Page<PackageDTO> list = packageService.findAllPaged(search, status, pageable);
         return ResponseEntity.ok().body(list);
     }
 
