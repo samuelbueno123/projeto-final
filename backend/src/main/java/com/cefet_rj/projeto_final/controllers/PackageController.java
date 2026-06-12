@@ -22,8 +22,11 @@ public class PackageController {
     private final PackageService packageService;
 
     @GetMapping
-    public ResponseEntity<Page<PackageDTO>> findAll(Pageable pageable){
-        Page<PackageDTO> list = packageService.findAllPaged(pageable);
+    public ResponseEntity<Page<PackageDTO>> findAll(
+            @RequestParam(value = "search", defaultValue = "") String search,
+            Pageable pageable
+    ) {
+        Page<PackageDTO> list = packageService.findAllPaged(search, pageable);
         return ResponseEntity.ok().body(list);
     }
 

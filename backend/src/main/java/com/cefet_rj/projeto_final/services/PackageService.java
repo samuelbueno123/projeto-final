@@ -5,20 +5,24 @@ import com.cefet_rj.projeto_final.dtos.insert.PackageInsertDTO;
 import com.cefet_rj.projeto_final.dtos.update.PackageUpdateDTO;
 import com.cefet_rj.projeto_final.entities.*;
 import com.cefet_rj.projeto_final.entities.Package;
+import com.cefet_rj.projeto_final.projections.PackageProjection;
 import com.cefet_rj.projeto_final.repositories.PackageRepository;
 import com.cefet_rj.projeto_final.repositories.UnitRepository;
 import com.cefet_rj.projeto_final.repositories.UserRepository;
 import com.cefet_rj.projeto_final.services.exceptions.DatabaseException;
 import com.cefet_rj.projeto_final.services.exceptions.ResourceNotFoundException;
+import com.cefet_rj.projeto_final.util.Utils;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -76,6 +80,25 @@ public class PackageService {
 		catch (DataIntegrityViolationException e) {
 			throw new DatabaseException("Integrity violation");
 		}
+	}
+
+	@SuppressWarnings(value = "unchecked")
+	@Transactional(readOnly = true)
+	public Page<PackageDTO> findAllPaged(String search, Pageable pageable) {
+
+		Page<PackageProjection> page = packageRepository.searchPackages(search, pageable);
+
+		List<Long> packageIds = page.map(PackageProjection::getId).toList();
+
+		List<Package> entities = packageRepository.searchPackagesWithRelations(packageIds);
+
+		entities = (List<Package>) Utils.replace(page.getContent(), entities);
+
+		List<PackageDTO> dtos = entities.stream()
+				.map(PackageDTO::new)
+				.toList();
+
+		return new PageImpl<>(dtos, page.getPageable(), page.getTotalElements());
 	}
 
 	private void linkAssociations(String description, com.cefet_rj.projeto_final.entities.enums.PackageStatus status,

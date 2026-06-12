@@ -3,6 +3,7 @@ package com.cefet_rj.projeto_final.entities;
 import com.cefet_rj.projeto_final.contracts.PackageStatusInterface;
 import com.cefet_rj.projeto_final.entities.enums.PackageStatus;
 import com.cefet_rj.projeto_final.factories.PackageStateFactory;
+import com.cefet_rj.projeto_final.projections.IdProjection;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -13,7 +14,7 @@ import java.time.LocalDateTime;
 @Setter
 @Table(name = "tb_package")
 @Entity
-public class Package {
+public class Package implements IdProjection<Long> {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
