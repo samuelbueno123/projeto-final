@@ -1,0 +1,64 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+
+actor "Administrador" as Admin
+actor "Síndico/Gestor" as Manager
+actor "Porteiro" as Doorman
+actor "Morador" as Resident
+actor "Visitante (não autenticado)" as Guest
+
+rectangle "Sistema de Gestão de Condomínio" {
+  usecase "Autenticar\n(obter token OAuth2)" as UCAuth
+  usecase "Cadastrar usuário" as UCRegister
+  usecase "Consultar usuários" as UCUsersRead
+  usecase "Atualizar usuário" as UCUsersUpdate
+
+  usecase "Gerenciar condomínios\n(listar, detalhar, criar, atualizar)" as UCCondo
+  usecase "Gerenciar setores\n(listar, detalhar, criar, atualizar)" as UCSector
+  usecase "Gerenciar unidades\n(listar, detalhar, criar, atualizar)" as UCUnit
+
+  usecase "Gerenciar vínculos\n(condomínio-usuário/role)" as UCMembership
+  usecase "Gerenciar moradores\n(listar, detalhar, criar, atualizar)" as UCResident
+
+  usecase "Gerenciar encomendas\n(listar, detalhar, registrar, atualizar status)" as UCPackage
+  usecase "Calcular mensalidade\n(plano BASIC/PREMIUM)" as UCBilling
+}
+
+Guest --> UCAuth
+Guest --> UCRegister
+
+Admin --> UCAuth
+Admin --> UCUsersRead
+Admin --> UCUsersUpdate
+Admin --> UCCondo
+Admin --> UCSector
+Admin --> UCUnit
+Admin --> UCMembership
+Admin --> UCResident
+Admin --> UCPackage
+Admin --> UCBilling
+
+Manager --> UCAuth
+Manager --> UCUsersRead
+Manager --> UCCondo
+Manager --> UCSector
+Manager --> UCUnit
+Manager --> UCMembership
+Manager --> UCResident
+Manager --> UCPackage
+Manager --> UCBilling
+
+Doorman --> UCAuth
+Doorman --> UCUsersRead
+Doorman --> UCPackage
+
+Resident --> UCAuth
+Resident --> UCUsersRead
+Resident --> UCPackage
+
+UCPackage ..> UCResident : <<include>>
+UCResident ..> UCUnit : <<include>>
+UCMembership ..> UCCondo : <<include>>
+UCMembership ..> UCUsersRead : <<include>>
+@enduml

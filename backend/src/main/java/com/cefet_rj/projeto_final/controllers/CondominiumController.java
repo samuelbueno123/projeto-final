@@ -1,8 +1,8 @@
 package com.cefet_rj.projeto_final.controllers;
 
 import com.cefet_rj.projeto_final.dtos.CondominiumDTO;
-import com.cefet_rj.projeto_final.dtos.CondominiumInsertDTO;
-import com.cefet_rj.projeto_final.dtos.CondominiumUpdateDTO;
+import com.cefet_rj.projeto_final.dtos.insert.CondominiumInsertDTO;
+import com.cefet_rj.projeto_final.dtos.update.CondominiumUpdateDTO;
 import com.cefet_rj.projeto_final.services.CondominiumService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -46,5 +46,11 @@ public class CondominiumController {
 	public ResponseEntity<CondominiumDTO> update(@PathVariable Long id, @Valid @RequestBody CondominiumUpdateDTO dto){
 		CondominiumDTO newDto = condominiumService.update(id, dto);
 		return ResponseEntity.ok().body(newDto);
+	}
+
+	@DeleteMapping("/{id}")
+	public ResponseEntity<Void> delete(@PathVariable Long id){
+		condominiumService.delete(id);
+		return ResponseEntity.noContent().build();
 	}
 }

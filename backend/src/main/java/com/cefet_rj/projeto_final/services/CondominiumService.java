@@ -1,19 +1,21 @@
 package com.cefet_rj.projeto_final.services;
 
 import com.cefet_rj.projeto_final.dtos.CondominiumDTO;
-import com.cefet_rj.projeto_final.dtos.CondominiumInsertDTO;
-import com.cefet_rj.projeto_final.dtos.CondominiumUpdateDTO;
+import com.cefet_rj.projeto_final.dtos.insert.CondominiumInsertDTO;
+import com.cefet_rj.projeto_final.dtos.update.CondominiumUpdateDTO;
 import com.cefet_rj.projeto_final.entities.Condominium;
-import com.cefet_rj.projeto_final.mapper.CondominiumMapper;
 import com.cefet_rj.projeto_final.repositories.CondominiumRepository;
+import com.cefet_rj.projeto_final.services.exceptions.DatabaseException;
 import com.cefet_rj.projeto_final.services.exceptions.ResourceNotFoundException;
 
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
@@ -23,8 +25,6 @@ import java.util.Optional;
 public class CondominiumService {
 
     private final CondominiumRepository condominiumRepository;
-
-	private final CondominiumMapper condominiumMapper;
 
     @Transactional(readOnly = true)
     public Page<CondominiumDTO> findAllPaged(Pageable pageable) {
@@ -42,7 +42,7 @@ public class CondominiumService {
 	@Transactional
 	public CondominiumDTO insert(CondominiumInsertDTO dto) {
 		Condominium entity = new Condominium();
-		condominiumMapper.copyInsertDtoToEntity(dto, entity);
+		linkAssociations(dto.name(), dto.address(), dto.billingPlan(), dto.isActive(), entity);
 		entity = condominiumRepository.save(entity);
 		return new CondominiumDTO(entity);
 	}
@@ -51,12 +51,33 @@ public class CondominiumService {
 	public CondominiumDTO update(Long id, CondominiumUpdateDTO dto){
 		try {
 			Condominium entity = condominiumRepository.getReferenceById(id);
-			condominiumMapper.copyUpdateDtoToEntity(dto, entity);
+			linkAssociations(dto.name(), dto.address(), dto.billingPlan(), dto.isActive(), entity);
 			entity = condominiumRepository.save(entity);
 			return new CondominiumDTO(entity);
 		}
 		catch (EntityNotFoundException e) {
 			throw new ResourceNotFoundException("Id " + id + " not found");
 		}
+	}
+
+	@Transactional(propagation = Propagation.SUPPORTS)
+	public void delete(Long id) {
+		if (!condominiumRepository.existsById(id)) {
+			throw new ResourceNotFoundException("Resource not found");
+		}
+		try {
+			condominiumRepository.deleteById(id);
+		}
+		catch (DataIntegrityViolationException e) {
+			throw new DatabaseException("Integrity violation");
+		}
+	}
+
+	private void linkAssociations(String name, String address, com.cefet_rj.projeto_final.entities.enums.CondominiumBillingPlan billingPlan,
+								  Boolean isActive, Condominium entity) {
+		entity.setName(name);
+		entity.setAddress(address);
+		entity.setBillingPlan(billingPlan);
+		entity.setIsActive(isActive);
 	}
 }

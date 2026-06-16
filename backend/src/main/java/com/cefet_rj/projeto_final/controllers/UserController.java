@@ -1,9 +1,8 @@
 package com.cefet_rj.projeto_final.controllers;
 
 import com.cefet_rj.projeto_final.dtos.UserDTO;
-import com.cefet_rj.projeto_final.dtos.UserInsertDTO;
-import com.cefet_rj.projeto_final.dtos.UserUpdateDTO;
-import com.cefet_rj.projeto_final.entities.User;
+import com.cefet_rj.projeto_final.dtos.insert.UserInsertDTO;
+import com.cefet_rj.projeto_final.dtos.update.UserUpdateDTO;
 import com.cefet_rj.projeto_final.services.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -48,4 +47,10 @@ public class UserController {
 		UserDTO newDto = userService.update(id, dto);
 		return ResponseEntity.ok().body(newDto);
 	}
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable Long id){
+        userService.delete(id);
+        return ResponseEntity.noContent().build();
+    }
 }

@@ -1,6 +1,7 @@
 package com.cefet_rj.projeto_final.controllers.exceptions;
 
 import com.cefet_rj.projeto_final.services.exceptions.DatabaseException;
+import com.cefet_rj.projeto_final.services.exceptions.InvalidStatusException;
 import com.cefet_rj.projeto_final.services.exceptions.ResourceNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
@@ -64,6 +65,24 @@ public class ResourceExceptionHandler {
                 "Validation failed",
                 request.getRequestURI(),
                 errors
+        );
+
+        return ResponseEntity.status(status).body(err);
+    }
+
+    @ExceptionHandler(InvalidStatusException.class)
+    public ResponseEntity<StandardError> invalidStatus(
+            InvalidStatusException e,
+            HttpServletRequest request){
+
+        HttpStatus status = HttpStatus.BAD_REQUEST;
+
+        StandardError err = new StandardError(
+                Instant.now(),
+                status.value(),
+                "Invalid package status",
+                e.getMessage(),
+                request.getRequestURI()
         );
 
         return ResponseEntity.status(status).body(err);

@@ -1,6 +1,8 @@
 package com.cefet_rj.projeto_final.controllers;
 
 import com.cefet_rj.projeto_final.dtos.ResidentDTO;
+import com.cefet_rj.projeto_final.dtos.insert.ResidentInsertDTO;
+import com.cefet_rj.projeto_final.dtos.update.ResidentUpdateDTO;
 import com.cefet_rj.projeto_final.services.ResidentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -32,17 +34,23 @@ public class ResidentController {
 	}
 
 	@PostMapping
-	public ResponseEntity<ResidentDTO> insert(@RequestBody ResidentDTO dto){
-		dto = residentService.insert(dto);
+	public ResponseEntity<ResidentDTO> insert(@RequestBody ResidentInsertDTO dto){
+		ResidentDTO newDto = residentService.insert(dto);
 		URI uri = ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}")
-				.buildAndExpand(dto.id()).toUri();
+				.buildAndExpand(newDto.id()).toUri();
 
-		return ResponseEntity.created(uri).body(dto);
+		return ResponseEntity.created(uri).body(newDto);
 	}
 
 	@PutMapping ("/{id}")
-	public ResponseEntity<ResidentDTO> update(@PathVariable Long id, @Valid @RequestBody ResidentDTO dto){
+	public ResponseEntity<ResidentDTO> update(@PathVariable Long id, @Valid @RequestBody ResidentUpdateDTO dto){
 		ResidentDTO newDto = residentService.update(id, dto);
 		return ResponseEntity.ok().body(newDto);
+	}
+
+	@DeleteMapping("/{id}")
+	public ResponseEntity<Void> delete(@PathVariable Long id){
+		residentService.delete(id);
+		return ResponseEntity.noContent().build();
 	}
 }

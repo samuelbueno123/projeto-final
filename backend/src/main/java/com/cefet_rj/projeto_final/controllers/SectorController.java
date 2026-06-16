@@ -1,8 +1,8 @@
 package com.cefet_rj.projeto_final.controllers;
 
 import com.cefet_rj.projeto_final.dtos.SectorDTO;
-import com.cefet_rj.projeto_final.dtos.SectorInsertDTO;
-import com.cefet_rj.projeto_final.dtos.SectorUpdateDTO;
+import com.cefet_rj.projeto_final.dtos.insert.SectorInsertDTO;
+import com.cefet_rj.projeto_final.dtos.update.SectorUpdateDTO;
 import com.cefet_rj.projeto_final.services.SectorService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -46,5 +46,11 @@ public class SectorController {
 	public ResponseEntity<SectorDTO> update(@PathVariable Long id, @Valid @RequestBody SectorUpdateDTO dto){
 		SectorDTO newDto = sectorService.update(id, dto);
 		return ResponseEntity.ok().body(newDto);
+	}
+
+	@DeleteMapping("/{id}")
+	public ResponseEntity<Void> delete(@PathVariable Long id){
+		sectorService.delete(id);
+		return ResponseEntity.noContent().build();
 	}
 }

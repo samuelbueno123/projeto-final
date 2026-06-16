@@ -1,15 +1,20 @@
 package com.cefet_rj.projeto_final.entities;
 
+import com.cefet_rj.projeto_final.contracts.PackageStatusInterface;
 import com.cefet_rj.projeto_final.entities.enums.PackageStatus;
+import com.cefet_rj.projeto_final.factories.PackageStateFactory;
+import com.cefet_rj.projeto_final.projections.IdProjection;
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
 
-@Data
+@Getter
+@Setter
 @Table(name = "tb_package")
 @Entity
-public class Package {
+public class Package implements IdProjection<Long> {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -24,8 +29,13 @@ public class Package {
     @JoinColumn(name = "unit_id")
     private Unit unit;
 
-    @Enumerated(EnumType.STRING)
+	@Enumerated(EnumType.STRING)
     private PackageStatus status;
+
+	public void advanceStatus() {
+		PackageStatusInterface state = PackageStateFactory.getState(this.status);
+		state.raiseToNextState(this);
+	}
 
     @Column(columnDefinition = "TIMESTAMP WITHOUT TIME ZONE")
     private LocalDateTime arrivalAt;
@@ -35,11 +45,13 @@ public class Package {
 
     @PrePersist
     public void prePersist() {
-        arrivalAt = LocalDateTime.now();
+		if (this.status == PackageStatus.PENDING) arrivalAt = LocalDateTime.now();
+		else arrivalAt = null;
     }
 
     @PreUpdate
     public void preUpdate(){
-        pickedUpAt = LocalDateTime.now();
+		if (this.status == PackageStatus.PICKED_UP) pickedUpAt = LocalDateTime.now();
+		else pickedUpAt = null;
     }
 }

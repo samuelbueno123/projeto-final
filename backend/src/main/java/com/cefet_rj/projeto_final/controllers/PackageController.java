@@ -1,6 +1,9 @@
 package com.cefet_rj.projeto_final.controllers;
 
 import com.cefet_rj.projeto_final.dtos.PackageDTO;
+import com.cefet_rj.projeto_final.dtos.insert.PackageInsertDTO;
+import com.cefet_rj.projeto_final.dtos.update.PackageUpdateDTO;
+import com.cefet_rj.projeto_final.entities.enums.PackageStatus;
 import com.cefet_rj.projeto_final.services.PackageService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,8 +23,12 @@ public class PackageController {
     private final PackageService packageService;
 
     @GetMapping
-    public ResponseEntity<Page<PackageDTO>> findAll(Pageable pageable){
-        Page<PackageDTO> list = packageService.findAllPaged(pageable);
+    public ResponseEntity<Page<PackageDTO>> findAll(
+            @RequestParam(value = "search", defaultValue = "") String search,
+            @RequestParam(value = "status", defaultValue = "") String status,
+            Pageable pageable
+    ) {
+        Page<PackageDTO> list = packageService.findAllPaged(search, status, pageable);
         return ResponseEntity.ok().body(list);
     }
 
@@ -32,17 +39,23 @@ public class PackageController {
     }
 
     @PostMapping
-    public ResponseEntity<PackageDTO> insert(@RequestBody PackageDTO dto){
-        dto = packageService.insert(dto);
+    public ResponseEntity<PackageDTO> insert(@RequestBody PackageInsertDTO dto){
+        PackageDTO newDto = packageService.insert(dto);
         URI uri = ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}")
-                .buildAndExpand(dto.id()).toUri();
+                .buildAndExpand(newDto.id()).toUri();
 
-        return ResponseEntity.created(uri).body(dto);
+        return ResponseEntity.created(uri).body(newDto);
     }
 
 	@PutMapping ("/{id}")
-	public ResponseEntity<PackageDTO> update(@PathVariable Long id, @Valid @RequestBody PackageDTO dto){
+	public ResponseEntity<PackageDTO> update(@PathVariable Long id, @Valid @RequestBody PackageUpdateDTO dto){
 		PackageDTO newDto = packageService.update(id, dto);
 		return ResponseEntity.ok().body(newDto);
 	}
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable Long id){
+        packageService.delete(id);
+        return ResponseEntity.noContent().build();
+    }
 }
