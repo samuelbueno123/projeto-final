@@ -52,7 +52,7 @@ public class PackageService {
 	@Transactional
 	public PackageDTO insert(PackageInsertDTO dto) {
 		Package entity = new Package();
-		linkAssociations(dto.description(), dto.status(), dto.arrivalAt(), dto.pickedUpAt(), dto.recipientId(), dto.unitId(), entity);
+		linkAssociations(dto.description(), dto.status(), dto.arrivalAt(), dto.pickedUpAt(), dto.recipientId(), dto.unitId(), dto.marketplaceCode(), dto.marketplaceOrderId(), entity);
 		entity = packageRepository.save(entity);
 		return new PackageDTO(entity);
 	}
@@ -61,7 +61,7 @@ public class PackageService {
 	public PackageDTO update(Long id, PackageUpdateDTO dto){
 		try {
 			Package entity = packageRepository.getReferenceById(id);
-			linkAssociations(dto.description(), dto.status(), dto.arrivalAt(), dto.pickedUpAt(), dto.recipientId(), dto.unitId(), entity);
+			linkAssociations(dto.description(), dto.status(), dto.arrivalAt(), dto.pickedUpAt(), dto.recipientId(), dto.unitId(), dto.marketplaceCode(), dto.marketplaceOrderId(), entity);
 			entity = packageRepository.save(entity);
 			return new PackageDTO(entity);
 		}
@@ -114,11 +114,13 @@ public class PackageService {
 
 	private void linkAssociations(String description, com.cefet_rj.projeto_final.entities.enums.PackageStatus status,
 								  java.time.LocalDateTime arrivalAt, java.time.LocalDateTime pickedUpAt,
-								  Long recipientId, Long unitId, Package entity) {
+								  Long recipientId, Long unitId, String marketplaceCode, String marketplaceOrderId, Package entity) {
 		entity.setDescription(description);
 		entity.setStatus(status);
 		entity.setArrivalAt(arrivalAt);
 		entity.setPickedUpAt(pickedUpAt);
+		entity.setMarketplaceCode(marketplaceCode);
+		entity.setMarketplaceOrderId(marketplaceOrderId);
 		User recipient = userRepository.getReferenceById(recipientId);
 		entity.setRecipient(recipient);
 		Unit unit = unitRepository.getReferenceById(unitId);

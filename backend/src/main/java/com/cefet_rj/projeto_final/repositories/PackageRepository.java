@@ -11,6 +11,8 @@ import java.util.List;
 
 public interface PackageRepository extends JpaRepository<Package, Long> {
 
+    boolean existsByMarketplaceCodeAndMarketplaceOrderId(String marketplaceCode, String marketplaceOrderId);
+
     @Query(nativeQuery = true, value = """
     SELECT * FROM (
         SELECT DISTINCT tb_package.id

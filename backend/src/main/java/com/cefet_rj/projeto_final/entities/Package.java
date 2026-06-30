@@ -12,7 +12,9 @@ import java.time.LocalDateTime;
 
 @Getter
 @Setter
-@Table(name = "tb_package")
+@Table(name = "tb_package", uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"marketplace_code", "marketplace_order_id"})
+})
 @Entity
 public class Package implements IdProjection<Long> {
 
@@ -20,6 +22,10 @@ public class Package implements IdProjection<Long> {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String description;
+
+    private String marketplaceCode;
+
+    private String marketplaceOrderId;
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "recipient_id")
