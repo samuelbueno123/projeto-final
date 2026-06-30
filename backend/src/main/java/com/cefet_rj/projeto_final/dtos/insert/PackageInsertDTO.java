@@ -12,7 +12,9 @@ public record PackageInsertDTO(
         Long unitId,
         PackageStatus status,
         LocalDateTime arrivalAt,
-        LocalDateTime pickedUpAt
+        LocalDateTime pickedUpAt,
+        String marketplaceCode,
+        String marketplaceOrderId
 ) {
 
     public PackageInsertDTO(Package entity) {
@@ -22,7 +24,9 @@ public record PackageInsertDTO(
                 entity.getUnit().getId(),
                 entity.getStatus(),
                 entity.getArrivalAt(),
-                entity.getPickedUpAt()
+                entity.getPickedUpAt(),
+                entity.getMarketplaceCode(),
+                entity.getMarketplaceOrderId()
         );
     }
 }
