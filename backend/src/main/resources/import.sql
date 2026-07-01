@@ -85,12 +85,12 @@ INSERT INTO tb_resident (user_id, unit_id, type) VALUES (9, 29, 'OWNER');
 INSERT INTO tb_resident (user_id, unit_id, type) VALUES (10, 31, 'TENANT');
 
 -- PACKAGE
-INSERT INTO tb_package (description, status, recipient_id, unit_id, arrival_at) VALUES ('Amazon - TV 50"', 'PENDING', 3, 3, CURRENT_TIMESTAMP);
-INSERT INTO tb_package (description, status, recipient_id, unit_id, arrival_at) VALUES ('Mercado Livre - Notebook', 'PENDING', 4,27, CURRENT_TIMESTAMP);
-INSERT INTO tb_package (description, status, recipient_id, unit_id, arrival_at) VALUES ('Shopee - Headset Gamer', 'PENDING', 7, 5, CURRENT_TIMESTAMP);
-INSERT INTO tb_package (description, status, recipient_id, unit_id, arrival_at) VALUES ('Amazon - Livro Clean Architecture', 'PENDING', 8, 14, CURRENT_TIMESTAMP);
-INSERT INTO tb_package (description, status, recipient_id, unit_id, arrival_at) VALUES ('Magazine Luiza - Geladeira', 'PENDING', 9, 29, CURRENT_TIMESTAMP);
-INSERT INTO tb_package (description, status, recipient_id, unit_id, arrival_at) VALUES ('Mercado Livre - Monitor 27"', 'PENDING', 10, 31, CURRENT_TIMESTAMP);
+INSERT INTO tb_package (description, status, recipient_id, unit_id, received_at) VALUES ('Amazon - TV 50"', 'RECEIVED', 3, 3, CURRENT_TIMESTAMP);
+INSERT INTO tb_package (description, status, recipient_id, unit_id, received_at) VALUES ('Mercado Livre - Notebook', 'RECEIVED', 4, 27, CURRENT_TIMESTAMP);
+INSERT INTO tb_package (description, status, recipient_id, unit_id, received_at) VALUES ('Shopee - Headset Gamer', 'RECEIVED', 7, 5, CURRENT_TIMESTAMP);
+INSERT INTO tb_package (description, status, recipient_id, unit_id, received_at) VALUES ('Amazon - Livro Clean Architecture', 'RECEIVED', 8, 14, CURRENT_TIMESTAMP);
+INSERT INTO tb_package (description, status, recipient_id, unit_id, received_at) VALUES ('Magazine Luiza - Geladeira', 'RECEIVED', 9, 29, CURRENT_TIMESTAMP);
+INSERT INTO tb_package (description, status, recipient_id, unit_id, received_at) VALUES ('Mercado Livre - Monitor 27"', 'RECEIVED', 10, 31, CURRENT_TIMESTAMP);
 
 -- CONDOMINIUM_USER
 INSERT INTO tb_condominium_user (user_id, condominium_id, role_id) VALUES (2, 1, 2);
