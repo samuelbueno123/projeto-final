@@ -8,28 +8,21 @@ import com.cefet_rj.projeto_final.packages.dtos.PackageInsertDTO;
 import com.cefet_rj.projeto_final.packages.dtos.PackageUpdateDTO;
 import com.cefet_rj.projeto_final.packages.entities.Package;
 import com.cefet_rj.projeto_final.packages.enums.PackageStatus;
-import com.cefet_rj.projeto_final.packages.projections.PackageProjection;
 import com.cefet_rj.projeto_final.packages.repositories.PackageRepository;
 import com.cefet_rj.projeto_final.condominiums.repositories.UnitRepository;
 import com.cefet_rj.projeto_final.users.repositories.UserRepository;
 import com.cefet_rj.projeto_final.shared.exceptions.DatabaseException;
 import com.cefet_rj.projeto_final.shared.exceptions.InvalidPackageStateTransitionException;
 import com.cefet_rj.projeto_final.shared.exceptions.ResourceNotFoundException;
-import com.cefet_rj.projeto_final.shared.util.Utils;
 import com.cefet_rj.projeto_final.users.entities.User;
-import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -47,8 +40,11 @@ public class PackageService {
 
     @Transactional(readOnly = true)
     public PackageDTO findById(Long id) {
-        Optional<Package> obj = packageRepository.findById(id);
-        Package entity = obj.orElseThrow(() -> new ResourceNotFoundException("Entity not found"));
+        Package entity = packageRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Package not found"));
+
+        validatePackageAccess(entity);
+
         return new PackageDTO(entity);
     }
 
@@ -98,6 +94,8 @@ public class PackageService {
         Package entity = packageRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Package not found"));
 
+        validatePackageAccess(entity);
+
         changeStatus(entity, PackageStatus.RECEIVED);
         entity.setReceivedAt(LocalDateTime.now());
 
@@ -108,6 +106,8 @@ public class PackageService {
     public PackageDTO notify(Long id) {
         Package entity = packageRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Package not found"));
+
+        validatePackageAccess(entity);
 
         changeStatus(entity, PackageStatus.NOTIFIED);
         entity.setNotifiedAt(LocalDateTime.now());
@@ -120,6 +120,8 @@ public class PackageService {
         Package entity = packageRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Package not found"));
 
+        validatePackageAccess(entity);
+
         changeStatus(entity, PackageStatus.PICKED_UP);
         entity.setPickedUpAt(LocalDateTime.now());
 
@@ -130,6 +132,8 @@ public class PackageService {
     public PackageDTO cancel(Long id) {
         Package entity = packageRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Package not found"));
+
+        validatePackageAccess(entity);
 
         changeStatus(entity, PackageStatus.CANCELLED);
         entity.setCancelledAt(LocalDateTime.now());
@@ -142,72 +146,47 @@ public class PackageService {
         Package entity = packageRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Package not found"));
 
+        validatePackageAccess(entity);
+
         changeStatus(entity, PackageStatus.RETURNED);
         entity.setReturnedAt(LocalDateTime.now());
 
         return new PackageDTO(entity);
     }
 
-	@Transactional
-	public PackageDTO update(Long id, PackageUpdateDTO dto){
-		try {
+    @Transactional
+    public PackageDTO update(Long id, PackageUpdateDTO dto) {
+        Package entity = packageRepository.findById(id)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Package not found: " + id));
+
+        validatePackageAccess(entity);
+
+        linkAssociations(
+                dto.description(),
+                dto.recipientId(),
+                dto.unitId(),
+                entity
+        );
+
+        return new PackageDTO(entity);
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        try {
             Package entity = packageRepository.findById(id)
-                    .orElseThrow(() -> new ResourceNotFoundException("Package not found"));
+                    .orElseThrow(() ->
+                            new ResourceNotFoundException("Package not found: " + id));
 
-			linkAssociations(dto.description(), dto.recipientId(), dto.unitId(), entity);
-			entity = packageRepository.save(entity);
-			return new PackageDTO(entity);
-		}
-		catch (EntityNotFoundException e) {
-			throw new ResourceNotFoundException("Id " + id + " not found");
-		}
-	}
+            validatePackageAccess(entity);
 
-	@Transactional(propagation = Propagation.SUPPORTS)
-	public void delete(Long id) {
-		if (!packageRepository.existsById(id)) {
-			throw new ResourceNotFoundException("Resource not found");
-		}
-		try {
-			packageRepository.deleteById(id);
-		}
-		catch (DataIntegrityViolationException e) {
-			throw new DatabaseException("Integrity violation");
-		}
-	}
-
-	@SuppressWarnings(value = "unchecked")
-	@Transactional(readOnly = true)
-	public Page<PackageDTO> findAllPaged(String search, String status, Pageable pageable) {
-
-		PackageStatus packageStatus = null;
-
-		if (!status.isBlank()) {
-			packageStatus = PackageStatus.fromString(status);
-		}
-
-		Page<PackageProjection> page = packageRepository.searchPackages(
-				search,
-				packageStatus == null ? null : packageStatus.name(),
-				pageable
-		);
-
-        List<Long> packageIds = page.map(PackageProjection::getId).toList();
-
-        if (packageIds.isEmpty()) {
-            return Page.empty(pageable);
+            packageRepository.delete(entity);
         }
-
-        List<Package> entities = packageRepository.searchPackagesWithRelations(packageIds);
-
-		entities = (List<Package>) Utils.replace(page.getContent(), entities);
-
-		List<PackageDTO> dtos = entities.stream()
-				.map(PackageDTO::new)
-				.toList();
-
-		return new PageImpl<>(dtos, page.getPageable(), page.getTotalElements());
-	}
+        catch (DataIntegrityViolationException e) {
+            throw new DatabaseException("Integrity violation");
+        }
+    }
 
     @Transactional(readOnly = true)
     public Page<PackageDTO> findAllPagedByCondominium(
@@ -253,20 +232,62 @@ public class PackageService {
         return page.map(PackageDTO::new);
     }
 
-	private void linkAssociations(
+    private void validatePackageAccess(Package packageEntity) {
+        User authenticatedUser = authenticatedUserService.getAuthenticatedUser();
+
+        if (authenticatedUser.hasRole("ROLE_ADMIN")) {
+            return;
+        }
+
+        Long condominiumId = packageEntity
+                .getUnit()
+                .getSector()
+                .getCondominium()
+                .getId();
+
+        condominiumAccessService.validateUserBelongsToCondominium(
+                authenticatedUser.getId(),
+                condominiumId
+        );
+    }
+
+    private void validateUnitAccess(Unit unit) {
+        User authenticatedUser = authenticatedUserService.getAuthenticatedUser();
+
+        if (authenticatedUser.hasRole("ROLE_ADMIN")) {
+            return;
+        }
+
+        Long condominiumId = unit
+                .getSector()
+                .getCondominium()
+                .getId();
+
+        condominiumAccessService.validateUserBelongsToCondominium(
+                authenticatedUser.getId(),
+                condominiumId
+        );
+    }
+
+    private void linkAssociations(
             String description,
-			Long recipientId,
+            Long recipientId,
             Long unitId,
             Package entity
     ) {
-		entity.setDescription(description);
+        entity.setDescription(description);
 
         User recipient = userRepository.findById(recipientId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + recipientId));
-        entity.setRecipient(recipient);
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("User not found: " + recipientId));
 
         Unit unit = unitRepository.findById(unitId)
-                .orElseThrow(() -> new ResourceNotFoundException("Unit not found: " + unitId));
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Unit not found: " + unitId));
+
+        validateUnitAccess(unit);
+
+        entity.setRecipient(recipient);
         entity.setUnit(unit);
-	}
+    }
 }
