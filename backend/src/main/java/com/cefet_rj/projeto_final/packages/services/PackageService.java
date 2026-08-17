@@ -8,6 +8,7 @@ import com.cefet_rj.projeto_final.packages.dtos.PackageInsertDTO;
 import com.cefet_rj.projeto_final.packages.dtos.PackageUpdateDTO;
 import com.cefet_rj.projeto_final.packages.entities.Package;
 import com.cefet_rj.projeto_final.packages.enums.PackageStatus;
+import com.cefet_rj.projeto_final.packages.events.PackageStatusChangedEvent;
 import com.cefet_rj.projeto_final.packages.history.services.PackageHistoryService;
 import com.cefet_rj.projeto_final.packages.repositories.PackageRepository;
 import com.cefet_rj.projeto_final.condominiums.repositories.UnitRepository;
@@ -17,6 +18,7 @@ import com.cefet_rj.projeto_final.shared.exceptions.InvalidPackageStateTransitio
 import com.cefet_rj.projeto_final.shared.exceptions.ResourceNotFoundException;
 import com.cefet_rj.projeto_final.users.entities.User;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -30,16 +32,12 @@ import java.time.LocalDateTime;
 public class PackageService {
 
 	private final PackageRepository packageRepository;
-
 	private final UserRepository userRepository;
-
 	private final UnitRepository unitRepository;
-
     private final AuthenticatedUserService authenticatedUserService;
-
     private final CondominiumAccessService condominiumAccessService;
-
     private final PackageHistoryService packageHistoryService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional(readOnly = true)
     public PackageDTO findById(Long id) {
@@ -56,6 +54,7 @@ public class PackageService {
             PackageStatus nextStatus,
             String notes
     ) {
+
         PackageStatus currentStatus = entity.getStatus();
 
         if (currentStatus == null) {
@@ -80,6 +79,12 @@ public class PackageService {
                 currentStatus,
                 nextStatus,
                 notes
+        );
+
+        publishStatusChangedEvent(
+                entity,
+                currentStatus,
+                nextStatus
         );
     }
 
@@ -306,6 +311,31 @@ public class PackageService {
                 authenticatedUser.getId(),
                 condominiumId
         );
+    }
+
+    private void publishStatusChangedEvent(
+            Package entity,
+            PackageStatus previousStatus,
+            PackageStatus newStatus
+    ) {
+
+        Long condominiumId = entity
+                .getUnit()
+                .getSector()
+                .getCondominium()
+                .getId();
+
+        PackageStatusChangedEvent event =
+                new PackageStatusChangedEvent(
+                        entity.getId(),
+                        entity.getRecipient().getId(),
+                        condominiumId,
+                        previousStatus,
+                        newStatus,
+                        LocalDateTime.now()
+                );
+
+        eventPublisher.publishEvent(event);
     }
 
     private void linkAssociations(
