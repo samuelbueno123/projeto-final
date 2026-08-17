@@ -8,6 +8,7 @@ import com.cefet_rj.projeto_final.packages.dtos.PackageInsertDTO;
 import com.cefet_rj.projeto_final.packages.dtos.PackageUpdateDTO;
 import com.cefet_rj.projeto_final.packages.entities.Package;
 import com.cefet_rj.projeto_final.packages.enums.PackageStatus;
+import com.cefet_rj.projeto_final.packages.history.services.PackageHistoryService;
 import com.cefet_rj.projeto_final.packages.repositories.PackageRepository;
 import com.cefet_rj.projeto_final.condominiums.repositories.UnitRepository;
 import com.cefet_rj.projeto_final.users.repositories.UserRepository;
@@ -38,6 +39,8 @@ public class PackageService {
 
     private final CondominiumAccessService condominiumAccessService;
 
+    private final PackageHistoryService packageHistoryService;
+
     @Transactional(readOnly = true)
     public PackageDTO findById(Long id) {
         Package entity = packageRepository.findById(id)
@@ -48,20 +51,36 @@ public class PackageService {
         return new PackageDTO(entity);
     }
 
-    private void changeStatus(Package entity, PackageStatus nextStatus) {
+    private void changeStatus(
+            Package entity,
+            PackageStatus nextStatus,
+            String notes
+    ) {
         PackageStatus currentStatus = entity.getStatus();
 
         if (currentStatus == null) {
-            throw new InvalidPackageStateTransitionException("Package has no current status");
+            throw new InvalidPackageStateTransitionException(
+                    "Package has no current status"
+            );
         }
 
         if (!currentStatus.canChangeTo(nextStatus)) {
             throw new InvalidPackageStateTransitionException(
-                    "Invalid package status transition from " + currentStatus + " to " + nextStatus
+                    "Invalid package status transition from "
+                            + currentStatus
+                            + " to "
+                            + nextStatus
             );
         }
 
         entity.setStatus(nextStatus);
+
+        packageHistoryService.registerUserAction(
+                entity,
+                currentStatus,
+                nextStatus,
+                notes
+        );
     }
 
     @Transactional
@@ -96,7 +115,11 @@ public class PackageService {
 
         validatePackageAccess(entity);
 
-        changeStatus(entity, PackageStatus.RECEIVED);
+        changeStatus(
+                entity,
+                PackageStatus.RECEIVED,
+                "Package received at condominium"
+        );
         entity.setReceivedAt(LocalDateTime.now());
 
         return new PackageDTO(entity);
@@ -109,7 +132,11 @@ public class PackageService {
 
         validatePackageAccess(entity);
 
-        changeStatus(entity, PackageStatus.NOTIFIED);
+        changeStatus(
+                entity,
+                PackageStatus.NOTIFIED,
+                "Resident notified about package"
+        );
         entity.setNotifiedAt(LocalDateTime.now());
 
         return new PackageDTO(entity);
@@ -122,7 +149,11 @@ public class PackageService {
 
         validatePackageAccess(entity);
 
-        changeStatus(entity, PackageStatus.PICKED_UP);
+        changeStatus(
+                entity,
+                PackageStatus.PICKED_UP,
+                "Package picked up"
+        );
         entity.setPickedUpAt(LocalDateTime.now());
 
         return new PackageDTO(entity);
@@ -135,7 +166,11 @@ public class PackageService {
 
         validatePackageAccess(entity);
 
-        changeStatus(entity, PackageStatus.CANCELLED);
+        changeStatus(
+                entity,
+                PackageStatus.CANCELLED,
+                "Expected package cancelled"
+        );
         entity.setCancelledAt(LocalDateTime.now());
 
         return new PackageDTO(entity);
@@ -148,7 +183,11 @@ public class PackageService {
 
         validatePackageAccess(entity);
 
-        changeStatus(entity, PackageStatus.RETURNED);
+        changeStatus(
+                entity,
+                PackageStatus.RETURNED,
+                "Package returned"
+        );
         entity.setReturnedAt(LocalDateTime.now());
 
         return new PackageDTO(entity);
