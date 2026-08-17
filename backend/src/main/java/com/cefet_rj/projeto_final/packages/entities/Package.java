@@ -1,10 +1,8 @@
 package com.cefet_rj.projeto_final.packages.entities;
 
-import com.cefet_rj.projeto_final.packages.contracts.PackageStatusInterface;
 import com.cefet_rj.projeto_final.condominiums.entities.Unit;
 import com.cefet_rj.projeto_final.users.entities.User;
 import com.cefet_rj.projeto_final.packages.enums.PackageStatus;
-import com.cefet_rj.projeto_final.packages.factories.PackageStateFactory;
 import com.cefet_rj.projeto_final.shared.projections.IdProjection;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -33,11 +31,6 @@ public class Package implements IdProjection<Long> {
 
 	@Enumerated(EnumType.STRING)
     private PackageStatus status;
-
-	public void advanceStatus() {
-		PackageStatusInterface state = PackageStateFactory.getState(this.status);
-		state.raiseToNextState(this);
-	}
 
     @Column(columnDefinition = "TIMESTAMP WITHOUT TIME ZONE")
     private LocalDateTime receivedAt;
