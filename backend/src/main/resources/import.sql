@@ -1,15 +1,35 @@
-
-
 -- ROLES
 INSERT INTO tb_role (authority) VALUES ('ROLE_ADMIN');
 INSERT INTO tb_role (authority) VALUES ('ROLE_MANAGER');
 INSERT INTO tb_role (authority) VALUES ('ROLE_RESIDENT');
 INSERT INTO tb_role (authority) VALUES ('ROLE_DOORMAN');
 
--- CONDOMINIOS
-INSERT INTO tb_condominium (name, address, billing_plan, is_active) VALUES ('Vila Angela', 'Rua Principal, 100', 'BASIC', true);
-INSERT INTO tb_condominium (name, address, billing_plan, is_active) VALUES ('Agora Nova Iguacu', 'Av Central, 200', 'PREMIUM', true);
+-- FEATURES
+INSERT INTO tb_feature (code, name, description) VALUES ('PACKAGES', 'Encomendas', 'Gerenciamento de encomendas');
+INSERT INTO tb_feature (code, name, description) VALUES ('NOTIFICATIONS', 'Notificações', 'Notificações internas para moradores');
+INSERT INTO tb_feature (code, name, description) VALUES ('ANNOUNCEMENTS', 'Comunicados', 'Comunicados do condomínio');
+INSERT INTO tb_feature (code, name, description) VALUES ('RESERVATIONS', 'Reservas', 'Reserva de áreas comuns');
+INSERT INTO tb_feature (code, name, description) VALUES ('REPORTS', 'Relatórios', 'Relatórios gerenciais');
+INSERT INTO tb_feature (code, name, description) VALUES ('MARKETPLACE_INTEGRATION', 'Integrações Marketplace', 'Integrações com marketplaces');
 
+-- BILLING PLANS
+INSERT INTO tb_billing_plan (name, monthly_fee, active) VALUES ('BASIC', 99.90, true);
+INSERT INTO tb_billing_plan (name, monthly_fee, active) VALUES ('PREMIUM', 199.90, true);
+
+-- BASIC FEATURES
+INSERT INTO tb_billing_plan_feature (billing_plan_id, feature_id) VALUES (1, 1);
+
+-- PREMIUM FEATURES
+INSERT INTO tb_billing_plan_feature (billing_plan_id, feature_id) VALUES (2, 1);
+INSERT INTO tb_billing_plan_feature (billing_plan_id, feature_id) VALUES (2, 2);
+INSERT INTO tb_billing_plan_feature (billing_plan_id, feature_id) VALUES (2, 3);
+INSERT INTO tb_billing_plan_feature (billing_plan_id, feature_id) VALUES (2, 4);
+INSERT INTO tb_billing_plan_feature (billing_plan_id, feature_id) VALUES (2, 5);
+INSERT INTO tb_billing_plan_feature (billing_plan_id, feature_id) VALUES (2, 6);
+
+-- CONDOMINIOS
+INSERT INTO tb_condominium (name, address, billing_plan_id, is_active) VALUES ('Vila Angela', 'Rua Principal, 100', 1, true);
+INSERT INTO tb_condominium (name, address, billing_plan_id, is_active) VALUES ('Agora Nova Iguacu', 'Av Central, 200', 2, true);
 -- SETORES
 INSERT INTO tb_sector (name, structural_type, condominium_id) VALUES ('Rua 1', 'STREET', 1);
 INSERT INTO tb_sector (name, structural_type, condominium_id) VALUES ('Rua 2', 'STREET', 1);

@@ -1,6 +1,6 @@
 package com.cefet_rj.projeto_final.condominiums.entities;
 
-import com.cefet_rj.projeto_final.billing.enums.CondominiumBillingPlan;
+import com.cefet_rj.projeto_final.billing.entities.BillingPlan;
 import jakarta.persistence.*;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -27,9 +27,9 @@ public class Condominium {
     @Column(nullable = false)
     private String address;
 
-    @Column(nullable = false)
-    @Enumerated(EnumType.STRING)
-    private CondominiumBillingPlan billingPlan;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "billing_plan_id", nullable = false)
+    private BillingPlan billingPlan;
 
     @Column(nullable = false)
     private Boolean isActive;

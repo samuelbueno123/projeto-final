@@ -1,6 +1,6 @@
 package com.cefet_rj.projeto_final.billing.enums;
 
-public enum Feature {
+public enum FeatureCode {
     PACKAGES,
     NOTIFICATIONS,
     ANNOUNCEMENTS,

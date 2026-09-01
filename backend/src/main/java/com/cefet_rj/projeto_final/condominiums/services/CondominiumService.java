@@ -1,6 +1,7 @@
 package com.cefet_rj.projeto_final.condominiums.services;
 
-import com.cefet_rj.projeto_final.billing.enums.CondominiumBillingPlan;
+import com.cefet_rj.projeto_final.billing.entities.BillingPlan;
+import com.cefet_rj.projeto_final.billing.repositories.BillingPlanRepository;
 import com.cefet_rj.projeto_final.condominiums.dtos.CondominiumDTO;
 import com.cefet_rj.projeto_final.condominiums.dtos.insert.CondominiumInsertDTO;
 import com.cefet_rj.projeto_final.condominiums.dtos.update.CondominiumUpdateDTO;
@@ -26,6 +27,7 @@ import java.util.Optional;
 public class CondominiumService {
 
     private final CondominiumRepository condominiumRepository;
+	private final BillingPlanRepository billingPlanRepository;
 
     @Transactional(readOnly = true)
     public Page<CondominiumDTO> findAllPaged(Pageable pageable) {
@@ -74,6 +76,16 @@ public class CondominiumService {
 		}
 	}
 
+	private BillingPlan getBillingPlanOrThrow(String billingPlanName) {
+		return billingPlanRepository
+				.findByNameIgnoreCase(billingPlanName)
+				.orElseThrow(() ->
+						new ResourceNotFoundException(
+								"Billing plan not found: " + billingPlanName
+						)
+				);
+	}
+
 	private void linkAssociations(
 			String name,
 			String address,
@@ -83,7 +95,13 @@ public class CondominiumService {
 	) {
 		entity.setName(name);
 		entity.setAddress(address);
-		entity.setBillingPlan(CondominiumBillingPlan.fromString(billingPlan));
-		entity.setIsActive(isActive != null ? isActive : true);
+
+		BillingPlan plan = getBillingPlanOrThrow(billingPlan);
+
+		entity.setBillingPlan(plan);
+
+		if (isActive != null) {
+			entity.setIsActive(isActive);
+		}
 	}
 }
