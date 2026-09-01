@@ -33,30 +33,6 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  final List<String> _names = ['samuel', 'marcus', 'turing', 'neumann'];
-
-  void _showRandomName() {
-    final random = Random();
-    final randomName = _names[random.nextInt(_names.length)];
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Random Name'),
-          content: Text('The selected name is: $randomName'),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: const Text('Close'),
-            ),
-          ],
-        );
-      },
-    );
-  }
 
   Future<void> _fetchDataFromUrl(String url, String buttonTitle) async {
     try {
@@ -109,16 +85,6 @@ class _MyHomePageState extends State<MyHomePage> {
               const Text(
                 'Lista de Nomes:',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
-              ..._names.map((name) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4.0),
-                child: Text(name, style: const TextStyle(fontSize: 18)),
-              )),
-              const SizedBox(height: 30),
-              ElevatedButton(
-                onPressed: _showRandomName,
-                child: const Text('Show Random Name Popup'),
               ),
               const SizedBox(height: 20),
               ElevatedButton(
