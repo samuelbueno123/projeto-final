@@ -1,8 +1,10 @@
 package com.cefet_rj.projeto_final.packages.services;
 
 import com.cefet_rj.projeto_final.auth.security.AuthenticatedUserService;
+import com.cefet_rj.projeto_final.billing.enums.FeatureCode;
 import com.cefet_rj.projeto_final.condominiums.entities.Unit;
 import com.cefet_rj.projeto_final.condominiums.security.CondominiumAccessService;
+import com.cefet_rj.projeto_final.condominiums.security.CondominiumFeatureAccessService;
 import com.cefet_rj.projeto_final.packages.dtos.PackageDTO;
 import com.cefet_rj.projeto_final.packages.dtos.PackageInsertDTO;
 import com.cefet_rj.projeto_final.packages.dtos.PackageUpdateDTO;
@@ -38,6 +40,7 @@ public class PackageService {
     private final CondominiumAccessService condominiumAccessService;
     private final PackageHistoryService packageHistoryService;
     private final ApplicationEventPublisher eventPublisher;
+    private final CondominiumFeatureAccessService featureAccessService;
 
     @Transactional(readOnly = true)
     public PackageDTO findById(Long id) {
@@ -338,6 +341,13 @@ public class PackageService {
         eventPublisher.publishEvent(event);
     }
 
+    private Long getCondominiumId(Unit unit) {
+        return unit
+                .getSector()
+                .getCondominium()
+                .getId();
+    }
+
     private void linkAssociations(
             String description,
             Long recipientId,
@@ -352,9 +362,17 @@ public class PackageService {
 
         Unit unit = unitRepository.findById(unitId)
                 .orElseThrow(() ->
-                        new ResourceNotFoundException("Unit not found: " + unitId));
+                        new ResourceNotFoundException(
+                                "Unit not found: " + unitId
+                        )
+                );
 
         validateUnitAccess(unit);
+
+        featureAccessService.validateFeatureEnabled(
+                getCondominiumId(unit),
+                FeatureCode.PACKAGES
+        );
 
         entity.setRecipient(recipient);
         entity.setUnit(unit);
