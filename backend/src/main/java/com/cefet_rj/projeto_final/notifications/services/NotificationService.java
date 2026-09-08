@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.ArrayList;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -45,6 +46,44 @@ public class NotificationService {
         notification.setCreatedAt(LocalDateTime.now());
 
         notificationRepository.save(notification);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void createAnnouncementNotifications(
+            List<Long> recipientIds,
+            String announcementTitle
+    ) {
+
+        if (recipientIds.isEmpty()) {
+            return;
+        }
+
+        List<User> recipients =
+                userRepository.findAllById(recipientIds);
+
+        List<Notification> notifications =
+                new ArrayList<>();
+
+        LocalDateTime now = LocalDateTime.now();
+
+        for (User recipient : recipients) {
+
+            Notification notification = new Notification();
+
+            notification.setRecipient(recipient);
+            notification.setType(NotificationType.ANNOUNCEMENT);
+            notification.setTitle("Novo comunicado");
+            notification.setMessage(
+                    "Novo comunicado disponível: "
+                            + announcementTitle
+            );
+            notification.setRead(false);
+            notification.setCreatedAt(now);
+
+            notifications.add(notification);
+        }
+
+        notificationRepository.saveAll(notifications);
     }
 
     @Transactional(readOnly = true)
