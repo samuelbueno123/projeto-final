@@ -4,6 +4,7 @@ import com.cefet_rj.projeto_final.condominiums.dtos.MembershipDTO;
 import com.cefet_rj.projeto_final.condominiums.dtos.insert.MembershipInsertDTO;
 import com.cefet_rj.projeto_final.condominiums.dtos.update.MembershipUpdateDTO;
 import com.cefet_rj.projeto_final.condominiums.services.MembershipService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -17,6 +18,10 @@ import java.net.URI;
 @RestController
 @RequestMapping("/memberships")
 @RequiredArgsConstructor
+@Tag(
+		name = "Condominiums",
+		description = "Gerenciamento de condomínios"
+)
 public class MembershipController {
 
 	private final MembershipService membershipService;

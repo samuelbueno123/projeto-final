@@ -10,11 +10,16 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import com.cefet_rj.projeto_final.announcements.dtos.AnnouncementUpdateDTO;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
+@Tag(
+        name = "Announcements",
+        description = "Comunicados dos condomínios"
+)
 public class AnnouncementController {
 
     private final AnnouncementService announcementService;

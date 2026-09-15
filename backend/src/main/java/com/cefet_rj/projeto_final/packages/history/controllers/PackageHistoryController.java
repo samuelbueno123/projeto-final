@@ -6,12 +6,17 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/packages/{packageId}/history")
 @RequiredArgsConstructor
+@Tag(
+        name = "Package History",
+        description = "Histórico de mudanças de status das encomendas"
+)
 public class PackageHistoryController {
 
     private final PackageHistoryService packageHistoryService;

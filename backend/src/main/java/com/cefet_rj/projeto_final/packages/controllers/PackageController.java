@@ -4,6 +4,7 @@ import com.cefet_rj.projeto_final.packages.dtos.PackageDTO;
 import com.cefet_rj.projeto_final.packages.dtos.PackageInsertDTO;
 import com.cefet_rj.projeto_final.packages.dtos.PackageUpdateDTO;
 import com.cefet_rj.projeto_final.packages.services.PackageService;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -12,12 +13,17 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 import java.net.URI;
 
 @RestController
 @RequestMapping("/packages")
 @RequiredArgsConstructor
+@Tag(
+        name = "Packages",
+        description = "Gerenciamento e ciclo de vida de encomendas"
+)
 public class PackageController {
 
     private final PackageService packageService;
@@ -93,18 +99,30 @@ public class PackageController {
 
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'DOORMAN')")
     @PatchMapping("/{id}/receive")
+    @Operation(
+            summary = "Marcar encomenda como recebida",
+            description = "Transiciona uma encomenda para o status RECEIVED."
+    )
     public ResponseEntity<PackageDTO> receive(@PathVariable Long id) {
         return ResponseEntity.ok(packageService.receive(id));
     }
 
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'DOORMAN')")
     @PatchMapping("/{id}/notify")
+    @Operation(
+            summary = "Marcar morador como notificado",
+            description = "Transiciona a encomenda para NOTIFIED e pode gerar notificação conforme o plano do condomínio."
+    )
     public ResponseEntity<PackageDTO> notify(@PathVariable Long id) {
         return ResponseEntity.ok(packageService.notify(id));
     }
 
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'DOORMAN')")
     @PatchMapping("/{id}/pickup")
+    @Operation(
+            summary = "Registrar retirada",
+            description = "Marca a encomenda como retirada pelo destinatário."
+    )
     public ResponseEntity<PackageDTO> pickUp(@PathVariable Long id) {
         return ResponseEntity.ok(packageService.pickUp(id));
     }

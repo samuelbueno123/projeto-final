@@ -4,6 +4,7 @@ import com.cefet_rj.projeto_final.condominiums.dtos.UnitDTO;
 import com.cefet_rj.projeto_final.condominiums.dtos.insert.UnitInsertDTO;
 import com.cefet_rj.projeto_final.condominiums.dtos.update.UnitUpdateDTO;
 import com.cefet_rj.projeto_final.condominiums.services.UnitService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -17,6 +18,10 @@ import java.net.URI;
 @RestController
 @RequestMapping("/units")
 @RequiredArgsConstructor
+@Tag(
+        name = "Units",
+        description = "Unidades residenciais dos condomínios"
+)
 public class UnitController {
 
     private final UnitService unitService;

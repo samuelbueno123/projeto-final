@@ -4,6 +4,7 @@ import com.cefet_rj.projeto_final.condominiums.dtos.ResidentDTO;
 import com.cefet_rj.projeto_final.condominiums.dtos.insert.ResidentInsertDTO;
 import com.cefet_rj.projeto_final.condominiums.dtos.update.ResidentUpdateDTO;
 import com.cefet_rj.projeto_final.condominiums.services.ResidentService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -17,6 +18,10 @@ import java.net.URI;
 @RestController
 @RequestMapping("/residents")
 @RequiredArgsConstructor
+@Tag(
+		name = "Residents",
+		description = "Gerenciamento de moradores"
+)
 public class ResidentController {
 
     private final ResidentService residentService;

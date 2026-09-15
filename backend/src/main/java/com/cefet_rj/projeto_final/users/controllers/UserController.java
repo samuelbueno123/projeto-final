@@ -4,6 +4,7 @@ import com.cefet_rj.projeto_final.users.dtos.UserDTO;
 import com.cefet_rj.projeto_final.users.dtos.insert.UserInsertDTO;
 import com.cefet_rj.projeto_final.users.dtos.update.UserUpdateDTO;
 import com.cefet_rj.projeto_final.users.services.UserService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -17,6 +18,10 @@ import java.net.URI;
 @RestController
 @RequestMapping("/users")
 @RequiredArgsConstructor
+@Tag(
+        name = "Users",
+        description = "Gerenciamento de usuários"
+)
 public class UserController {
 
     private final UserService userService;

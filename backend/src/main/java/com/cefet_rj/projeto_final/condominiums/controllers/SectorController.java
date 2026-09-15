@@ -4,6 +4,7 @@ import com.cefet_rj.projeto_final.condominiums.dtos.SectorDTO;
 import com.cefet_rj.projeto_final.condominiums.dtos.insert.SectorInsertDTO;
 import com.cefet_rj.projeto_final.condominiums.dtos.update.SectorUpdateDTO;
 import com.cefet_rj.projeto_final.condominiums.services.SectorService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -17,6 +18,10 @@ import java.net.URI;
 @RestController
 @RequestMapping("/sectors")
 @RequiredArgsConstructor
+@Tag(
+		name = "Sectors",
+		description = "Blocos, torres e setores dos condomínios"
+)
 public class SectorController {
 
 	private final SectorService sectorService;
