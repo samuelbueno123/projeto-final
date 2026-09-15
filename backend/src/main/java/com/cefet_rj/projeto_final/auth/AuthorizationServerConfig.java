@@ -8,6 +8,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.security.oauth2.server.authorization.token.OAuth2RefreshTokenGenerator;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -42,7 +43,7 @@ import org.springframework.security.oauth2.server.authorization.token.OAuth2Acce
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenGenerator;
 import org.springframework.security.web.SecurityFilterChain;
-
+import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import com.cefet_rj.projeto_final.auth.customgrant.CustomPasswordAuthenticationConverter;
 import com.cefet_rj.projeto_final.auth.customgrant.CustomPasswordAuthenticationProvider;
 import com.cefet_rj.projeto_final.auth.customgrant.CustomUserAuthorities;
@@ -64,6 +65,9 @@ public class AuthorizationServerConfig {
 
     @Value("${security.jwt.duration}")
     private Integer jwtDurationSeconds;
+
+    @Value("${security.jwt.refresh-duration}")
+    private Integer refreshTokenDurationSeconds;
 
     @Bean
     @Order(1)
@@ -116,11 +120,19 @@ public class AuthorizationServerConfig {
                 .withId(UUID.randomUUID().toString())
                 .clientId(clientId)
                 .clientSecret(passwordEncoder.encode(clientSecret))
+                .clientAuthenticationMethod(
+                        ClientAuthenticationMethod.CLIENT_SECRET_BASIC
+                )
                 .authorizationGrantType(PASSWORD_GRANT)
+                .authorizationGrantType(
+                        AuthorizationGrantType.REFRESH_TOKEN
+                )
                 .scope("read")
                 .scope("write")
                 .tokenSettings(tokenSettings())
-                .clientSettings(ClientSettings.builder().build())
+                .clientSettings(
+                        ClientSettings.builder().build()
+                )
                 .build();
 
         return new InMemoryRegisteredClientRepository(client);
@@ -129,8 +141,20 @@ public class AuthorizationServerConfig {
     @Bean
     public TokenSettings tokenSettings() {
         return TokenSettings.builder()
-                .accessTokenFormat(OAuth2TokenFormat.SELF_CONTAINED)
-                .accessTokenTimeToLive(Duration.ofSeconds(jwtDurationSeconds))
+                .accessTokenFormat(
+                        OAuth2TokenFormat.SELF_CONTAINED
+                )
+                .accessTokenTimeToLive(
+                        Duration.ofSeconds(
+                                jwtDurationSeconds
+                        )
+                )
+                .refreshTokenTimeToLive(
+                        Duration.ofSeconds(
+                                refreshTokenDurationSeconds
+                        )
+                )
+                .reuseRefreshTokens(false)
                 .build();
     }
 
@@ -152,9 +176,13 @@ public class AuthorizationServerConfig {
         OAuth2AccessTokenGenerator accessTokenGenerator =
                 new OAuth2AccessTokenGenerator();
 
+        OAuth2RefreshTokenGenerator refreshTokenGenerator =
+                new OAuth2RefreshTokenGenerator();
+
         return new DelegatingOAuth2TokenGenerator(
                 jwtGenerator,
-                accessTokenGenerator
+                accessTokenGenerator,
+                refreshTokenGenerator
         );
     }
 

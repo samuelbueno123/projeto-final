@@ -5,6 +5,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.oauth2.core.OAuth2RefreshToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -91,7 +92,37 @@ public class CustomPasswordAuthenticationProvider implements AuthenticationProvi
             throw invalidGrant("Invalid credentials");
         }
 
-        Set<String> authorizedScopes = new HashSet<>(registeredClient.getScopes());
+        Set<String> requestedScopes =
+                authRequest.getScopes();
+
+        Set<String> authorizedScopes;
+
+        if (requestedScopes == null
+                || requestedScopes.isEmpty()) {
+
+            authorizedScopes =
+                    new HashSet<>(
+                            registeredClient.getScopes()
+                    );
+
+        } else {
+
+            if (!registeredClient
+                    .getScopes()
+                    .containsAll(
+                            requestedScopes
+                    )) {
+
+                throw new OAuth2AuthenticationException(
+                        OAuth2ErrorCodes.INVALID_SCOPE
+                );
+            }
+
+            authorizedScopes =
+                    new HashSet<>(
+                            requestedScopes
+                    );
+        }
 
         CustomUserAuthorities customUser =
                 new CustomUserAuthorities(username, user.getAuthorities());
@@ -114,7 +145,7 @@ public class CustomPasswordAuthenticationProvider implements AuthenticationProvi
 
         OAuth2Authorization.Builder authorizationBuilder =
                 OAuth2Authorization.withRegisteredClient(registeredClient)
-                        .principalName(clientPrincipal.getName())
+                        .principalName(username)
                         .authorizationGrantType(PASSWORD_GRANT_TYPE)
                         .authorizedScopes(authorizedScopes)
                         .attribute(Principal.class.getName(), clientPrincipal);
@@ -155,13 +186,49 @@ public class CustomPasswordAuthenticationProvider implements AuthenticationProvi
             authorizationBuilder.accessToken(accessToken);
         }
 
-        OAuth2Authorization authorization = authorizationBuilder.build();
-        authorizationService.save(authorization);
+        OAuth2TokenContext refreshTokenContext =
+                tokenContextBuilder
+                        .tokenType(
+                                OAuth2TokenType.REFRESH_TOKEN
+                        )
+                        .build();
+
+        OAuth2Token generatedRefreshToken =
+                tokenGenerator.generate(
+                        refreshTokenContext
+                );
+
+        if (!(generatedRefreshToken
+                instanceof OAuth2RefreshToken refreshToken)) {
+
+            OAuth2Error error =
+                    new OAuth2Error(
+                            OAuth2ErrorCodes.SERVER_ERROR,
+                            "The token generator failed to generate the refresh token.",
+                            ERROR_URI
+                    );
+
+            throw new OAuth2AuthenticationException(
+                    error
+            );
+        }
+
+        authorizationBuilder.refreshToken(
+                refreshToken
+        );
+
+        OAuth2Authorization authorization =
+                authorizationBuilder.build();
+
+        authorizationService.save(
+                authorization
+        );
 
         return new OAuth2AccessTokenAuthenticationToken(
                 registeredClient,
                 clientPrincipal,
-                accessToken
+                accessToken,
+                refreshToken
         );
     }
 
