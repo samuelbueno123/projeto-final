@@ -15,6 +15,7 @@ import com.cefet_rj.projeto_final.users.entities.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.cefet_rj.projeto_final.reservations.dtos.CommonAreaUpdateDTO;
 
 import java.util.List;
 
@@ -105,6 +106,100 @@ public class CommonAreaService {
                 .validateUserBelongsToCondominium(
                         user.getId(),
                         condominiumId
+                );
+    }
+
+    @Transactional
+    public CommonAreaDTO update(
+            Long id,
+            CommonAreaUpdateDTO dto
+    ) {
+
+        CommonArea commonArea =
+                findCommonAreaById(id);
+
+        Long condominiumId =
+                commonArea.getCondominium().getId();
+
+        featureAccessService.validateFeatureEnabled(
+                condominiumId,
+                FeatureCode.RESERVATIONS
+        );
+
+        validateCondominiumAccess(condominiumId);
+
+        commonArea.setName(
+                dto.name().trim()
+        );
+
+        commonArea.setDescription(
+                dto.description() == null
+                        ? null
+                        : dto.description().trim()
+        );
+
+        commonArea.setCapacity(
+                dto.capacity()
+        );
+
+        commonArea =
+                commonAreaRepository.save(commonArea);
+
+        return new CommonAreaDTO(commonArea);
+    }
+
+    @Transactional
+    public void activate(Long id) {
+
+        CommonArea commonArea =
+                findCommonAreaById(id);
+
+        Long condominiumId =
+                commonArea.getCondominium().getId();
+
+        featureAccessService.validateFeatureEnabled(
+                condominiumId,
+                FeatureCode.RESERVATIONS
+        );
+
+        validateCondominiumAccess(condominiumId);
+
+        commonArea.setActive(true);
+
+        commonAreaRepository.save(commonArea);
+    }
+
+    @Transactional
+    public void deactivate(Long id) {
+
+        CommonArea commonArea =
+                findCommonAreaById(id);
+
+        Long condominiumId =
+                commonArea.getCondominium().getId();
+
+        featureAccessService.validateFeatureEnabled(
+                condominiumId,
+                FeatureCode.RESERVATIONS
+        );
+
+        validateCondominiumAccess(condominiumId);
+
+        commonArea.setActive(false);
+
+        commonAreaRepository.save(commonArea);
+    }
+
+    private CommonArea findCommonAreaById(
+            Long id
+    ) {
+
+        return commonAreaRepository
+                .findById(id)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Common area not found: " + id
+                        )
                 );
     }
 }

@@ -39,4 +39,41 @@ public interface ReservationRepository
             @Param("cancelledStatus")
             ReservationStatus cancelledStatus
     );
+
+    List<Reservation>
+    findByCommonAreaCondominiumIdOrderByStartAtDesc(
+            Long condominiumId
+    );
+
+    @Query("""
+        select count(r)
+        from Reservation r
+        where r.commonArea.condominium.id = :condominiumId
+        """)
+    long countByCondominiumId(
+            Long condominiumId
+    );
+
+    @Query("""
+        select r.status, count(r)
+        from Reservation r
+        where r.commonArea.condominium.id = :condominiumId
+        group by r.status
+        """)
+    List<Object[]> countByStatusForCondominium(
+            Long condominiumId
+    );
+
+    @Query("""
+        select count(r)
+        from Reservation r
+        where r.commonArea.condominium.id = :condominiumId
+          and r.status = :status
+          and r.startAt > :now
+        """)
+    long countFutureByCondominiumAndStatus(
+            Long condominiumId,
+            ReservationStatus status,
+            LocalDateTime now
+    );
 }

@@ -9,11 +9,17 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import com.cefet_rj.projeto_final.reservations.dtos.CommonAreaUpdateDTO;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
+@Tag(
+        name = "Common Areas",
+        description = "Gerenciamento das áreas comuns reserváveis"
+)
 public class CommonAreaController {
 
     private final CommonAreaService commonAreaService;
@@ -56,5 +62,59 @@ public class CommonAreaController {
                                 condominiumId
                         )
         );
+    }
+
+    @PutMapping(
+            "/common-areas/{id}"
+    )
+    @PreAuthorize(
+            "hasAnyRole('ADMIN', 'MANAGER')"
+    )
+    public ResponseEntity<CommonAreaDTO> update(
+            @PathVariable Long id,
+            @Valid
+            @RequestBody CommonAreaUpdateDTO dto
+    ) {
+
+        return ResponseEntity.ok(
+                commonAreaService.update(
+                        id,
+                        dto
+                )
+        );
+    }
+
+    @PatchMapping(
+            "/common-areas/{id}/activate"
+    )
+    @PreAuthorize(
+            "hasAnyRole('ADMIN', 'MANAGER')"
+    )
+    public ResponseEntity<Void> activate(
+            @PathVariable Long id
+    ) {
+
+        commonAreaService.activate(id);
+
+        return ResponseEntity
+                .noContent()
+                .build();
+    }
+
+    @PatchMapping(
+            "/common-areas/{id}/deactivate"
+    )
+    @PreAuthorize(
+            "hasAnyRole('ADMIN', 'MANAGER')"
+    )
+    public ResponseEntity<Void> deactivate(
+            @PathVariable Long id
+    ) {
+
+        commonAreaService.deactivate(id);
+
+        return ResponseEntity
+                .noContent()
+                .build();
     }
 }

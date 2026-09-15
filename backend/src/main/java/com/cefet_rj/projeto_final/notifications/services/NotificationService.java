@@ -116,4 +116,53 @@ public class NotificationService {
 
         return new NotificationDTO(notification);
     }
+
+    @Transactional(
+            propagation = Propagation.REQUIRES_NEW
+    )
+    public void createReservationNotification(
+            Long recipientId,
+            String commonAreaName,
+            LocalDateTime startAt
+    ) {
+
+        User recipient =
+                userRepository.findById(recipientId)
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "User not found: "
+                                                + recipientId
+                                )
+                        );
+
+        Notification notification =
+                new Notification();
+
+        notification.setRecipient(recipient);
+
+        notification.setType(
+                NotificationType.RESERVATION
+        );
+
+        notification.setTitle(
+                "Reserva confirmada"
+        );
+
+        notification.setMessage(
+                "Sua reserva de "
+                        + commonAreaName
+                        + " foi confirmada para "
+                        + startAt
+        );
+
+        notification.setRead(false);
+
+        notification.setCreatedAt(
+                LocalDateTime.now()
+        );
+
+        notificationRepository.save(
+                notification
+        );
+    }
 }

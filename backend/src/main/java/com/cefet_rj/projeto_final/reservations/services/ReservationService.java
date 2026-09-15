@@ -18,6 +18,8 @@ import com.cefet_rj.projeto_final.users.entities.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.cefet_rj.projeto_final.reservations.events.ReservationCreatedEvent;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -28,7 +30,7 @@ public class ReservationService {
 
     private final ReservationRepository reservationRepository;
     private final CommonAreaRepository commonAreaRepository;
-
+    private final ApplicationEventPublisher eventPublisher;
     private final AuthenticatedUserService authenticatedUserService;
     private final CondominiumAccessService condominiumAccessService;
     private final CondominiumFeatureAccessService featureAccessService;
@@ -94,6 +96,17 @@ public class ReservationService {
         reservation =
                 reservationRepository.save(reservation);
 
+        eventPublisher.publishEvent(
+                new ReservationCreatedEvent(
+                        reservation.getId(),
+                        condominiumId,
+                        user.getId(),
+                        commonArea.getName(),
+                        reservation.getStartAt(),
+                        LocalDateTime.now()
+                )
+        );
+
         return new ReservationDTO(reservation);
     }
 
@@ -144,17 +157,23 @@ public class ReservationService {
         );
 
         User user =
-                authenticatedUserService.getAuthenticatedUser();
+                authenticatedUserService
+                        .getAuthenticatedUser();
+
+        validateCondominiumAccess(
+                condominiumId
+        );
 
         boolean isOwner =
                 reservation.getReservedBy()
                         .getId()
                         .equals(user.getId());
 
-        boolean isAdmin =
-                user.hasRole("ROLE_ADMIN");
+        boolean isAdministrativeUser =
+                user.hasRole("ROLE_ADMIN")
+                        || user.hasRole("ROLE_MANAGER");
 
-        if (!isOwner && !isAdmin) {
+        if (!isOwner && !isAdministrativeUser) {
             throw new ForbiddenException(
                     "You cannot cancel this reservation"
             );
@@ -206,5 +225,26 @@ public class ReservationService {
                         user.getId(),
                         condominiumId
                 );
+    }
+
+    @Transactional(readOnly = true)
+    public List<ReservationDTO> findAllByCondominium(
+            Long condominiumId
+    ) {
+
+        featureAccessService.validateFeatureEnabled(
+                condominiumId,
+                FeatureCode.RESERVATIONS
+        );
+
+        validateCondominiumAccess(condominiumId);
+
+        return reservationRepository
+                .findByCommonAreaCondominiumIdOrderByStartAtDesc(
+                        condominiumId
+                )
+                .stream()
+                .map(ReservationDTO::new)
+                .toList();
     }
 }
