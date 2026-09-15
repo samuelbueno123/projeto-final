@@ -77,4 +77,27 @@ public interface PackageRepository extends JpaRepository<Package, Long> {
     """
     )
     Page<Package> findByRecipientId(Long userId, Pageable pageable);
+
+    @Query("""
+        select count(p)
+        from Package p
+        join p.unit u
+        join u.sector s
+        where s.condominium.id = :condominiumId
+        """)
+    long countByCondominiumId(
+            Long condominiumId
+    );
+
+    @Query("""
+        select p.status, count(p)
+        from Package p
+        join p.unit u
+        join u.sector s
+        where s.condominium.id = :condominiumId
+        group by p.status
+        """)
+    List<Object[]> countByStatusForCondominium(
+            Long condominiumId
+    );
 }
