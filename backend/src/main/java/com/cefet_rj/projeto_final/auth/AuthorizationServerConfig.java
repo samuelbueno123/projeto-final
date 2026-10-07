@@ -6,8 +6,10 @@ import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.time.Duration;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.UUID;
 
+import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2RefreshTokenGenerator;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -22,12 +24,9 @@ import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.OAuth2Token;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
-import org.springframework.security.oauth2.server.authorization.InMemoryOAuth2AuthorizationConsentService;
-import org.springframework.security.oauth2.server.authorization.InMemoryOAuth2AuthorizationService;
-import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2ClientAuthenticationToken;
-import org.springframework.security.oauth2.server.authorization.client.InMemoryRegisteredClientRepository;
+import org.springframework.security.oauth2.server.authorization.client.JdbcRegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.config.annotation.web.configuration.OAuth2AuthorizationServerConfiguration;
@@ -50,6 +49,8 @@ import com.cefet_rj.projeto_final.auth.customgrant.CustomUserAuthorities;
 import com.nimbusds.jose.jwk.*;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService;
 
 @Configuration
 public class AuthorizationServerConfig {
@@ -103,18 +104,31 @@ public class AuthorizationServerConfig {
     }
 
     @Bean
-    public OAuth2AuthorizationService authorizationService() {
-        return new InMemoryOAuth2AuthorizationService();
-    }
+    public OAuth2AuthorizationService authorizationService(
+            JdbcTemplate jdbcTemplate,
+            RegisteredClientRepository registeredClientRepository
+    ) {
 
-    @Bean
-    public OAuth2AuthorizationConsentService authorizationConsentService() {
-        return new InMemoryOAuth2AuthorizationConsentService();
+        return new JdbcOAuth2AuthorizationService(
+                jdbcTemplate,
+                registeredClientRepository
+        );
     }
 
     @Bean
     public RegisteredClientRepository registeredClientRepository(
-            PasswordEncoder passwordEncoder) {
+            PasswordEncoder passwordEncoder,
+            JdbcTemplate jdbcTemplate) {
+
+        JdbcRegisteredClientRepository repository =
+                new JdbcRegisteredClientRepository(jdbcTemplate);
+
+        RegisteredClient existingClient =
+                repository.findByClientId(clientId);
+
+        if (existingClient != null) {
+            return repository;
+        }
 
         RegisteredClient client = RegisteredClient
                 .withId(UUID.randomUUID().toString())
@@ -135,7 +149,9 @@ public class AuthorizationServerConfig {
                 )
                 .build();
 
-        return new InMemoryRegisteredClientRepository(client);
+        repository.save(client);
+
+        return repository;
     }
 
     @Bean
@@ -191,22 +207,50 @@ public class AuthorizationServerConfig {
 
         return context -> {
 
-            OAuth2ClientAuthenticationToken principal = context.getPrincipal();
-
-            CustomUserAuthorities user =
-                    (CustomUserAuthorities) principal.getDetails();
-
-            List<String> authorities = user.getAuthorities()
-                    .stream()
-                    .map(GrantedAuthority::getAuthority)
-                    .toList();
-
-            if ("access_token".equals(context.getTokenType().getValue())) {
-
-                context.getClaims()
-                        .claim("authorities", authorities)
-                        .claim("username", user.getUsername());
+            if (!"access_token".equals(
+                    context.getTokenType().getValue()
+            )) {
+                return;
             }
+
+            Authentication principal =
+                    context.getPrincipal();
+
+            String username;
+            List<String> authorities;
+
+            if (principal instanceof OAuth2ClientAuthenticationToken clientPrincipal
+                    && clientPrincipal.getDetails()
+                    instanceof CustomUserAuthorities customUser) {
+
+                username =
+                        customUser.getUsername();
+
+                authorities =
+                        new ArrayList<>(
+                                customUser.getAuthorities()
+                                        .stream()
+                                        .map(GrantedAuthority::getAuthority)
+                                        .toList()
+                        );
+
+            } else {
+
+                username =
+                        principal.getName();
+
+                authorities =
+                        new ArrayList<>(
+                                principal.getAuthorities()
+                                        .stream()
+                                        .map(GrantedAuthority::getAuthority)
+                                        .toList()
+                        );
+            }
+
+            context.getClaims()
+                    .claim("authorities", authorities)
+                    .claim("username", username);
         };
     }
 

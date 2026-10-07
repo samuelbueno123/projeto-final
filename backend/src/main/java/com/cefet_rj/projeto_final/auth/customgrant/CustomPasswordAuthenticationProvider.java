@@ -3,9 +3,11 @@ package com.cefet_rj.projeto_final.auth.customgrant;
 import java.security.Principal;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.ArrayList;
 
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.oauth2.core.OAuth2RefreshToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -30,6 +32,7 @@ import org.springframework.security.oauth2.server.authorization.token.DefaultOAu
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenContext;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenGenerator;
 import org.springframework.util.Assert;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 
 public class CustomPasswordAuthenticationProvider implements AuthenticationProvider {
 
@@ -127,6 +130,25 @@ public class CustomPasswordAuthenticationProvider implements AuthenticationProvi
         CustomUserAuthorities customUser =
                 new CustomUserAuthorities(username, user.getAuthorities());
 
+        var persistedAuthorities =
+                new ArrayList<>(
+                        user.getAuthorities()
+                                .stream()
+                                .map(authority ->
+                                        new SimpleGrantedAuthority(
+                                                authority.getAuthority()
+                                        )
+                                )
+                                .toList()
+                );
+
+        Authentication userPrincipal =
+                UsernamePasswordAuthenticationToken.authenticated(
+                        username,
+                        null,
+                        persistedAuthorities
+                );
+
         clientPrincipal.setDetails(customUser);
 
         var context = SecurityContextHolder.createEmptyContext();
@@ -148,7 +170,7 @@ public class CustomPasswordAuthenticationProvider implements AuthenticationProvi
                         .principalName(username)
                         .authorizationGrantType(PASSWORD_GRANT_TYPE)
                         .authorizedScopes(authorizedScopes)
-                        .attribute(Principal.class.getName(), clientPrincipal);
+                        .attribute(Principal.class.getName(), userPrincipal);
 
         OAuth2TokenContext tokenContext =
                 tokenContextBuilder
