@@ -1,14 +1,11 @@
 package com.cefet_rj.projeto_final.auth;
 
-import java.security.KeyPair;
-import java.security.KeyPairGenerator;
-import java.security.interfaces.RSAPrivateKey;
-import java.security.interfaces.RSAPublicKey;
 import java.time.Duration;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.UUID;
 
+import com.cefet_rj.projeto_final.auth.security.PersistentRsaKeyService;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2RefreshTokenGenerator;
 import org.springframework.beans.factory.annotation.Value;
@@ -260,38 +257,17 @@ public class AuthorizationServerConfig {
     }
 
     @Bean
-    public JWKSource<SecurityContext> jwkSource() {
+    public JWKSource<SecurityContext> jwkSource(
+            PersistentRsaKeyService rsaKeyService
+    ) {
 
-        RSAKey rsaKey = generateRsa();
-        JWKSet jwkSet = new JWKSet(rsaKey);
+        RSAKey rsaKey =
+                rsaKeyService.loadOrCreate();
 
-        return (selector, context) -> selector.select(jwkSet);
-    }
+        JWKSet jwkSet =
+                new JWKSet(rsaKey);
 
-    private static RSAKey generateRsa() {
-
-        KeyPair keyPair = generateRsaKey();
-
-        return new RSAKey.Builder((RSAPublicKey) keyPair.getPublic())
-                .privateKey((RSAPrivateKey) keyPair.getPrivate())
-                .keyID(UUID.randomUUID().toString())
-                .build();
-    }
-
-    private static KeyPair generateRsaKey() {
-
-        try {
-
-            KeyPairGenerator generator =
-                    KeyPairGenerator.getInstance("RSA");
-
-            generator.initialize(2048);
-
-            return generator.generateKeyPair();
-
-        } catch (Exception ex) {
-
-            throw new IllegalStateException(ex);
-        }
+        return (selector, context) ->
+                selector.select(jwkSet);
     }
 }
