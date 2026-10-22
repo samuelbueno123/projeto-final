@@ -39,6 +39,7 @@ import org.springframework.security.oauth2.server.authorization.token.OAuth2Acce
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenGenerator;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import com.cefet_rj.projeto_final.auth.customgrant.CustomPasswordAuthenticationConverter;
 import com.cefet_rj.projeto_final.auth.customgrant.CustomPasswordAuthenticationProvider;
@@ -74,10 +75,13 @@ public class AuthorizationServerConfig {
             OAuth2AuthorizationService authorizationService,
             OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator,
             UserDetailsService userDetailsService,
-            PasswordEncoder passwordEncoder
+            PasswordEncoder passwordEncoder,
+            CorsConfigurationSource corsConfigurationSource
     ) throws Exception {
 
         OAuth2AuthorizationServerConfiguration.applyDefaultSecurity(http);
+
+        http.cors(cors -> cors.configurationSource(corsConfigurationSource));
 
         http.getConfigurer(OAuth2AuthorizationServerConfigurer.class)
                 .tokenEndpoint(tokenEndpoint ->

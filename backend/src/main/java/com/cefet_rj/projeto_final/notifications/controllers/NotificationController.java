@@ -21,7 +21,7 @@ public class NotificationController {
 
     private final NotificationService notificationService;
 
-    @PreAuthorize("hasRole('RESIDENT')")
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/my")
     public ResponseEntity<List<NotificationDTO>> findMyNotifications() {
         return ResponseEntity.ok(
@@ -29,7 +29,7 @@ public class NotificationController {
         );
     }
 
-    @PreAuthorize("hasRole('RESIDENT')")
+    @PreAuthorize("isAuthenticated()")
     @PatchMapping("/{id}/read")
     public ResponseEntity<NotificationDTO> markAsRead(
             @PathVariable Long id

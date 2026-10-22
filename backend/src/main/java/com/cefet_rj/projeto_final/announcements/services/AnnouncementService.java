@@ -60,6 +60,7 @@ public class AnnouncementService {
 
         announcement.setTitle(dto.title().trim());
         announcement.setContent(dto.content().trim());
+        announcement.setImageUrl(dto.imageUrl());
         announcement.setCondominium(condominium);
         announcement.setCreatedBy(authenticatedUser);
         announcement.setCreatedAt(LocalDateTime.now());

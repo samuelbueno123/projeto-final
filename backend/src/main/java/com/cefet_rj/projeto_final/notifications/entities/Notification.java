@@ -29,8 +29,11 @@ public class Notification {
     @Column(nullable = false)
     private String title;
 
-    @Column(nullable = false, length = 500)
+    @Column(nullable = false, columnDefinition = "text")
     private String message;
+
+    @Column(name = "image_url", columnDefinition = "text")
+    private String imageUrl;
 
     @Column(nullable = false)
     private Boolean read;

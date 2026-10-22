@@ -39,6 +39,14 @@ public class User implements UserDetails {
     @Column(nullable = false)
     private String password;
 
+    @Setter
+    @Column(columnDefinition = "text")
+    private String profileImage;
+
+    @Setter
+    @Column(name = "google_subject", unique = true)
+    private String googleSubject;
+
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "tb_user_role",

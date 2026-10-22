@@ -1,7 +1,8 @@
+name: projeto-final
+
 services:
   postgres:
     image: postgres:16
-    container_name: gestao-condominial-postgres
     restart: always
     environment:
       POSTGRES_DB: gestao_condominial_db
@@ -11,10 +12,37 @@ services:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d gestao_condominial_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: projeto-final-api:latest
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      APP_PROFILE: dev
+      DB_URL: jdbc:postgresql://postgres:5432/gestao_condominial_db
+      DB_USERNAME: postgres
+      DB_PASSWORD: 123456
+      CORS_ORIGINS: http://localhost:5500,http://127.0.0.1:5500
+      JWT_PRIVATE_KEY_PATH: /app/.secrets/jwt-private.pem
+      JWT_PUBLIC_KEY_PATH: /app/.secrets/jwt-public.pem
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-1093543407623-ch2dq0uh0bnvrhm6pkf6kd8v75bvr3a0.apps.googleusercontent.com}
+    volumes:
+      - jwt_keys:/app/.secrets
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   pgadmin:
     image: dpage/pgadmin4
-    container_name: gestao-condominial-pgadmin
     restart: always
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@email.com
@@ -24,5 +52,20 @@ services:
     depends_on:
       - postgres
 
+  frontend:
+    build:
+      context: ../projeto-front
+      dockerfile: Dockerfile
+      args:
+        API_BASE_URL: ${API_BASE_URL:-http://localhost:8080}
+        GOOGLE_WEB_CLIENT_ID: ${GOOGLE_CLIENT_ID:-1093543407623-ch2dq0uh0bnvrhm6pkf6kd8v75bvr3a0.apps.googleusercontent.com}
+    restart: always
+    ports:
+      - "5500:80"
+
 volumes:
   postgres_data:
+    external: true
+    name: projeto-final_postgres_data
+  jwt_keys:
+    name: projeto-final_jwt_keys

@@ -11,7 +11,8 @@ public record NotificationDTO(
         String title,
         String message,
         Boolean read,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        String imageUrl
 ) {
     public NotificationDTO(Notification entity) {
         this(
@@ -20,7 +21,8 @@ public record NotificationDTO(
                 entity.getTitle(),
                 entity.getMessage(),
                 entity.getRead(),
-                entity.getCreatedAt()
+                entity.getCreatedAt(),
+                entity.getImageUrl()
         );
     }
 }

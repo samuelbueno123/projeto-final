@@ -52,6 +52,7 @@ public class ResourceServerConfig {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/h2-console/**").permitAll()
                         .requestMatchers("/oauth2/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/auth/google").permitAll()
                         .requestMatchers(
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",

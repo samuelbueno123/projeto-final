@@ -4,6 +4,7 @@ import com.cefet_rj.projeto_final.users.dtos.RoleDTO;
 import com.cefet_rj.projeto_final.users.entities.User;
 import com.cefet_rj.projeto_final.users.validation.UserInsertValid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Size;
 
 import java.util.HashSet;
@@ -17,7 +18,9 @@ public record UserInsertDTO(
 
         String lastName,
 
-        @NotBlank(message = "Favor entrar com um email válido")
+        @NotBlank(message = "Informe um email")
+        @Email(message = "Informe um email válido")
+        @Size(max = 254, message = "O email deve ter no máximo 254 caracteres")
         String email,
 
         @NotBlank(message = "Campo obrigatório")

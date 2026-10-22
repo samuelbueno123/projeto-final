@@ -2,6 +2,7 @@ package com.cefet_rj.projeto_final.notifications.services;
 
 import com.cefet_rj.projeto_final.auth.security.AuthenticatedUserService;
 import com.cefet_rj.projeto_final.notifications.dtos.NotificationDTO;
+import com.cefet_rj.projeto_final.notifications.dtos.SystemAnnouncementRequestDTO;
 import com.cefet_rj.projeto_final.notifications.entities.Notification;
 import com.cefet_rj.projeto_final.notifications.enums.NotificationType;
 import com.cefet_rj.projeto_final.notifications.repositories.NotificationRepository;
@@ -10,6 +11,8 @@ import com.cefet_rj.projeto_final.users.entities.User;
 import com.cefet_rj.projeto_final.users.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
@@ -24,6 +27,31 @@ public class NotificationService {
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
     private final AuthenticatedUserService authenticatedUserService;
+
+    @Transactional
+    public int publishSystemAnnouncement(SystemAnnouncementRequestDTO request) {
+        String image = request.imageUrl();
+        if (image != null && !image.isBlank()
+                && !(image.startsWith("data:image/png;base64,")
+                || image.startsWith("data:image/jpeg;base64,")
+                || image.startsWith("data:image/webp;base64,"))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Imagem deve ser PNG, JPEG ou WEBP em formato data URL.");
+        }
+        List<Notification> notifications = userRepository.findAll().stream().map(user -> {
+            Notification notice = new Notification();
+            notice.setRecipient(user);
+            notice.setType(NotificationType.SYSTEM_ANNOUNCEMENT);
+            notice.setTitle(request.title().trim());
+            notice.setMessage(request.message().trim());
+            notice.setImageUrl(image);
+            notice.setRead(false);
+            notice.setCreatedAt(LocalDateTime.now());
+            return notice;
+        }).toList();
+        notificationRepository.saveAll(notifications);
+        return notifications.size();
+    }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void createPackageNotification(

@@ -14,7 +14,17 @@ public record AnnouncementRequestDTO(
         @NotBlank
         String content,
 
-        LocalDateTime expiresAt
+        LocalDateTime expiresAt,
+
+        @jakarta.validation.constraints.Size(max = 1500000)
+        String imageUrl
 
 ) {
+    public AnnouncementRequestDTO(
+            String title,
+            String content,
+            LocalDateTime expiresAt
+    ) {
+        this(title, content, expiresAt, null);
+    }
 }

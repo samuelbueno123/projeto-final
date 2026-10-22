@@ -11,6 +11,7 @@ import com.cefet_rj.projeto_final.condominiums.repositories.CondominiumRepositor
 import com.cefet_rj.projeto_final.condominiums.repositories.MembershipRepository;
 import com.cefet_rj.projeto_final.users.repositories.RoleRepository;
 import com.cefet_rj.projeto_final.users.repositories.UserRepository;
+import com.cefet_rj.projeto_final.auth.security.AuthenticatedUserService;
 import com.cefet_rj.projeto_final.shared.exceptions.DatabaseException;
 import com.cefet_rj.projeto_final.shared.exceptions.ResourceNotFoundException;
 import jakarta.persistence.EntityNotFoundException;
@@ -23,6 +24,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -35,6 +37,15 @@ public class MembershipService {
 	private final RoleRepository roleRepository;
 
 	private final UserRepository userRepository;
+	private final AuthenticatedUserService authenticatedUserService;
+
+	@Transactional(readOnly = true)
+	public List<MembershipDTO> findMine() {
+		Long userId = authenticatedUserService.getAuthenticatedUser().getId();
+		return membershipRepository.findAllByUserId(userId).stream()
+				.map(MembershipDTO::new)
+				.toList();
+	}
 
 	@Transactional(readOnly = true)
 	public Page<MembershipDTO> findAllPaged(Pageable pageable) {

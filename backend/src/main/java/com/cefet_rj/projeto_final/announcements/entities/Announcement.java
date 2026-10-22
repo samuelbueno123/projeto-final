@@ -27,6 +27,9 @@ public class Announcement {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
+    @Column(name = "image_url", columnDefinition = "text")
+    private String imageUrl;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "condominium_id", nullable = false)
     private Condominium condominium;

@@ -47,7 +47,7 @@ public class UserService {
 	@Transactional
 	public UserDTO insert(UserInsertDTO dto) {
 		User entity = new User();
-		linkAssociations(dto.firstName(), dto.lastName(), dto.email(), entity);
+		linkAssociations(dto.firstName(), dto.lastName(), dto.email().trim().toLowerCase(java.util.Locale.ROOT), entity);
 
 		entity.getRoles().clear();
 		Role role = roleRepository.findByAuthority("ROLE_RESIDENT");
