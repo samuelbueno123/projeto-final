@@ -21,7 +21,7 @@ public class PackageHistoryController {
 
     private final PackageHistoryService packageHistoryService;
 
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'DOORMAN')")
+    @PreAuthorize("isAuthenticated()")
     @GetMapping
     public ResponseEntity<List<PackageHistoryDTO>> findByPackageId(
             @PathVariable Long packageId

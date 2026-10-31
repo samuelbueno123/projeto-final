@@ -5,6 +5,8 @@ import java.time.LocalDateTime;
 public record AnnouncementCreatedEvent(
         Long announcementId,
         Long condominiumId,
+        String condominiumName,
+        Long unitId,
         String title,
         LocalDateTime occurredAt
 ) {

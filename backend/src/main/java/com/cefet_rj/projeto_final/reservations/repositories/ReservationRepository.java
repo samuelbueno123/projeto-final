@@ -23,6 +23,7 @@ public interface ReservationRepository
             from Reservation r
             where r.commonArea.id = :commonAreaId
               and r.status <> :cancelledStatus
+              and r.status <> com.cefet_rj.projeto_final.reservations.enums.ReservationStatus.REJECTED
               and r.startAt < :endAt
               and r.endAt > :startAt
             """)
@@ -38,6 +39,23 @@ public interface ReservationRepository
 
             @Param("cancelledStatus")
             ReservationStatus cancelledStatus
+    );
+
+    @Query("""
+            select r
+            from Reservation r
+            join fetch r.reservedBy
+            where r.commonArea.id = :commonAreaId
+              and r.status <> com.cefet_rj.projeto_final.reservations.enums.ReservationStatus.CANCELLED
+              and r.status <> com.cefet_rj.projeto_final.reservations.enums.ReservationStatus.REJECTED
+              and r.startAt < :endAt
+              and r.endAt > :startAt
+            order by r.startAt asc
+            """)
+    List<Reservation> findActiveOverlapping(
+            @Param("commonAreaId") Long commonAreaId,
+            @Param("startAt") LocalDateTime startAt,
+            @Param("endAt") LocalDateTime endAt
     );
 
     List<Reservation>

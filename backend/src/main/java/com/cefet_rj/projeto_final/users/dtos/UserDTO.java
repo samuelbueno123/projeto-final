@@ -17,9 +17,21 @@ public record UserDTO(
         @NotBlank(message = "Favor entrar com um email válido")
         String email,
 
-        Set<RoleDTO> roles
+        Set<RoleDTO> roles,
+
+        String profileImage
 
 ) {
+
+    public UserDTO(
+            Long id,
+            String firstName,
+            String lastName,
+            String email,
+            Set<RoleDTO> roles
+    ) {
+        this(id, firstName, lastName, email, roles, null);
+    }
 
     public UserDTO(User entity) {
         this(
@@ -30,7 +42,8 @@ public record UserDTO(
                 entity.getRoles()
                         .stream()
                         .map(RoleDTO::new)
-                        .collect(java.util.stream.Collectors.toSet())
+                        .collect(java.util.stream.Collectors.toSet()),
+                entity.getProfileImage()
         );
     }
 

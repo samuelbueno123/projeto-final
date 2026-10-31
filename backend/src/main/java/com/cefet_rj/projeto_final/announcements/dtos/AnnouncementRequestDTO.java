@@ -17,7 +17,10 @@ public record AnnouncementRequestDTO(
         LocalDateTime expiresAt,
 
         @jakarta.validation.constraints.Size(max = 1500000)
-        String imageUrl
+        String imageUrl,
+
+        /** Unidade destinatária. Nulo = comunicado para todo o condomínio. */
+        Long unitId
 
 ) {
     public AnnouncementRequestDTO(
@@ -25,6 +28,15 @@ public record AnnouncementRequestDTO(
             String content,
             LocalDateTime expiresAt
     ) {
-        this(title, content, expiresAt, null);
+        this(title, content, expiresAt, null, null);
+    }
+
+    public AnnouncementRequestDTO(
+            String title,
+            String content,
+            LocalDateTime expiresAt,
+            String imageUrl
+    ) {
+        this(title, content, expiresAt, imageUrl, null);
     }
 }

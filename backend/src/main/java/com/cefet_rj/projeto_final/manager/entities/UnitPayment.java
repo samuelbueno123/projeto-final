@@ -10,13 +10,38 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-@Getter @Setter @Entity @Table(name = "tb_unit_payment_status")
+@Getter
+@Setter
+@Entity
+@Table(name = "tb_unit_payment_status")
 public class UnitPayment {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY) private Long id;
-    @OneToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "unit_id", nullable = false, unique = true) private Unit unit;
-    @Enumerated(EnumType.STRING) @Column(nullable = false) private UnitPaymentStatus status;
-    @Column(name = "due_date") private LocalDate dueDate;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @OneToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "unit_id", nullable = false, unique = true)
+    private Unit unit;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 40)
+    private UnitPaymentStatus status;
+
+    @Column(name = "due_date")
+    private LocalDate dueDate;
+
     private BigDecimal amount;
-    @Column(name = "updated_at", nullable = false) private LocalDateTime updatedAt;
-    @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "updated_by_id", nullable = false) private User updatedBy;
+
+    @Column(name = "payment_note", length = 500)
+    private String paymentNote;
+
+    @Column(name = "requested_at")
+    private LocalDateTime requestedAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "updated_by_id", nullable = false)
+    private User updatedBy;
 }

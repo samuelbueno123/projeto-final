@@ -1,6 +1,7 @@
 package com.cefet_rj.projeto_final.announcements.entities;
 
 import com.cefet_rj.projeto_final.condominiums.entities.Condominium;
+import com.cefet_rj.projeto_final.condominiums.entities.Unit;
 import com.cefet_rj.projeto_final.users.entities.User;
 import jakarta.persistence.*;
 import lombok.EqualsAndHashCode;
@@ -33,6 +34,11 @@ public class Announcement {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "condominium_id", nullable = false)
     private Condominium condominium;
+
+    /** Target unit. Null when the announcement is for the whole condominium. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "unit_id")
+    private Unit unit;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "created_by_id", nullable = false)

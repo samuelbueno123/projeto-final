@@ -40,4 +40,19 @@ public class Notification {
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
+
+    @Column(name = "invitation_id")
+    private Long invitationId;
+
+    @Column(name = "condominium_id")
+    private Long condominiumId;
+
+    @Column(name = "condominium_name")
+    private String condominiumName;
+
+    @Column(name = "invitation_authority", length = 50)
+    private String authority;
+
+    @Column(name = "invitation_status", length = 30)
+    private String invitationStatus;
 }

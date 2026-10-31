@@ -16,6 +16,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 import java.net.URI;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/packages")
@@ -46,14 +47,14 @@ public class PackageController {
         return ResponseEntity.ok().body(list);
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'DOORMAN')")
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/{id}")
     public ResponseEntity<PackageDTO> findById(@PathVariable Long id){
         PackageDTO dto = packageService.findById(id);
         return ResponseEntity.ok().body(dto);
     }
 
-    @PreAuthorize("hasRole('RESIDENT')")
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/my")
     public ResponseEntity<Page<PackageDTO>> findMyPackages(Pageable pageable) {
         Page<PackageDTO> list = packageService.findMyPackages(pageable);
@@ -70,7 +71,7 @@ public class PackageController {
         return ResponseEntity.created(uri).body(newDto);
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'DOORMAN')")
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/expected")
     public ResponseEntity<PackageDTO> insertExpected(@Valid @RequestBody PackageInsertDTO dto) {
         PackageDTO newDto = packageService.registerExpected(dto);
@@ -127,7 +128,21 @@ public class PackageController {
         return ResponseEntity.ok(packageService.pickUp(id));
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'DOORMAN')")
+    @PreAuthorize("isAuthenticated()")
+    @PostMapping("/{id}/request-pickup")
+    @Operation(
+            summary = "Solicitar separação para retirada na portaria",
+            description = "Morador avisa a portaria que irá retirar a encomenda ou autoriza terceiro."
+    )
+    public ResponseEntity<PackageDTO> requestPickup(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, String> body
+    ) {
+        String note = body != null ? body.get("note") : null;
+        return ResponseEntity.ok(packageService.requestPickup(id, note));
+    }
+
+    @PreAuthorize("isAuthenticated()")
     @PatchMapping("/{id}/cancel")
     public ResponseEntity<PackageDTO> cancel(@PathVariable Long id) {
         return ResponseEntity.ok(packageService.cancel(id));

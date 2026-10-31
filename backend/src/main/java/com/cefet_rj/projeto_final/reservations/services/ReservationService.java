@@ -4,6 +4,8 @@ import com.cefet_rj.projeto_final.auth.security.AuthenticatedUserService;
 import com.cefet_rj.projeto_final.billing.enums.FeatureCode;
 import com.cefet_rj.projeto_final.condominiums.security.CondominiumAccessService;
 import com.cefet_rj.projeto_final.condominiums.security.CondominiumFeatureAccessService;
+import com.cefet_rj.projeto_final.notifications.enums.NotificationType;
+import com.cefet_rj.projeto_final.notifications.services.NotificationService;
 import com.cefet_rj.projeto_final.reservations.dtos.ReservationDTO;
 import com.cefet_rj.projeto_final.reservations.dtos.ReservationRequestDTO;
 import com.cefet_rj.projeto_final.reservations.entities.CommonArea;
@@ -15,6 +17,7 @@ import com.cefet_rj.projeto_final.reservations.repositories.ReservationRepositor
 import com.cefet_rj.projeto_final.shared.exceptions.ForbiddenException;
 import com.cefet_rj.projeto_final.shared.exceptions.ResourceNotFoundException;
 import com.cefet_rj.projeto_final.users.entities.User;
+import com.cefet_rj.projeto_final.users.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,10 +33,12 @@ public class ReservationService {
 
     private final ReservationRepository reservationRepository;
     private final CommonAreaRepository commonAreaRepository;
+    private final UserRepository userRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final AuthenticatedUserService authenticatedUserService;
     private final CondominiumAccessService condominiumAccessService;
     private final CondominiumFeatureAccessService featureAccessService;
+    private final NotificationService notificationService;
 
     @Transactional
     public ReservationDTO create(
@@ -76,8 +81,20 @@ public class ReservationService {
             );
         }
 
-        User user =
+        User authenticatedUser =
                 authenticatedUserService.getAuthenticatedUser();
+
+        User user = authenticatedUser;
+        if (authenticatedUser.hasRole("ROLE_ADMIN") && dto.reservedById() != null) {
+            user = userRepository.findById(dto.reservedById())
+                    .orElseThrow(() -> new ResourceNotFoundException("User not found: " + dto.reservedById()));
+        }
+
+        boolean isAdminOrManager = authenticatedUser.hasRole("ROLE_ADMIN")
+                || authenticatedUser.hasRole("ROLE_MANAGER");
+        boolean requiresApproval = commonArea.getRequiresApproval() != null
+                ? commonArea.getRequiresApproval()
+                : true;
 
         Reservation reservation =
                 new Reservation();
@@ -86,8 +103,20 @@ public class ReservationService {
         reservation.setReservedBy(user);
         reservation.setStartAt(dto.startAt());
         reservation.setEndAt(dto.endAt());
+        reservation.setContactPhone(
+                dto.contactPhone() == null || dto.contactPhone().isBlank()
+                        ? null
+                        : dto.contactPhone().replaceAll("\\D", "")
+        );
+        reservation.setNotes(
+                dto.notes() == null || dto.notes().isBlank()
+                        ? null
+                        : dto.notes().trim()
+        );
         reservation.setStatus(
-                ReservationStatus.CONFIRMED
+                (!requiresApproval || isAdminOrManager)
+                        ? ReservationStatus.CONFIRMED
+                        : ReservationStatus.PENDING
         );
         reservation.setCreatedAt(
                 LocalDateTime.now()
@@ -105,6 +134,59 @@ public class ReservationService {
                         reservation.getStartAt(),
                         LocalDateTime.now()
                 )
+        );
+
+        return new ReservationDTO(reservation);
+    }
+
+    @Transactional
+    public ReservationDTO approve(Long id) {
+        Reservation reservation = reservationRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Reservation not found: " + id));
+        Long condominiumId = reservation.getCommonArea().getCondominium().getId();
+        featureAccessService.validateFeatureEnabled(condominiumId, FeatureCode.RESERVATIONS);
+        validateCondominiumAccess(condominiumId);
+
+        reservation.setStatus(ReservationStatus.CONFIRMED);
+        reservation.setRejectionReason(null);
+        reservation = reservationRepository.save(reservation);
+
+        notificationService.createDirectNotification(
+                reservation.getReservedBy(),
+                NotificationType.RESERVATION,
+                "Reserva aprovada!",
+                "Sua solicitação de reserva para " + reservation.getCommonArea().getName()
+                        + " foi aprovada pelo síndico.",
+                condominiumId,
+                reservation.getCommonArea().getCondominium().getName()
+        );
+
+        return new ReservationDTO(reservation);
+    }
+
+    @Transactional
+    public ReservationDTO reject(Long id, String reason) {
+        Reservation reservation = reservationRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Reservation not found: " + id));
+        Long condominiumId = reservation.getCommonArea().getCondominium().getId();
+        featureAccessService.validateFeatureEnabled(condominiumId, FeatureCode.RESERVATIONS);
+        validateCondominiumAccess(condominiumId);
+
+        String cleanReason = reason == null || reason.isBlank()
+                ? "Solicitação não aprovada pela administração."
+                : reason.trim();
+        reservation.setStatus(ReservationStatus.REJECTED);
+        reservation.setRejectionReason(cleanReason);
+        reservation = reservationRepository.save(reservation);
+
+        notificationService.createDirectNotification(
+                reservation.getReservedBy(),
+                NotificationType.RESERVATION,
+                "Reserva recusada",
+                "Sua solicitação para " + reservation.getCommonArea().getName()
+                        + " foi recusada: " + cleanReason,
+                condominiumId,
+                reservation.getCommonArea().getCondominium().getName()
         );
 
         return new ReservationDTO(reservation);

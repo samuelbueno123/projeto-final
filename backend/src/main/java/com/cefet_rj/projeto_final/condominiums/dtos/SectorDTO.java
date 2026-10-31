@@ -6,8 +6,13 @@ public record SectorDTO(
         Long id,
         String name,
 		String structuralType,
-        Long condominiumId
+        Long condominiumId,
+        String condominiumName
 ) {
+
+    public SectorDTO(Long id, String name, String structuralType, Long condominiumId) {
+        this(id, name, structuralType, condominiumId, null);
+    }
 
     public SectorDTO(Sector entity) {
         this(
@@ -16,6 +21,9 @@ public record SectorDTO(
 				entity.getStructuralType().toString(),
                 entity.getCondominium() != null
                         ? entity.getCondominium().getId()
+                        : null,
+                entity.getCondominium() != null
+                        ? entity.getCondominium().getName()
                         : null
         );
     }

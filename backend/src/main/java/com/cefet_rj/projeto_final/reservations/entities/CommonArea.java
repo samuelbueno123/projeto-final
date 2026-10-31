@@ -28,7 +28,19 @@ public class CommonArea {
     private Integer capacity;
 
     @Column(nullable = false)
-    private Boolean active;
+    private Boolean active = true;
+
+    @Column(name = "requires_approval", nullable = false)
+    private Boolean requiresApproval = true;
+
+    @Column(length = 1000)
+    private String rules;
+
+    @Column(name = "opening_hour")
+    private Integer openingHour = 8;
+
+    @Column(name = "closing_hour")
+    private Integer closingHour = 22;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "condominium_id", nullable = false)

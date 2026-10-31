@@ -25,7 +25,7 @@ public class AnnouncementController {
     private final AnnouncementService announcementService;
 
     @PostMapping("/condominiums/{condominiumId}/announcements")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'DOORMAN')")
     public ResponseEntity<AnnouncementDTO> create(
             @PathVariable Long condominiumId,
             @Valid @RequestBody AnnouncementRequestDTO dto

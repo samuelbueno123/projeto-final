@@ -18,6 +18,11 @@ public interface CommonAreaRepository
             Long condominiumId
     );
 
+    List<CommonArea>
+    findByCondominiumIdOrderByNameAsc(
+            Long condominiumId
+    );
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select ca

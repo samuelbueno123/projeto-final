@@ -40,7 +40,7 @@ public class User implements UserDetails {
     private String password;
 
     @Setter
-    @Column(columnDefinition = "text")
+    @Column(name = "profile_image", length = 500)
     private String profileImage;
 
     @Setter

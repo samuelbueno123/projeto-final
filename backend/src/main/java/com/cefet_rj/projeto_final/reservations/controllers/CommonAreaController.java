@@ -5,6 +5,7 @@ import com.cefet_rj.projeto_final.reservations.dtos.CommonAreaRequestDTO;
 import com.cefet_rj.projeto_final.reservations.services.CommonAreaService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -12,13 +13,15 @@ import org.springframework.web.bind.annotation.*;
 import com.cefet_rj.projeto_final.reservations.dtos.CommonAreaUpdateDTO;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
 @Tag(
         name = "Common Areas",
-        description = "Gerenciamento das áreas comuns reserváveis"
+        description = "Gerenciamento das áreas comuns reserváveis e consulta de disponibilidade"
 )
 public class CommonAreaController {
 
@@ -62,6 +65,38 @@ public class CommonAreaController {
                                 condominiumId
                         )
         );
+    }
+
+    @GetMapping(
+            "/condominiums/{condominiumId}/common-areas/all"
+    )
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    public ResponseEntity<List<CommonAreaDTO>>
+    findAllIncludingInactive(
+            @PathVariable Long condominiumId
+    ) {
+        return ResponseEntity.ok(
+                commonAreaService.findAllByCondominium(condominiumId)
+        );
+    }
+
+    @GetMapping("/common-areas/{id}/availability")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<CommonAreaService.CommonAreaAvailabilityDTO> getAvailability(
+            @PathVariable Long id,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
+    ) {
+        return ResponseEntity.ok(commonAreaService.getAvailabilityForDate(id, date));
+    }
+
+    @GetMapping("/common-areas/{id}/check-availability")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<CommonAreaService.AvailabilityCheckDTO> checkAvailability(
+            @PathVariable Long id,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startAt,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endAt
+    ) {
+        return ResponseEntity.ok(commonAreaService.checkIntervalAvailability(id, startAt, endAt));
     }
 
     @PutMapping(

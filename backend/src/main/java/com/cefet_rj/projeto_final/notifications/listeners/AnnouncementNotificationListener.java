@@ -3,6 +3,7 @@ package com.cefet_rj.projeto_final.notifications.listeners;
 import com.cefet_rj.projeto_final.announcements.events.AnnouncementCreatedEvent;
 import com.cefet_rj.projeto_final.billing.enums.FeatureCode;
 import com.cefet_rj.projeto_final.condominiums.repositories.MembershipRepository;
+import com.cefet_rj.projeto_final.condominiums.repositories.ResidentRepository;
 import com.cefet_rj.projeto_final.condominiums.security.CondominiumFeatureAccessService;
 import com.cefet_rj.projeto_final.notifications.services.NotificationService;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +19,7 @@ public class AnnouncementNotificationListener {
 
     private final NotificationService notificationService;
     private final MembershipRepository membershipRepository;
+    private final ResidentRepository residentRepository;
     private final CondominiumFeatureAccessService featureAccessService;
 
     @TransactionalEventListener(
@@ -38,13 +40,24 @@ public class AnnouncementNotificationListener {
                                 event.condominiumId()
                         );
 
+        if (event.unitId() != null) {
+            List<Long> unitResidentIds =
+                    residentRepository.findUserIdsByUnitId(event.unitId());
+
+            residentIds = residentIds.stream()
+                    .filter(unitResidentIds::contains)
+                    .toList();
+        }
+
         if (residentIds.isEmpty()) {
             return;
         }
 
         notificationService.createAnnouncementNotifications(
                 residentIds,
-                event.title()
+                event.title(),
+                event.condominiumId(),
+                event.condominiumName()
         );
     }
 }

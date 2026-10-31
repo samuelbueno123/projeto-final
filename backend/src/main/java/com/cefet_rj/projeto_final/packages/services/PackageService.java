@@ -2,7 +2,10 @@ package com.cefet_rj.projeto_final.packages.services;
 
 import com.cefet_rj.projeto_final.auth.security.AuthenticatedUserService;
 import com.cefet_rj.projeto_final.billing.enums.FeatureCode;
+import com.cefet_rj.projeto_final.condominiums.entities.Resident;
 import com.cefet_rj.projeto_final.condominiums.entities.Unit;
+import com.cefet_rj.projeto_final.condominiums.repositories.MembershipRepository;
+import com.cefet_rj.projeto_final.condominiums.repositories.ResidentRepository;
 import com.cefet_rj.projeto_final.condominiums.security.CondominiumAccessService;
 import com.cefet_rj.projeto_final.condominiums.security.CondominiumFeatureAccessService;
 import com.cefet_rj.projeto_final.packages.dtos.PackageDTO;
@@ -24,8 +27,10 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 
@@ -33,9 +38,11 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class PackageService {
 
-	private final PackageRepository packageRepository;
-	private final UserRepository userRepository;
-	private final UnitRepository unitRepository;
+    private final PackageRepository packageRepository;
+    private final UserRepository userRepository;
+    private final UnitRepository unitRepository;
+    private final ResidentRepository residentRepository;
+    private final MembershipRepository membershipRepository;
     private final AuthenticatedUserService authenticatedUserService;
     private final CondominiumAccessService condominiumAccessService;
     private final PackageHistoryService packageHistoryService;
@@ -95,7 +102,7 @@ public class PackageService {
     public PackageDTO registerReceived(PackageInsertDTO dto) {
         Package entity = new Package();
 
-        linkAssociations(dto.description(), dto.recipientId(), dto.unitId(), entity);
+        linkAssociations(dto.condominiumId(), dto.description(), dto.recipientId(), dto.unitId(), entity);
 
         entity.setStatus(PackageStatus.RECEIVED);
         entity.setReceivedAt(LocalDateTime.now());
@@ -107,12 +114,35 @@ public class PackageService {
     @Transactional
     public PackageDTO registerExpected(PackageInsertDTO dto) {
         Package entity = new Package();
+        User caller = authenticatedUserService.getAuthenticatedUser();
+        Long recipientId = dto.recipientId();
+        boolean isStaff = caller.hasRole("ROLE_ADMIN") || caller.hasRole("ROLE_MANAGER") || caller.hasRole("ROLE_DOORMAN");
+        if (recipientId == null && !isStaff) {
+            recipientId = caller.getId();
+        }
 
-        linkAssociations(dto.description(), dto.recipientId(), dto.unitId(), entity);
+        linkAssociations(dto.condominiumId(), dto.description(), recipientId, dto.unitId(), entity);
 
         entity.setStatus(PackageStatus.EXPECTED);
 
         entity = packageRepository.save(entity);
+        return new PackageDTO(entity);
+    }
+
+    @Transactional
+    public PackageDTO requestPickup(Long id, String note) {
+        Package entity = packageRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Package not found"));
+        validatePackageAccess(entity);
+        String cleanNote = note == null || note.isBlank()
+                ? "Morador solicitou separação da encomenda para retirada na portaria."
+                : "Solicitação de retirada: " + note.trim();
+        packageHistoryService.registerUserAction(
+                entity,
+                entity.getStatus(),
+                entity.getStatus(),
+                cleanNote
+        );
         return new PackageDTO(entity);
     }
 
@@ -210,6 +240,7 @@ public class PackageService {
         validatePackageAccess(entity);
 
         linkAssociations(
+                null,
                 dto.description(),
                 dto.recipientId(),
                 dto.unitId(),
@@ -349,6 +380,7 @@ public class PackageService {
     }
 
     private void linkAssociations(
+            Long condominiumId,
             String description,
             Long recipientId,
             Long unitId,
@@ -356,21 +388,49 @@ public class PackageService {
     ) {
         entity.setDescription(description);
 
-        User recipient = userRepository.findById(recipientId)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("User not found: " + recipientId));
-
-        Unit unit = unitRepository.findById(unitId)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException(
-                                "Unit not found: " + unitId
-                        )
-                );
+        Unit unit;
+        if (unitId != null) {
+            unit = unitRepository.findById(unitId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Unit not found: " + unitId));
+        } else if (recipientId != null && condominiumId != null) {
+            unit = residentRepository.findFirstByUserIdAndUnitSectorCondominiumId(recipientId, condominiumId)
+                    .map(Resident::getUnit)
+                    .orElseGet(() -> unitRepository.findAllForCondominium(condominiumId).stream()
+                            .findFirst()
+                            .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Informe uma unidade válida.")));
+        } else if (condominiumId != null) {
+            unit = unitRepository.findAllForCondominium(condominiumId).stream()
+                    .findFirst()
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Informe uma unidade válida."));
+        } else {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Informe a unidade da encomenda.");
+        }
 
         validateUnitAccess(unit);
 
+        Long resolvedCondoId = getCondominiumId(unit);
+        if (condominiumId != null && !condominiumId.equals(resolvedCondoId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A unidade informada não pertence ao condomínio selecionado.");
+        }
+
+        User recipient;
+        if (recipientId != null) {
+            recipient = userRepository.findById(recipientId)
+                    .orElseThrow(() -> new ResourceNotFoundException("User not found: " + recipientId));
+        } else {
+            recipient = residentRepository.findFirstByUnitId(unit.getId())
+                    .map(Resident::getUser)
+                    .orElseGet(() -> {
+                        var residentUserIds = membershipRepository.findResidentUserIdsByCondominiumId(resolvedCondoId);
+                        if (!residentUserIds.isEmpty()) {
+                            return userRepository.findById(residentUserIds.getFirst()).orElseGet(authenticatedUserService::getAuthenticatedUser);
+                        }
+                        return authenticatedUserService.getAuthenticatedUser();
+                    });
+        }
+
         featureAccessService.validateFeatureEnabled(
-                getCondominiumId(unit),
+                resolvedCondoId,
                 FeatureCode.PACKAGES
         );
 

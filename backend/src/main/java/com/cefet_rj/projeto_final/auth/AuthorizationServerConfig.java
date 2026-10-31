@@ -6,6 +6,8 @@ import java.util.ArrayList;
 import java.util.UUID;
 
 import com.cefet_rj.projeto_final.auth.security.PersistentRsaKeyService;
+import com.cefet_rj.projeto_final.users.entities.Role;
+import com.cefet_rj.projeto_final.users.repositories.UserRepository;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2RefreshTokenGenerator;
 import org.springframework.beans.factory.annotation.Value;
@@ -204,7 +206,7 @@ public class AuthorizationServerConfig {
     }
 
     @Bean
-    public OAuth2TokenCustomizer<JwtEncodingContext> tokenCustomizer() {
+    public OAuth2TokenCustomizer<JwtEncodingContext> tokenCustomizer(UserRepository userRepository) {
 
         return context -> {
 
@@ -247,6 +249,17 @@ public class AuthorizationServerConfig {
                                         .map(GrantedAuthority::getAuthority)
                                         .toList()
                         );
+            }
+
+            if (username != null && !username.isBlank()) {
+                var userOpt = userRepository.findByEmailIgnoreCase(username);
+                if (userOpt.isPresent()) {
+                    authorities = new ArrayList<>(
+                            userOpt.get().getRoles().stream()
+                                    .map(Role::getAuthority)
+                                    .toList()
+                    );
+                }
             }
 
             context.getClaims()

@@ -43,4 +43,13 @@ public class Reservation {
     private LocalDateTime createdAt;
 
     private LocalDateTime cancelledAt;
+
+    @Column(name = "contact_phone", length = 20)
+    private String contactPhone;
+
+    @Column(length = 500)
+    private String notes;
+
+    @Column(name = "rejection_reason", length = 500)
+    private String rejectionReason;
 }

@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
@@ -39,6 +40,7 @@ public class CondominiumController {
     }
 
 	@PostMapping
+	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<CondominiumDTO> insert(@Valid @RequestBody CondominiumInsertDTO dto){
 		CondominiumDTO newDto = condominiumService.insert(dto);
 		URI uri = ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}")
@@ -48,12 +50,14 @@ public class CondominiumController {
 	}
 
 	@PutMapping ("/{id}")
+	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<CondominiumDTO> update(@PathVariable Long id, @Valid @RequestBody CondominiumUpdateDTO dto){
 		CondominiumDTO newDto = condominiumService.update(id, dto);
 		return ResponseEntity.ok().body(newDto);
 	}
 
 	@DeleteMapping("/{id}")
+	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<Void> delete(@PathVariable Long id){
 		condominiumService.delete(id);
 		return ResponseEntity.noContent().build();

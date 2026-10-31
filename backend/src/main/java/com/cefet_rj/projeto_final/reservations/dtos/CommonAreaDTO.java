@@ -9,7 +9,12 @@ public record CommonAreaDTO(
         String description,
         Integer capacity,
         Boolean active,
-        Long condominiumId
+        Boolean requiresApproval,
+        String rules,
+        Integer openingHour,
+        Integer closingHour,
+        Long condominiumId,
+        String condominiumName
 
 ) {
 
@@ -20,7 +25,12 @@ public record CommonAreaDTO(
                 entity.getDescription(),
                 entity.getCapacity(),
                 entity.getActive(),
-                entity.getCondominium().getId()
+                entity.getRequiresApproval() != null ? entity.getRequiresApproval() : true,
+                entity.getRules(),
+                entity.getOpeningHour() != null ? entity.getOpeningHour() : 8,
+                entity.getClosingHour() != null ? entity.getClosingHour() : 22,
+                entity.getCondominium().getId(),
+                entity.getCondominium().getName()
         );
     }
 }

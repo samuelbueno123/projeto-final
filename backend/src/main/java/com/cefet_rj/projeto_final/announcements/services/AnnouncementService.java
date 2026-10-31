@@ -7,6 +7,10 @@ import com.cefet_rj.projeto_final.announcements.repositories.AnnouncementReposit
 import com.cefet_rj.projeto_final.auth.security.AuthenticatedUserService;
 import com.cefet_rj.projeto_final.billing.enums.FeatureCode;
 import com.cefet_rj.projeto_final.condominiums.entities.Condominium;
+import com.cefet_rj.projeto_final.condominiums.entities.Unit;
+import com.cefet_rj.projeto_final.condominiums.repositories.ResidentRepository;
+import com.cefet_rj.projeto_final.condominiums.repositories.UnitRepository;
+import com.cefet_rj.projeto_final.shared.exceptions.ForbiddenException;
 import com.cefet_rj.projeto_final.condominiums.repositories.CondominiumRepository;
 import com.cefet_rj.projeto_final.condominiums.security.CondominiumAccessService;
 import com.cefet_rj.projeto_final.condominiums.security.CondominiumFeatureAccessService;
@@ -32,6 +36,8 @@ public class AnnouncementService {
     private final AuthenticatedUserService authenticatedUserService;
     private final CondominiumAccessService condominiumAccessService;
     private final CondominiumFeatureAccessService featureAccessService;
+    private final UnitRepository unitRepository;
+    private final ResidentRepository residentRepository;
 
     @Transactional
     public AnnouncementDTO create(
@@ -56,7 +62,10 @@ public class AnnouncementService {
         User authenticatedUser =
                 authenticatedUserService.getAuthenticatedUser();
 
+        Unit targetUnit = resolveTargetUnit(authenticatedUser, condominiumId, dto.unitId());
+
         Announcement announcement = new Announcement();
+        announcement.setUnit(targetUnit);
 
         announcement.setTitle(dto.title().trim());
         announcement.setContent(dto.content().trim());
@@ -73,6 +82,8 @@ public class AnnouncementService {
                 new AnnouncementCreatedEvent(
                         announcement.getId(),
                         condominiumId,
+                        condominium.getName(),
+                        targetUnit != null ? targetUnit.getId() : null,
                         announcement.getTitle(),
                         LocalDateTime.now()
                 )
@@ -99,6 +110,7 @@ public class AnnouncementService {
                 )
                 .stream()
                 .filter(this::isNotExpired)
+                .filter(visibleTo(authenticatedUserService.getAuthenticatedUser()))
                 .map(AnnouncementDTO::new)
                 .toList();
     }
@@ -122,6 +134,58 @@ public class AnnouncementService {
         announcement.setActive(false);
 
         announcementRepository.save(announcement);
+    }
+
+    /**
+     * Resolves the announcement target unit. Managers/admins may publish to the whole
+     * condominium or to one unit; doormen may only publish to specific units.
+     */
+    private Unit resolveTargetUnit(User author, Long condominiumId, Long unitId) {
+
+        boolean isStaffWithFullScope =
+                author.hasRole("ROLE_ADMIN") || author.hasRole("ROLE_MANAGER");
+
+        if (unitId == null) {
+            if (!isStaffWithFullScope) {
+                throw new ForbiddenException(
+                        "Doormen can only send announcements to specific units"
+                );
+            }
+            return null;
+        }
+
+        Unit unit = unitRepository.findById(unitId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Unit not found: " + unitId)
+                );
+
+        if (!unit.getSector().getCondominium().getId().equals(condominiumId)) {
+            throw new ForbiddenException(
+                    "Unit does not belong to this condominium"
+            );
+        }
+
+        return unit;
+    }
+
+    /**
+     * Unit-targeted announcements are only visible to the unit residents
+     * (and to the condominium staff).
+     */
+    private java.util.function.Predicate<Announcement> visibleTo(User user) {
+
+        boolean isStaff = user.hasRole("ROLE_ADMIN")
+                || user.hasRole("ROLE_MANAGER")
+                || user.hasRole("ROLE_DOORMAN");
+
+        if (isStaff) {
+            return announcement -> true;
+        }
+
+        List<Long> myUnitIds = residentRepository.findUnitIdsByUserId(user.getId());
+
+        return announcement -> announcement.getUnit() == null
+                || myUnitIds.contains(announcement.getUnit().getId());
     }
 
     private boolean isNotExpired(Announcement announcement) {

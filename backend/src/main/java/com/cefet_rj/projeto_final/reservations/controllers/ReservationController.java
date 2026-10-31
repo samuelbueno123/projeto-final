@@ -15,12 +15,13 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
 @Tag(
         name = "Reservations",
-        description = "Reservas de áreas comuns"
+        description = "Reservas e solicitações de reserva de áreas comuns"
 )
 public class ReservationController {
 
@@ -31,13 +32,13 @@ public class ReservationController {
     )
     @PreAuthorize("isAuthenticated()")
     @Operation(
-            summary = "Criar reserva",
-            description = "Cria uma reserva para uma área comum disponível."
+            summary = "Solicitar ou criar reserva",
+            description = "Solicita ou cria uma reserva para uma área comum disponível."
     )
     @ApiResponses({
             @ApiResponse(
                     responseCode = "201",
-                    description = "Reserva criada"
+                    description = "Reserva ou solicitação criada"
             ),
             @ApiResponse(
                     responseCode = "409",
@@ -80,6 +81,22 @@ public class ReservationController {
                                 condominiumId
                         )
         );
+    }
+
+    @PatchMapping("/reservations/{id}/approve")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    public ResponseEntity<ReservationDTO> approve(@PathVariable Long id) {
+        return ResponseEntity.ok(reservationService.approve(id));
+    }
+
+    @PatchMapping("/reservations/{id}/reject")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    public ResponseEntity<ReservationDTO> reject(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, String> body
+    ) {
+        String reason = body != null ? body.get("reason") : null;
+        return ResponseEntity.ok(reservationService.reject(id, reason));
     }
 
     @PatchMapping(

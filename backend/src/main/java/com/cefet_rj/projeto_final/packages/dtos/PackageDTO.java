@@ -7,9 +7,14 @@ import java.time.LocalDateTime;
 
 public record PackageDTO(
         Long id,
+        Long condominiumId,
+        String condominiumName,
         String description,
         Long recipientId,
+        String recipientName,
         Long unitId,
+        String unitIdentifier,
+        String sectorName,
         PackageStatus status,
         LocalDateTime receivedAt,
         LocalDateTime notifiedAt,
@@ -21,9 +26,21 @@ public record PackageDTO(
     public PackageDTO(Package entity) {
         this(
                 entity.getId(),
+                entity.getUnit() != null && entity.getUnit().getSector() != null
+                        ? entity.getUnit().getSector().getCondominium().getId()
+                        : null,
+                entity.getUnit() != null && entity.getUnit().getSector() != null
+                        ? entity.getUnit().getSector().getCondominium().getName()
+                        : null,
                 entity.getDescription(),
                 entity.getRecipient().getId(),
+                (entity.getRecipient().getFirstName() + " "
+                        + entity.getRecipient().getLastName()).trim(),
                 entity.getUnit().getId(),
+                entity.getUnit().getIdentifier(),
+                entity.getUnit().getSector() != null
+                        ? entity.getUnit().getSector().getName()
+                        : null,
                 entity.getStatus(),
                 entity.getReceivedAt(),
                 entity.getNotifiedAt(),

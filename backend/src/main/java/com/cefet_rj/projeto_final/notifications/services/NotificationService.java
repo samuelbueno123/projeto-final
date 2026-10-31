@@ -6,6 +6,7 @@ import com.cefet_rj.projeto_final.notifications.dtos.SystemAnnouncementRequestDT
 import com.cefet_rj.projeto_final.notifications.entities.Notification;
 import com.cefet_rj.projeto_final.notifications.enums.NotificationType;
 import com.cefet_rj.projeto_final.notifications.repositories.NotificationRepository;
+import com.cefet_rj.projeto_final.packages.repositories.PackageRepository;
 import com.cefet_rj.projeto_final.shared.exceptions.ResourceNotFoundException;
 import com.cefet_rj.projeto_final.users.entities.User;
 import com.cefet_rj.projeto_final.users.repositories.UserRepository;
@@ -25,6 +26,7 @@ import java.util.List;
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
+    private final PackageRepository packageRepository;
     private final UserRepository userRepository;
     private final AuthenticatedUserService authenticatedUserService;
 
@@ -53,6 +55,28 @@ public class NotificationService {
         return notifications.size();
     }
 
+    @Transactional
+    public void createDirectNotification(
+            User recipient,
+            NotificationType type,
+            String title,
+            String message,
+            Long condominiumId,
+            String condominiumName
+    ) {
+        if (recipient == null) return;
+        Notification notification = new Notification();
+        notification.setRecipient(recipient);
+        notification.setType(type);
+        notification.setCondominiumId(condominiumId);
+        notification.setCondominiumName(condominiumName);
+        notification.setTitle(title);
+        notification.setMessage(message);
+        notification.setRead(false);
+        notification.setCreatedAt(LocalDateTime.now());
+        notificationRepository.save(notification);
+    }
+
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void createPackageNotification(
             Long recipientId,
@@ -68,7 +92,11 @@ public class NotificationService {
         notification.setType(NotificationType.PACKAGE_RECEIVED);
         notification.setTitle("Encomenda disponível");
         notification.setMessage(
-                "Sua encomenda #" + packageId + " está disponível na portaria."
+                packageRepository.findById(packageId)
+                        .map(p -> p.getDescription() == null || p.getDescription().isBlank()
+                                ? "Sua encomenda está disponível na portaria."
+                                : "Sua encomenda (" + p.getDescription().trim() + ") está disponível na portaria.")
+                        .orElse("Sua encomenda está disponível na portaria.")
         );
         notification.setRead(false);
         notification.setCreatedAt(LocalDateTime.now());
@@ -79,7 +107,9 @@ public class NotificationService {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void createAnnouncementNotifications(
             List<Long> recipientIds,
-            String announcementTitle
+            String announcementTitle,
+            Long condominiumId,
+            String condominiumName
     ) {
 
         if (recipientIds.isEmpty()) {
@@ -100,6 +130,8 @@ public class NotificationService {
 
             notification.setRecipient(recipient);
             notification.setType(NotificationType.ANNOUNCEMENT);
+            notification.setCondominiumId(condominiumId);
+            notification.setCondominiumName(condominiumName);
             notification.setTitle("Novo comunicado");
             notification.setMessage(
                     "Novo comunicado disponível: "
@@ -173,13 +205,13 @@ public class NotificationService {
         );
 
         notification.setTitle(
-                "Reserva confirmada"
+                "Reserva registrada"
         );
 
         notification.setMessage(
                 "Sua reserva de "
                         + commonAreaName
-                        + " foi confirmada para "
+                        + " foi registrada para "
                         + startAt
         );
 

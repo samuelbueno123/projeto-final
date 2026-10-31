@@ -7,11 +7,14 @@ import com.cefet_rj.projeto_final.users.dtos.update.UserPasswordUpdateDTO;
 import com.cefet_rj.projeto_final.users.dtos.update.UserProfileUpdateDTO;
 import com.cefet_rj.projeto_final.users.entities.User;
 import com.cefet_rj.projeto_final.users.repositories.UserRepository;
+import com.cefet_rj.projeto_final.users.services.PictureStorageService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestController
@@ -22,6 +25,7 @@ public class UserProfileController {
     private final UserRepository users;
     private final PasswordEncoder passwordEncoder;
     private final GoogleIdentityTokenService googleTokens;
+    private final PictureStorageService pictureStorageService;
 
     @GetMapping
     public UserProfileDTO getProfile() {
@@ -52,14 +56,35 @@ public class UserProfileController {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Este email já está em uso.");
             }
         }
-        String image = request.profileImage();
-        if (image != null && !image.isBlank() && !image.matches("^data:image/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$")) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A imagem deve ser PNG, JPEG ou WebP válida.");
-        }
+        String storedPicturePath = pictureStorageService.resolveOrStoreProfileImage(
+                user.getId(),
+                request.profileImage(),
+                user.getProfileImage()
+        );
         user.setFirstName(request.firstName().trim());
-        user.setLastName(request.lastName().trim());
+        user.setLastName(request.lastName() == null ? "" : request.lastName().trim());
         user.setEmail(email);
-        user.setProfileImage(image == null || image.isBlank() ? null : image);
+        user.setProfileImage(storedPicturePath);
+        return new UserProfileDTO(users.save(user));
+    }
+
+    @PostMapping(value = {"/picture", "/profile/picture"}, consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public UserProfileDTO uploadProfilePicture(@RequestParam("file") MultipartFile file) {
+        User user = authenticatedUser.getAuthenticatedUser();
+        String storedPath = pictureStorageService.storeMultipartPicture(
+                user.getId(),
+                file,
+                user.getProfileImage()
+        );
+        user.setProfileImage(storedPath);
+        return new UserProfileDTO(users.save(user));
+    }
+
+    @DeleteMapping({"/picture", "/profile/picture"})
+    public UserProfileDTO deleteProfilePicture() {
+        User user = authenticatedUser.getAuthenticatedUser();
+        pictureStorageService.deleteFileIfPresent(user.getProfileImage());
+        user.setProfileImage(null);
         return new UserProfileDTO(users.save(user));
     }
 

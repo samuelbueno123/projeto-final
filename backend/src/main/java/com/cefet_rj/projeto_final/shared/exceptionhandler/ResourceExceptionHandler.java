@@ -12,8 +12,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 
@@ -213,5 +215,46 @@ public class ResourceExceptionHandler {
         return ResponseEntity
                 .status(status)
                 .body(error);
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<StandardError> responseStatus(
+            ResponseStatusException exception,
+            HttpServletRequest request
+    ) {
+
+        HttpStatus status = HttpStatus.resolve(exception.getStatusCode().value());
+        if (status == null) {
+            status = HttpStatus.INTERNAL_SERVER_ERROR;
+        }
+
+        StandardError error =
+                new StandardError(
+                        Instant.now(),
+                        status.value(),
+                        status.getReasonPhrase(),
+                        exception.getReason() != null ? exception.getReason() : exception.getMessage(),
+                        request.getRequestURI()
+                );
+
+        return ResponseEntity
+                .status(status)
+                .body(error);
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<StandardError> missingParameter(
+            MissingServletRequestParameterException exception,
+            HttpServletRequest request
+    ) {
+        HttpStatus status = HttpStatus.BAD_REQUEST;
+        StandardError error = new StandardError(
+                Instant.now(),
+                status.value(),
+                status.getReasonPhrase(),
+                "Parâmetro obrigatório ausente: " + exception.getParameterName(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(status).body(error);
     }
 }

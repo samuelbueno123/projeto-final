@@ -14,6 +14,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -50,8 +52,32 @@ public class UserService {
 		linkAssociations(dto.firstName(), dto.lastName(), dto.email().trim().toLowerCase(java.util.Locale.ROOT), entity);
 
 		entity.getRoles().clear();
-		Role role = roleRepository.findByAuthority("ROLE_RESIDENT");
-		entity.getRoles().add(role);
+		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+		boolean isAdminCaller = authentication != null
+				&& authentication.getAuthorities() != null
+				&& authentication.getAuthorities().stream()
+						.anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+
+		if (isAdminCaller && dto.roles() != null && !dto.roles().isEmpty()) {
+			for (var roleDto : dto.roles()) {
+				if (roleDto == null || roleDto.authority() == null || roleDto.authority().isBlank()) {
+					continue;
+				}
+				String authority = roleDto.authority().trim().toUpperCase(java.util.Locale.ROOT);
+				if (!authority.startsWith("ROLE_")) {
+					authority = "ROLE_" + authority;
+				}
+				Role found = roleRepository.findByAuthority(authority);
+				if (found != null) {
+					entity.getRoles().add(found);
+				}
+			}
+		}
+
+		if (entity.getRoles().isEmpty()) {
+			Role role = roleRepository.findByAuthority("ROLE_RESIDENT");
+			entity.getRoles().add(role);
+		}
 		entity.setPassword(passwordEncoder.encode(dto.password()));
 
 		entity = userRepository.save(entity);
@@ -63,7 +89,37 @@ public class UserService {
 	public UserDTO update(Long id, UserUpdateDTO dto) {
 		try {
 			User entity = userRepository.getReferenceById(id);
-			linkAssociations(dto.firstName(), dto.lastName(), dto.email(), entity);
+			linkAssociations(dto.firstName(), dto.lastName(), dto.email().trim().toLowerCase(java.util.Locale.ROOT), entity);
+
+			Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+			boolean isAdminCaller = authentication != null
+					&& authentication.getAuthorities() != null
+					&& authentication.getAuthorities().stream()
+							.anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+
+			if (isAdminCaller && dto.roles() != null && !dto.roles().isEmpty()) {
+				entity.getRoles().clear();
+				for (var roleDto : dto.roles()) {
+					if (roleDto == null || roleDto.authority() == null || roleDto.authority().isBlank()) {
+						continue;
+					}
+					String authority = roleDto.authority().trim().toUpperCase(java.util.Locale.ROOT);
+					if (!authority.startsWith("ROLE_")) {
+						authority = "ROLE_" + authority;
+					}
+					Role found = roleRepository.findByAuthority(authority);
+					if (found != null) {
+						entity.getRoles().add(found);
+					}
+				}
+				if (entity.getRoles().isEmpty()) {
+					Role role = roleRepository.findByAuthority("ROLE_RESIDENT");
+					if (role != null) {
+						entity.getRoles().add(role);
+					}
+				}
+			}
+
 			entity = userRepository.save(entity);
 			return new UserDTO(entity);
 		}
@@ -87,7 +143,7 @@ public class UserService {
 
 	private void linkAssociations(String firstName, String lastName, String email, User entity) {
 		entity.setFirstName(firstName);
-		entity.setLastName(lastName);
+		entity.setLastName(lastName == null ? "" : lastName);
 		entity.setEmail(email);
 	}
 }

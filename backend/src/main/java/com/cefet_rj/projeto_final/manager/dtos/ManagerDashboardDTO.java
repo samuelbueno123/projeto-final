@@ -5,9 +5,37 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
-public record ManagerDashboardDTO(Long condominiumId, String condominiumName, long totalUnits,
-        long totalUsers, long totalReservations, List<UnitInfo> units, List<ReservationInfo> reservations) {
-    public record UnitInfo(Long id, String identifier, String sector, String paymentStatus, LocalDate dueDate, BigDecimal amount) {}
-    public record ReservationInfo(Long id, LocalDateTime startAt, LocalDateTime endAt, String status,
-            String commonArea, String residentName, String residentEmail) {}
+public record ManagerDashboardDTO(
+        Long condominiumId,
+        String condominiumName,
+        long totalUnits,
+        long totalUsers,
+        long totalReservations,
+        List<UnitInfo> units,
+        List<ReservationInfo> reservations
+) {
+    public record UnitInfo(
+            Long id,
+            String identifier,
+            String sector,
+            String paymentStatus,
+            LocalDate dueDate,
+            BigDecimal amount,
+            String paymentNote,
+            LocalDateTime requestedAt
+    ) {}
+
+    public record ReservationInfo(
+            Long id,
+            LocalDateTime startAt,
+            LocalDateTime endAt,
+            String status,
+            Long commonAreaId,
+            String commonArea,
+            String residentName,
+            String residentEmail,
+            String contactPhone,
+            String notes,
+            String rejectionReason
+    ) {}
 }
