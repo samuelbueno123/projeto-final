@@ -1,0 +1,55 @@
+package com.cefet_rj.projeto_final.community.repositories;
+
+import com.cefet_rj.projeto_final.community.entities.DoormanChatMessage;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
+@Repository
+public interface DoormanChatMessageRepository extends JpaRepository<DoormanChatMessage, Long> {
+
+    @Query("""
+        SELECT m FROM DoormanChatMessage m
+        WHERE m.condominium.id = :condoId
+          AND (m.sender.id = :userId OR m.recipient.id = :userId OR (:unitId IS NOT NULL AND m.unit.id = :unitId))
+        ORDER BY m.sentAt ASC
+    """)
+    List<DoormanChatMessage> findResidentConversation(
+            @Param("condoId") Long condoId,
+            @Param("userId") Long userId,
+            @Param("unitId") Long unitId
+    );
+
+    @Query("""
+        SELECT m FROM DoormanChatMessage m
+        WHERE m.condominium.id = :condoId
+          AND (:targetUserId IS NULL OR m.sender.id = :targetUserId OR m.recipient.id = :targetUserId)
+        ORDER BY m.sentAt ASC
+    """)
+    List<DoormanChatMessage> findDoormanConversation(
+            @Param("condoId") Long condoId,
+            @Param("targetUserId") Long targetUserId
+    );
+
+    @Query("""
+        SELECT COUNT(m) FROM DoormanChatMessage m
+        WHERE m.condominium.id = :condoId
+          AND m.recipient.id = :userId
+          AND m.isRead = false
+    """)
+    long countUnreadMessages(@Param("condoId") Long condoId, @Param("userId") Long userId);
+
+    @Modifying
+    @Query("""
+        UPDATE DoormanChatMessage m
+        SET m.isRead = true
+        WHERE m.condominium.id = :condoId
+          AND m.recipient.id = :userId
+          AND m.isRead = false
+    """)
+    void markAsReadForUser(@Param("condoId") Long condoId, @Param("userId") Long userId);
+}

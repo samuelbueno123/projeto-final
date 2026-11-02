@@ -52,4 +52,20 @@ public class Reservation {
 
     @Column(name = "rejection_reason", length = 500)
     private String rejectionReason;
+
+    @Column(name = "counter_proposal_notes", length = 500)
+    private String counterProposalNotes;
+
+    @Column(name = "proposed_start_at")
+    private LocalDateTime proposedStartAt;
+
+    @Column(name = "proposed_end_at")
+    private LocalDateTime proposedEndAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reviewed_by_id")
+    private User reviewedBy;
+
+    @Column(name = "reviewed_at")
+    private LocalDateTime reviewedAt;
 }

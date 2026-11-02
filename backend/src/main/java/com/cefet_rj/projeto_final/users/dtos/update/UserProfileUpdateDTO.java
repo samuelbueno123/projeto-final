@@ -10,5 +10,17 @@ public record UserProfileUpdateDTO(
         @NotBlank @Email @Size(max = 150) String email,
         @Size(max = 4_200_000) String profileImage,
         String currentPassword,
-        String googleIdToken
-) {}
+        String googleIdToken,
+        String themePreference
+) {
+    public UserProfileUpdateDTO(
+            String firstName,
+            String lastName,
+            String email,
+            String profileImage,
+            String currentPassword,
+            String googleIdToken
+    ) {
+        this(firstName, lastName, email, profileImage, currentPassword, googleIdToken, null);
+    }
+}

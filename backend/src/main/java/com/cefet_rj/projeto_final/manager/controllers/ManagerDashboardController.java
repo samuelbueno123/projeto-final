@@ -1,6 +1,9 @@
 package com.cefet_rj.projeto_final.manager.controllers;
 
 import com.cefet_rj.projeto_final.auth.security.AuthenticatedUserService;
+import com.cefet_rj.projeto_final.billing.entities.BillingPlan;
+import com.cefet_rj.projeto_final.billing.repositories.BillingPlanRepository;
+import com.cefet_rj.projeto_final.condominiums.dtos.CondominiumDTO;
 import com.cefet_rj.projeto_final.condominiums.dtos.SectorDTO;
 import com.cefet_rj.projeto_final.condominiums.dtos.UnitDTO;
 import com.cefet_rj.projeto_final.condominiums.entities.Condominium;
@@ -34,6 +37,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
@@ -52,6 +57,7 @@ public class ManagerDashboardController {
     private final ReservationRepository reservationRepository;
     private final CondominiumAccessService condominiumAccessService;
     private final NotificationService notificationService;
+    private final BillingPlanRepository billingPlanRepository;
 
     @GetMapping("/manager/dashboard")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
@@ -70,7 +76,10 @@ public class ManagerDashboardController {
                     payment == null ? null : payment.getDueDate(),
                     payment == null ? null : payment.getAmount(),
                     payment == null ? null : payment.getPaymentNote(),
-                    payment == null ? null : payment.getRequestedAt()
+                    payment == null ? null : payment.getRequestedAt(),
+                    payment == null ? null : payment.getInvoiceTitle(),
+                    payment == null ? null : payment.getDigitableLine(),
+                    payment == null ? null : payment.getPaidAt()
             );
         }).toList();
         var reservations = reservationRepository.findByCommonAreaCondominiumIdOrderByStartAtDesc(condominiumId)
@@ -85,7 +94,10 @@ public class ManagerDashboardController {
                         r.getReservedBy().getEmail(),
                         r.getContactPhone(),
                         r.getNotes(),
-                        r.getRejectionReason()
+                        r.getRejectionReason(),
+                        r.getCounterProposalNotes(),
+                        r.getProposedStartAt(),
+                        r.getProposedEndAt()
                 ))
                 .toList();
         return new ManagerDashboardDTO(
@@ -97,6 +109,29 @@ public class ManagerDashboardController {
                 units,
                 reservations
         );
+    }
+
+    @PutMapping("/manager/condominiums/{condominiumId}/select-plan")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    @Transactional
+    public ResponseEntity<CondominiumDTO> selectCondominiumPlan(
+            @PathVariable Long condominiumId,
+            @RequestBody Map<String, Object> body
+    ) {
+        User viewer = authenticatedUserService.getAuthenticatedUser();
+        ensureAccess(viewer, condominiumId);
+        Condominium condo = condominiumRepository.findById(condominiumId)
+                .orElseThrow(() -> new ResourceNotFoundException("Condomínio não encontrado"));
+        Long planId = body.get("planId") instanceof Number n ? n.longValue() : null;
+        if (planId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Informe o plano desejado.");
+        }
+        BillingPlan plan = billingPlanRepository.findById(planId)
+                .orElseThrow(() -> new ResourceNotFoundException("Plano não encontrado: " + planId));
+        condo.setBillingPlan(plan);
+        condo.setPlanSelected(true);
+        condo = condominiumRepository.save(condo);
+        return ResponseEntity.ok(new CondominiumDTO(condo));
     }
 
     @PutMapping("/manager/condominiums/{condominiumId}/units/{unitId}/payment-status")
@@ -118,68 +153,170 @@ public class ManagerDashboardController {
         payment.setStatus(dto.status());
         payment.setDueDate(dto.dueDate());
         payment.setAmount(dto.amount());
-        if (dto.paymentNote() != null) {
-            payment.setPaymentNote(dto.paymentNote().isBlank() ? null : dto.paymentNote().trim());
+        payment.setPaymentNote(dto.paymentNote());
+        if (payment.getStatus() == UnitPaymentStatus.PAID && payment.getPaidAt() == null) {
+            payment.setPaidAt(LocalDateTime.now());
         }
         payment.setUpdatedAt(LocalDateTime.now());
         payment.setUpdatedBy(viewer);
         paymentRepository.save(payment);
-
-        // Notify residents of the unit when status changes
-        List<Resident> unitResidents = residentRepository.findAllByUnitIdWithUser(unitId);
-        String statusLabel = switch (dto.status()) {
-            case PAID -> "PAGO (Confirmado)";
-            case PENDING -> "PENDENTE";
-            case OVERDUE -> "EM ATRASO";
-            case CONFIRMATION_REQUESTED -> "EM ANÁLISE";
-        };
-        for (Resident res : unitResidents) {
-            notificationService.createDirectNotification(
-                    res.getUser(),
-                    NotificationType.SYSTEM_ANNOUNCEMENT,
-                    "Situação financeira da unidade " + unit.getIdentifier(),
-                    "O status financeiro da sua unidade (" + unit.getSector().getName() + " • " + unit.getIdentifier()
-                            + ") foi atualizado para: " + statusLabel + ".",
-                    condominiumId,
-                    unit.getSector().getCondominium().getName()
-            );
-        }
-
         return ResponseEntity.noContent().build();
     }
 
-    @GetMapping("/condominiums/{condominiumId}/units/my-payments")
+    @PostMapping("/manager/condominiums/{condominiumId}/units/{unitId}/generate-boleto")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    @Transactional
+    public ResponseEntity<ManagerDashboardDTO.UnitInfo> generateBoleto(
+            @PathVariable Long condominiumId,
+            @PathVariable Long unitId,
+            @RequestBody(required = false) Map<String, Object> body
+    ) {
+        User viewer = authenticatedUserService.getAuthenticatedUser();
+        ensureAccess(viewer, condominiumId);
+        Unit unit = unitRepository.findById(unitId)
+                .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada: " + unitId));
+        if (!unit.getSector().getCondominium().getId().equals(condominiumId)) {
+            throw new AccessDeniedException("Unidade fora deste condomínio");
+        }
+        BigDecimal amount = body != null && body.get("amount") != null
+                ? new BigDecimal(body.get("amount").toString())
+                : new BigDecimal("450.00");
+        LocalDate dueDate = body != null && body.get("dueDate") != null
+                ? LocalDate.parse(body.get("dueDate").toString())
+                : LocalDate.now().plusDays(10);
+        String title = body != null && body.get("title") != null && !body.get("title").toString().isBlank()
+                ? body.get("title").toString().trim()
+                : "Taxa de Condomínio - " + LocalDate.now().getMonth().name().substring(0, 3) + "/" + LocalDate.now().getYear();
+
+        String digitableLine = "34191.79001 01043.510047 91020.150008 8 " + String.format("%014d", amount.multiply(new BigDecimal(100)).longValue());
+
+        UnitPayment payment = paymentRepository.findByUnitId(unitId).orElseGet(UnitPayment::new);
+        payment.setUnit(unit);
+        payment.setStatus(UnitPaymentStatus.PENDING);
+        payment.setAmount(amount);
+        payment.setDueDate(dueDate);
+        payment.setInvoiceTitle(title);
+        payment.setDigitableLine(digitableLine);
+        payment.setPaidAt(null);
+        payment.setPaymentNote("Boleto gerado pelo síndico " + viewer.getFirstName());
+        payment.setUpdatedAt(LocalDateTime.now());
+        payment.setUpdatedBy(viewer);
+        payment = paymentRepository.save(payment);
+
+        return ResponseEntity.ok(new ManagerDashboardDTO.UnitInfo(
+                unit.getId(),
+                unit.getIdentifier(),
+                unit.getSector().getName(),
+                payment.getStatus().name(),
+                payment.getDueDate(),
+                payment.getAmount(),
+                payment.getPaymentNote(),
+                payment.getRequestedAt(),
+                payment.getInvoiceTitle(),
+                payment.getDigitableLine(),
+                payment.getPaidAt()
+        ));
+    }
+
+    @PostMapping("/condominiums/{condominiumId}/units/{unitId}/pay-boleto")
+    @PreAuthorize("isAuthenticated()")
+    @Transactional
+    public ResponseEntity<ManagerDashboardDTO.UnitInfo> payBoleto(
+            @PathVariable Long condominiumId,
+            @PathVariable Long unitId
+    ) {
+        User user = authenticatedUserService.getAuthenticatedUser();
+        Unit unit = unitRepository.findById(unitId)
+                .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada: " + unitId));
+        if (!unit.getSector().getCondominium().getId().equals(condominiumId)) {
+            throw new AccessDeniedException("Unidade fora deste condomínio");
+        }
+        UnitPayment payment = paymentRepository.findByUnitId(unitId)
+                .orElseThrow(() -> new ResourceNotFoundException("Cobrança não encontrada para esta unidade"));
+
+        payment.setStatus(UnitPaymentStatus.PAID);
+        payment.setPaidAt(LocalDateTime.now());
+        payment.setPaymentNote("Pagamento liquidado via aplicativo por " + user.getFirstName());
+        payment.setUpdatedAt(LocalDateTime.now());
+        payment.setUpdatedBy(user);
+        payment = paymentRepository.save(payment);
+
+        return ResponseEntity.ok(new ManagerDashboardDTO.UnitInfo(
+                unit.getId(),
+                unit.getIdentifier(),
+                unit.getSector().getName(),
+                payment.getStatus().name(),
+                payment.getDueDate(),
+                payment.getAmount(),
+                payment.getPaymentNote(),
+                payment.getRequestedAt(),
+                payment.getInvoiceTitle(),
+                payment.getDigitableLine(),
+                payment.getPaidAt()
+        ));
+    }
+
+    @GetMapping("/condominiums/{condominiumId}/units/{unitId}/payment-status")
     @PreAuthorize("isAuthenticated()")
     @Transactional(readOnly = true)
-    public ResponseEntity<List<ManagerDashboardDTO.UnitInfo>> getMyUnitPayments(
+    public ResponseEntity<ManagerDashboardDTO.UnitInfo> getUnitPaymentStatus(
+            @PathVariable Long condominiumId,
+            @PathVariable Long unitId
+    ) {
+        Unit unit = unitRepository.findById(unitId)
+                .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada: " + unitId));
+        UnitPayment payment = paymentRepository.findByUnitId(unitId).orElse(null);
+        if (payment == null) {
+            return ResponseEntity.ok(new ManagerDashboardDTO.UnitInfo(
+                    unit.getId(), unit.getIdentifier(), unit.getSector().getName(),
+                    "UP_TO_DATE", null, null, null, null, null, null, null
+            ));
+        }
+        return ResponseEntity.ok(new ManagerDashboardDTO.UnitInfo(
+                unit.getId(),
+                unit.getIdentifier(),
+                unit.getSector().getName(),
+                payment.getStatus().name(),
+                payment.getDueDate(),
+                payment.getAmount(),
+                payment.getPaymentNote(),
+                payment.getRequestedAt(),
+                payment.getInvoiceTitle(),
+                payment.getDigitableLine(),
+                payment.getPaidAt()
+        ));
+    }
+
+    @GetMapping("/condominiums/{condominiumId}/my-invoices")
+    @PreAuthorize("isAuthenticated()")
+    @Transactional(readOnly = true)
+    public ResponseEntity<List<ManagerDashboardDTO.UnitInfo>> getMyInvoices(
             @PathVariable Long condominiumId
     ) {
         User user = authenticatedUserService.getAuthenticatedUser();
-        if (!user.hasRole("ROLE_ADMIN")) {
-            condominiumAccessService.validateUserBelongsToCondominium(user.getId(), condominiumId);
-        }
-        List<Long> myUnitIds = residentRepository.findUnitIdsByUserId(user.getId());
-        var allUnits = unitRepository.findAllForCondominium(condominiumId);
-        var filtered = allUnits.stream()
-                .filter(u -> myUnitIds.contains(u.getId()))
+        var residents = residentRepository.findByCondominiumId(condominiumId).stream()
+                .filter(r -> r.getUser().getId().equals(user.getId()))
                 .toList();
-        var targetUnits = filtered.isEmpty() ? allUnits.stream().limit(1).toList() : filtered;
 
-        var infos = targetUnits.stream().map(unit -> {
-            var payment = paymentRepository.findByUnitId(unit.getId()).orElse(null);
+        List<ManagerDashboardDTO.UnitInfo> list = residents.stream().map(r -> {
+            Unit unit = r.getUnit();
+            UnitPayment payment = paymentRepository.findByUnitId(unit.getId()).orElse(null);
             return new ManagerDashboardDTO.UnitInfo(
                     unit.getId(),
                     unit.getIdentifier(),
                     unit.getSector().getName(),
-                    payment == null ? "NOT_RECORDED" : payment.getStatus().name(),
+                    payment == null ? "UP_TO_DATE" : payment.getStatus().name(),
                     payment == null ? null : payment.getDueDate(),
                     payment == null ? null : payment.getAmount(),
                     payment == null ? null : payment.getPaymentNote(),
-                    payment == null ? null : payment.getRequestedAt()
+                    payment == null ? null : payment.getRequestedAt(),
+                    payment == null ? null : payment.getInvoiceTitle(),
+                    payment == null ? null : payment.getDigitableLine(),
+                    payment == null ? null : payment.getPaidAt()
             );
         }).toList();
 
-        return ResponseEntity.ok(infos);
+        return ResponseEntity.ok(list);
     }
 
     @PostMapping("/condominiums/{condominiumId}/units/{unitId}/request-payment-confirmation")
@@ -236,7 +373,10 @@ public class ManagerDashboardController {
                 payment.getDueDate(),
                 payment.getAmount(),
                 payment.getPaymentNote(),
-                payment.getRequestedAt()
+                payment.getRequestedAt(),
+                payment.getInvoiceTitle(),
+                payment.getDigitableLine(),
+                payment.getPaidAt()
         ));
     }
 

@@ -32,6 +32,15 @@ public class UnitPayment {
 
     private BigDecimal amount;
 
+    @Column(name = "invoice_title", length = 200)
+    private String invoiceTitle;
+
+    @Column(name = "digitable_line", length = 100)
+    private String digitableLine;
+
+    @Column(name = "paid_at")
+    private LocalDateTime paidAt;
+
     @Column(name = "payment_note", length = 500)
     private String paymentNote;
 

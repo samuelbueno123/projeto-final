@@ -16,15 +16,28 @@ import java.util.concurrent.TimeUnit;
 @RestController
 @RequestMapping("/media/pictures")
 @RequiredArgsConstructor
-@Tag(name = "Media Pictures", description = "Serviço de arquivos de fotos de perfil em media/pictures")
+@Tag(name = "Media Pictures", description = "Serviço de imagens armazenadas no servidor separadas por pastas")
 public class MediaPictureController {
 
     private final PictureStorageService pictureStorageService;
 
+    @GetMapping("/{category}/{filename:.+}")
+    @Operation(summary = "Obtém uma imagem por pasta de categoria (ex: profiles/ ou condominiums/)")
+    public ResponseEntity<byte[]> getPictureWithCategory(
+            @PathVariable String category,
+            @PathVariable String filename
+    ) {
+        return serve(category + "/" + filename);
+    }
+
     @GetMapping("/{filename:.+}")
-    @Operation(summary = "Obtém uma foto de perfil armazenada no servidor em media/pictures")
-    public ResponseEntity<byte[]> getPicture(@PathVariable String filename) {
-        PictureStorageService.StoredPicture picture = pictureStorageService.loadPicture(filename);
+    @Operation(summary = "Obtém uma imagem na raiz de fotos ou por compatibilidade legada")
+    public ResponseEntity<byte[]> getPictureLegacy(@PathVariable String filename) {
+        return serve(filename);
+    }
+
+    private ResponseEntity<byte[]> serve(String relativePath) {
+        PictureStorageService.StoredPicture picture = pictureStorageService.loadPicture(relativePath);
         return ResponseEntity.ok()
                 .contentType(picture.mediaType())
                 .cacheControl(CacheControl.maxAge(1, TimeUnit.HOURS).cachePublic())

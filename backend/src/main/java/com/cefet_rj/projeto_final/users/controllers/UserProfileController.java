@@ -17,6 +17,8 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/users/me")
 @RequiredArgsConstructor
@@ -65,6 +67,22 @@ public class UserProfileController {
         user.setLastName(request.lastName() == null ? "" : request.lastName().trim());
         user.setEmail(email);
         user.setProfileImage(storedPicturePath);
+        if (request.themePreference() != null && !request.themePreference().isBlank()) {
+            user.setThemePreference(request.themePreference().trim().toUpperCase());
+        }
+        return new UserProfileDTO(users.save(user));
+    }
+
+    @PatchMapping("/theme")
+    public UserProfileDTO updateTheme(@RequestBody Map<String, String> body) {
+        User user = authenticatedUser.getAuthenticatedUser();
+        String theme = body.getOrDefault("theme", "SYSTEM");
+        if (theme != null) {
+            theme = theme.trim().toUpperCase();
+        } else {
+            theme = "SYSTEM";
+        }
+        user.setThemePreference(theme);
         return new UserProfileDTO(users.save(user));
     }
 
@@ -72,7 +90,8 @@ public class UserProfileController {
     public UserProfileDTO uploadProfilePicture(@RequestParam("file") MultipartFile file) {
         User user = authenticatedUser.getAuthenticatedUser();
         String storedPath = pictureStorageService.storeMultipartPicture(
-                user.getId(),
+                PictureStorageService.PROFILES_FOLDER,
+                "user_" + user.getId(),
                 file,
                 user.getProfileImage()
         );

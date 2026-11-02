@@ -15,7 +15,8 @@ public record MembershipDTO(
         Long unitId,
         String unitLabel,
         String residentType,
-        String requestMessage
+        String requestMessage,
+        Boolean hasSeenWelcome
 ) {
 
     public MembershipDTO(
@@ -29,7 +30,7 @@ public record MembershipDTO(
             String status,
             Long unitId
     ) {
-        this(id, userId, condominiumId, condominiumName, authority, userName, email, status, unitId, null, null, null);
+        this(id, userId, condominiumId, condominiumName, authority, userName, email, status, unitId, null, null, null, false);
     }
 
     public MembershipDTO(Membership entity) {
@@ -47,7 +48,8 @@ public record MembershipDTO(
                         ? (entity.getRequestedUnit().getSector().getName() + " • Unid. " + entity.getRequestedUnit().getIdentifier())
                         : null,
                 entity.getRequestedResidentType() != null ? entity.getRequestedResidentType().name() : null,
-                entity.getRequestMessage()
+                entity.getRequestMessage(),
+                entity.getHasSeenWelcome() != null ? entity.getHasSeenWelcome() : false
         );
     }
 
@@ -64,7 +66,8 @@ public record MembershipDTO(
                 resolvedUnitId != null ? resolvedUnitId : unitId,
                 resolvedUnitLabel != null ? resolvedUnitLabel : unitLabel,
                 resolvedResidentType != null ? resolvedResidentType : residentType,
-                requestMessage
+                requestMessage,
+                hasSeenWelcome
         );
     }
 }

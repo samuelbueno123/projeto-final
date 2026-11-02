@@ -34,6 +34,9 @@ public class Condominium {
     @Column(nullable = false)
     private Boolean isActive;
 
+    @Column(name = "plan_selected", nullable = false)
+    private Boolean planSelected = false;
+
     @OneToMany(mappedBy = "condominium", fetch = FetchType.LAZY)
     private Set<Sector> sectors = new HashSet<>();
 }

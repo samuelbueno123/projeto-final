@@ -54,4 +54,7 @@ public class Membership {
 
     @Column(name = "responded_at")
     private LocalDateTime respondedAt;
+
+    @Column(name = "has_seen_welcome", nullable = false)
+    private Boolean hasSeenWelcome = false;
 }

@@ -13,10 +13,27 @@ public record CommonAreaDTO(
         String rules,
         Integer openingHour,
         Integer closingHour,
+        String imageUrl,
         Long condominiumId,
         String condominiumName
 
 ) {
+
+    public CommonAreaDTO(
+            Long id,
+            String name,
+            String description,
+            Integer capacity,
+            Boolean active,
+            Boolean requiresApproval,
+            String rules,
+            Integer openingHour,
+            Integer closingHour,
+            Long condominiumId,
+            String condominiumName
+    ) {
+        this(id, name, description, capacity, active, requiresApproval, rules, openingHour, closingHour, null, condominiumId, condominiumName);
+    }
 
     public CommonAreaDTO(CommonArea entity) {
         this(
@@ -29,6 +46,7 @@ public record CommonAreaDTO(
                 entity.getRules(),
                 entity.getOpeningHour() != null ? entity.getOpeningHour() : 8,
                 entity.getClosingHour() != null ? entity.getClosingHour() : 22,
+                entity.getImageUrl(),
                 entity.getCondominium().getId(),
                 entity.getCondominium().getName()
         );

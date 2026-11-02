@@ -62,6 +62,19 @@ public class MembershipService {
                 .toList();
     }
 
+    @Transactional
+    public MembershipDTO acknowledgeWelcome(Long membershipId) {
+        Long userId = authenticatedUserService.getAuthenticatedUser().getId();
+        Membership membership = membershipRepository.findById(membershipId)
+                .orElseThrow(() -> new ResourceNotFoundException("Membership not found: " + membershipId));
+        if (!membership.getUser().getId().equals(userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Não autorizado.");
+        }
+        membership.setHasSeenWelcome(true);
+        membership = membershipRepository.save(membership);
+        return enrichWithUnitInfo(membership);
+    }
+
     @Transactional(readOnly = true)
     public List<MembershipDTO> findMyPendingAndRequests() {
         Long userId = authenticatedUserService.getAuthenticatedUser().getId();

@@ -34,6 +34,12 @@ public class MembershipController {
         return ResponseEntity.ok(membershipService.findMine());
     }
 
+    @PostMapping("/{id}/ack-welcome")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<MembershipDTO> acknowledgeWelcome(@PathVariable Long id) {
+        return ResponseEntity.ok(membershipService.acknowledgeWelcome(id));
+    }
+
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<Page<MembershipDTO>> findAll(Pageable pageable) {

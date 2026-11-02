@@ -71,6 +71,7 @@ public class CommonAreaService {
         commonArea.setRules(dto.rules() == null || dto.rules().isBlank() ? null : dto.rules().trim());
         commonArea.setOpeningHour(dto.openingHour() != null ? dto.openingHour() : 8);
         commonArea.setClosingHour(dto.closingHour() != null ? dto.closingHour() : 22);
+        commonArea.setImageUrl(dto.imageUrl());
         commonArea.setActive(true);
         commonArea.setCondominium(condominium);
 
@@ -302,6 +303,9 @@ public class CommonAreaService {
         }
         if (dto.closingHour() != null) {
             commonArea.setClosingHour(dto.closingHour());
+        }
+        if (dto.imageUrl() != null) {
+            commonArea.setImageUrl(dto.imageUrl());
         }
 
         commonArea =

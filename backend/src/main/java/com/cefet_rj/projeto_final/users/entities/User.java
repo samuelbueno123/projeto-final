@@ -44,6 +44,10 @@ public class User implements UserDetails {
     private String profileImage;
 
     @Setter
+    @Column(name = "theme_preference", length = 20)
+    private String themePreference = "SYSTEM";
+
+    @Setter
     @Column(name = "google_subject", unique = true)
     private String googleSubject;
 

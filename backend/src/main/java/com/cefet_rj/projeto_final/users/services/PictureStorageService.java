@@ -22,7 +22,10 @@ import java.util.regex.Pattern;
 public class PictureStorageService {
 
     public static final String PICTURES_DB_PREFIX = "media/pictures/";
-    private static final long MAX_PICTURE_BYTES = 5L * 1024L * 1024L;
+    public static final String PROFILES_FOLDER = "profiles";
+    public static final String CONDOMINIUMS_FOLDER = "condominiums";
+
+    private static final long MAX_PICTURE_BYTES = 10L * 1024L * 1024L; // 10 MB
     private static final Pattern DATA_IMAGE_PATTERN = Pattern.compile(
             "^data:image/(png|jpeg|jpg|webp);base64,([A-Za-z0-9+/=\\r\\n]+)$"
     );
@@ -35,6 +38,8 @@ public class PictureStorageService {
         this.storageDirectory = Paths.get(configuredDir).toAbsolutePath().normalize();
         try {
             Files.createDirectories(this.storageDirectory);
+            Files.createDirectories(this.storageDirectory.resolve(PROFILES_FOLDER));
+            Files.createDirectories(this.storageDirectory.resolve(CONDOMINIUMS_FOLDER));
         } catch (IOException e) {
             throw new IllegalStateException("Não foi possível criar o diretório de fotos: " + this.storageDirectory, e);
         }
@@ -45,12 +50,30 @@ public class PictureStorageService {
     }
 
     /**
-     * Recebe um valor enviado no update de perfil:
-     * - null ou vazio: remove foto anterior e retorna null
-     * - caminho existente em media/pictures/<arquivo>: mantém o caminho relativo no banco
-     * - data URL base64: decodifica os bytes, salva o arquivo em media/pictures/<arquivo> e retorna apenas o caminho "media/pictures/<arquivo>"
+     * Armazena foto de perfil de usuário na subpasta "profiles".
      */
     public String resolveOrStoreProfileImage(Long userId, String inputImage, String existingPath) {
+        return storeDecodedImage(
+                PROFILES_FOLDER,
+                userId == null ? "user" : "user_" + userId,
+                inputImage,
+                existingPath
+        );
+    }
+
+    /**
+     * Armazena imagem do condomínio ou área comum na subpasta "condominiums".
+     */
+    public String resolveOrStoreCondominiumImage(Long condominiumId, String inputImage, String existingPath) {
+        return storeDecodedImage(
+                CONDOMINIUMS_FOLDER,
+                condominiumId == null ? "condo" : "condo_" + condominiumId,
+                inputImage,
+                existingPath
+        );
+    }
+
+    private String storeDecodedImage(String folder, String prefix, String inputImage, String existingPath) {
         if (inputImage == null || inputImage.isBlank()) {
             deleteFileIfPresent(existingPath);
             return null;
@@ -60,15 +83,16 @@ public class PictureStorageService {
 
         if (trimmed.startsWith(PICTURES_DB_PREFIX) || trimmed.startsWith("/" + PICTURES_DB_PREFIX)) {
             String normalized = trimmed.startsWith("/") ? trimmed.substring(1) : trimmed;
-            String fileName = sanitizeFileName(normalized.substring(PICTURES_DB_PREFIX.length()));
-            return PICTURES_DB_PREFIX + fileName;
+            String relative = normalized.substring(PICTURES_DB_PREFIX.length());
+            validateSafeRelativePath(relative);
+            return PICTURES_DB_PREFIX + relative;
         }
 
         Matcher matcher = DATA_IMAGE_PATTERN.matcher(trimmed);
         if (!matcher.matches()) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "A imagem deve ser PNG, JPEG ou WebP válida ou um caminho em media/pictures."
+                    "A imagem deve ser PNG, JPEG ou WebP válida ou um caminho existente em media/pictures."
             );
         }
 
@@ -84,7 +108,7 @@ public class PictureStorageService {
         if (bytes.length == 0 || bytes.length > MAX_PICTURE_BYTES) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "A imagem deve ter no máximo 5 MB."
+                    "A imagem deve ter no máximo 10 MB."
             );
         }
 
@@ -94,10 +118,14 @@ public class PictureStorageService {
             default -> "png";
         };
 
-        String fileName = buildFileName(userId, extension);
+        String token = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+        String fileName = prefix + "_" + token + "." + extension;
+        String relativePath = folder + "/" + fileName;
+
         try {
-            Files.createDirectories(storageDirectory);
-            Path target = storageDirectory.resolve(fileName).normalize();
+            Path targetFolder = storageDirectory.resolve(folder);
+            Files.createDirectories(targetFolder);
+            Path target = targetFolder.resolve(fileName).normalize();
             if (!target.startsWith(storageDirectory)) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Caminho de imagem inválido.");
             }
@@ -105,31 +133,34 @@ public class PictureStorageService {
         } catch (IOException e) {
             throw new ResponseStatusException(
                     HttpStatus.INTERNAL_SERVER_ERROR,
-                    "Não foi possível armazenar a foto de perfil no servidor."
+                    "Não foi possível armazenar a imagem no servidor."
             );
         }
 
         deleteFileIfPresent(existingPath);
-        return PICTURES_DB_PREFIX + fileName;
+        return PICTURES_DB_PREFIX + relativePath;
     }
 
     /**
-     * Recebe um MultipartFile enviado via upload multipart, salva em media/pictures e retorna "media/pictures/<arquivo>".
+     * Recebe um MultipartFile enviado via upload multipart, salva na subpasta especificada.
      */
-    public String storeMultipartPicture(Long userId, MultipartFile file, String existingPath) {
+    public String storeMultipartPicture(String folder, String prefix, MultipartFile file, String existingPath) {
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Selecione um arquivo de imagem.");
         }
         if (file.getSize() > MAX_PICTURE_BYTES) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A imagem deve ter no máximo 5 MB.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A imagem deve ter no máximo 10 MB.");
         }
 
         String extension = resolveExtension(file.getContentType(), file.getOriginalFilename());
-        String fileName = buildFileName(userId, extension);
+        String token = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+        String fileName = prefix + "_" + token + "." + extension;
+        String relativePath = folder + "/" + fileName;
 
         try {
-            Files.createDirectories(storageDirectory);
-            Path target = storageDirectory.resolve(fileName).normalize();
+            Path targetFolder = storageDirectory.resolve(folder);
+            Files.createDirectories(targetFolder);
+            Path target = targetFolder.resolve(fileName).normalize();
             if (!target.startsWith(storageDirectory)) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Caminho de imagem inválido.");
             }
@@ -137,26 +168,32 @@ public class PictureStorageService {
         } catch (IOException e) {
             throw new ResponseStatusException(
                     HttpStatus.INTERNAL_SERVER_ERROR,
-                    "Não foi possível salvar a foto de perfil."
+                    "Não foi possível salvar a imagem no servidor."
             );
         }
 
         deleteFileIfPresent(existingPath);
-        return PICTURES_DB_PREFIX + fileName;
+        return PICTURES_DB_PREFIX + relativePath;
     }
 
-    public StoredPicture loadPicture(String requestedFileName) {
-        String safeFileName = sanitizeFileName(requestedFileName);
-        Path target = storageDirectory.resolve(safeFileName).normalize();
+    public StoredPicture loadPicture(String requestedPath) {
+        validateSafeRelativePath(requestedPath);
+        Path target = storageDirectory.resolve(requestedPath).normalize();
         if (!target.startsWith(storageDirectory) || !Files.exists(target) || !Files.isRegularFile(target)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Imagem não encontrada.");
+            // Tentativa de compatibilidade legada se foi passado sem a subpasta
+            Path legacyProfile = storageDirectory.resolve(PROFILES_FOLDER).resolve(requestedPath).normalize();
+            if (legacyProfile.startsWith(storageDirectory) && Files.exists(legacyProfile) && Files.isRegularFile(legacyProfile)) {
+                target = legacyProfile;
+            } else {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Imagem não encontrada.");
+            }
         }
         try {
             byte[] bytes = Files.readAllBytes(target);
-            MediaType mediaType = resolveMediaType(safeFileName);
-            return new StoredPicture(bytes, mediaType, safeFileName);
+            MediaType mediaType = resolveMediaType(target.getFileName().toString());
+            return new StoredPicture(bytes, mediaType, target.getFileName().toString());
         } catch (IOException e) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Erro ao ler imagem de perfil.");
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Erro ao ler imagem.");
         }
     }
 
@@ -171,12 +208,12 @@ public class PictureStorageService {
         if (!normalized.startsWith(PICTURES_DB_PREFIX)) {
             return;
         }
-        String fileName = normalized.substring(PICTURES_DB_PREFIX.length());
-        if (fileName.isBlank() || fileName.contains("..") || fileName.contains("/") || fileName.contains("\\")) {
+        String relative = normalized.substring(PICTURES_DB_PREFIX.length());
+        if (relative.isBlank() || relative.contains("..")) {
             return;
         }
         try {
-            Path target = storageDirectory.resolve(fileName).normalize();
+            Path target = storageDirectory.resolve(relative).normalize();
             if (target.startsWith(storageDirectory)) {
                 Files.deleteIfExists(target);
             }
@@ -184,25 +221,14 @@ public class PictureStorageService {
         }
     }
 
-    private String buildFileName(Long userId, String extension) {
-        String prefix = userId == null ? "user" : "user_" + userId;
-        String token = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
-        return prefix + "_" + token + "." + extension;
-    }
-
-    private String sanitizeFileName(String rawName) {
-        if (rawName == null || rawName.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Nome de arquivo inválido.");
+    private void validateSafeRelativePath(String path) {
+        if (path == null || path.isBlank() || path.contains("..") || path.contains("\\")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Caminho de imagem inválido.");
         }
-        if (rawName.contains("..") || rawName.contains("/") || rawName.contains("\\")) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Nome de arquivo inválido.");
-        }
-        String fileName = Paths.get(rawName).getFileName().toString();
-        String lower = fileName.toLowerCase(Locale.ROOT);
+        String lower = path.toLowerCase(Locale.ROOT);
         if (!(lower.endsWith(".png") || lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".webp"))) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Formato de imagem não suportado.");
         }
-        return fileName;
     }
 
     private String resolveExtension(String contentType, String originalFilename) {

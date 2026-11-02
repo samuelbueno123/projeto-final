@@ -19,7 +19,9 @@ public record UserDTO(
 
         Set<RoleDTO> roles,
 
-        String profileImage
+        String profileImage,
+
+        String themePreference
 
 ) {
 
@@ -30,7 +32,18 @@ public record UserDTO(
             String email,
             Set<RoleDTO> roles
     ) {
-        this(id, firstName, lastName, email, roles, null);
+        this(id, firstName, lastName, email, roles, null, "SYSTEM");
+    }
+
+    public UserDTO(
+            Long id,
+            String firstName,
+            String lastName,
+            String email,
+            Set<RoleDTO> roles,
+            String profileImage
+    ) {
+        this(id, firstName, lastName, email, roles, profileImage, "SYSTEM");
     }
 
     public UserDTO(User entity) {
@@ -43,13 +56,17 @@ public record UserDTO(
                         .stream()
                         .map(RoleDTO::new)
                         .collect(java.util.stream.Collectors.toSet()),
-                entity.getProfileImage()
+                entity.getProfileImage(),
+                entity.getThemePreference() != null ? entity.getThemePreference() : "SYSTEM"
         );
     }
 
     public UserDTO {
         if (roles == null) {
             roles = new HashSet<>();
+        }
+        if (themePreference == null || themePreference.isBlank()) {
+            themePreference = "SYSTEM";
         }
     }
 }

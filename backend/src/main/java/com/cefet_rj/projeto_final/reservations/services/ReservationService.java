@@ -114,7 +114,7 @@ public class ReservationService {
                         : dto.notes().trim()
         );
         reservation.setStatus(
-                (!requiresApproval || isAdminOrManager)
+                isAdminOrManager
                         ? ReservationStatus.CONFIRMED
                         : ReservationStatus.PENDING
         );
@@ -147,8 +147,11 @@ public class ReservationService {
         featureAccessService.validateFeatureEnabled(condominiumId, FeatureCode.RESERVATIONS);
         validateCondominiumAccess(condominiumId);
 
+        User reviewer = authenticatedUserService.getAuthenticatedUser();
         reservation.setStatus(ReservationStatus.CONFIRMED);
         reservation.setRejectionReason(null);
+        reservation.setReviewedBy(reviewer);
+        reservation.setReviewedAt(LocalDateTime.now());
         reservation = reservationRepository.save(reservation);
 
         notificationService.createDirectNotification(
@@ -156,7 +159,7 @@ public class ReservationService {
                 NotificationType.RESERVATION,
                 "Reserva aprovada!",
                 "Sua solicitação de reserva para " + reservation.getCommonArea().getName()
-                        + " foi aprovada pelo síndico.",
+                        + " foi aprovada pela portaria/administração.",
                 condominiumId,
                 reservation.getCommonArea().getCondominium().getName()
         );
@@ -172,11 +175,14 @@ public class ReservationService {
         featureAccessService.validateFeatureEnabled(condominiumId, FeatureCode.RESERVATIONS);
         validateCondominiumAccess(condominiumId);
 
+        User reviewer = authenticatedUserService.getAuthenticatedUser();
         String cleanReason = reason == null || reason.isBlank()
                 ? "Solicitação não aprovada pela administração."
                 : reason.trim();
         reservation.setStatus(ReservationStatus.REJECTED);
         reservation.setRejectionReason(cleanReason);
+        reservation.setReviewedBy(reviewer);
+        reservation.setReviewedAt(LocalDateTime.now());
         reservation = reservationRepository.save(reservation);
 
         notificationService.createDirectNotification(
@@ -189,6 +195,105 @@ public class ReservationService {
                 reservation.getCommonArea().getCondominium().getName()
         );
 
+        return new ReservationDTO(reservation);
+    }
+
+    @Transactional
+    public ReservationDTO counterPropose(Long id, ReservationDTO.CounterProposalDTO dto) {
+        Reservation reservation = reservationRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Reservation not found: " + id));
+        Long condominiumId = reservation.getCommonArea().getCondominium().getId();
+        featureAccessService.validateFeatureEnabled(condominiumId, FeatureCode.RESERVATIONS);
+        validateCondominiumAccess(condominiumId);
+
+        User reviewer = authenticatedUserService.getAuthenticatedUser();
+        reservation.setStatus(ReservationStatus.COUNTER_PROPOSED);
+        reservation.setProposedStartAt(dto.proposedStartAt());
+        reservation.setProposedEndAt(dto.proposedEndAt());
+        reservation.setCounterProposalNotes(dto.notes() == null ? null : dto.notes().trim());
+        reservation.setReviewedBy(reviewer);
+        reservation.setReviewedAt(LocalDateTime.now());
+        reservation = reservationRepository.save(reservation);
+
+        notificationService.createDirectNotification(
+                reservation.getReservedBy(),
+                NotificationType.RESERVATION_COUNTER_PROPOSAL,
+                "Contraproposta de reserva recebida!",
+                "A portaria enviou uma contraproposta de horário para a sua reserva de "
+                        + reservation.getCommonArea().getName() + ". Abra o app para visualizar e aceitar.",
+                condominiumId,
+                reservation.getCommonArea().getCondominium().getName()
+        );
+
+        return new ReservationDTO(reservation);
+    }
+
+    @Transactional
+    public ReservationDTO modifyAndConfirm(Long id, ReservationDTO.ModifyAndConfirmDTO dto) {
+        Reservation reservation = reservationRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Reservation not found: " + id));
+        Long condominiumId = reservation.getCommonArea().getCondominium().getId();
+        featureAccessService.validateFeatureEnabled(condominiumId, FeatureCode.RESERVATIONS);
+        validateCondominiumAccess(condominiumId);
+
+        User reviewer = authenticatedUserService.getAuthenticatedUser();
+        if (dto.startAt() != null) reservation.setStartAt(dto.startAt());
+        if (dto.endAt() != null) reservation.setEndAt(dto.endAt());
+        if (dto.notes() != null && !dto.notes().isBlank()) {
+            reservation.setNotes(dto.notes().trim());
+        }
+        reservation.setStatus(ReservationStatus.CONFIRMED);
+        reservation.setRejectionReason(null);
+        reservation.setReviewedBy(reviewer);
+        reservation.setReviewedAt(LocalDateTime.now());
+        reservation = reservationRepository.save(reservation);
+
+        notificationService.createDirectNotification(
+                reservation.getReservedBy(),
+                NotificationType.RESERVATION,
+                "Reserva confirmada com ajustes!",
+                "Sua reserva para " + reservation.getCommonArea().getName()
+                        + " foi ajustada e confirmada pela portaria.",
+                condominiumId,
+                reservation.getCommonArea().getCondominium().getName()
+        );
+
+        return new ReservationDTO(reservation);
+    }
+
+    @Transactional
+    public ReservationDTO acceptCounterProposal(Long id) {
+        Reservation reservation = reservationRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Reservation not found: " + id));
+        User user = authenticatedUserService.getAuthenticatedUser();
+        if (!reservation.getReservedBy().getId().equals(user.getId()) && !user.hasRole("ROLE_ADMIN")) {
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN, "Não autorizado.");
+        }
+        if (reservation.getStatus() != ReservationStatus.COUNTER_PROPOSED) {
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "Esta reserva não possui uma contraproposta ativa.");
+        }
+        if (reservation.getProposedStartAt() != null) {
+            reservation.setStartAt(reservation.getProposedStartAt());
+        }
+        if (reservation.getProposedEndAt() != null) {
+            reservation.setEndAt(reservation.getProposedEndAt());
+        }
+        reservation.setStatus(ReservationStatus.CONFIRMED);
+        reservation = reservationRepository.save(reservation);
+        return new ReservationDTO(reservation);
+    }
+
+    @Transactional
+    public ReservationDTO declineCounterProposal(Long id) {
+        Reservation reservation = reservationRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Reservation not found: " + id));
+        User user = authenticatedUserService.getAuthenticatedUser();
+        if (!reservation.getReservedBy().getId().equals(user.getId()) && !user.hasRole("ROLE_ADMIN")) {
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN, "Não autorizado.");
+        }
+        reservation.setStatus(ReservationStatus.CANCELLED);
+        reservation.setCancelledAt(LocalDateTime.now());
+        reservation = reservationRepository.save(reservation);
         return new ReservationDTO(reservation);
     }
 

@@ -30,10 +30,12 @@ public record CommonAreaUpdateDTO(
 
         @Min(1)
         @Max(24)
-        Integer closingHour
+        Integer closingHour,
+
+        String imageUrl
 
 ) {
     public CommonAreaUpdateDTO(String name, String description, Integer capacity) {
-        this(name, description, capacity, null, null, null, null);
+        this(name, description, capacity, null, null, null, null, null);
     }
 }

@@ -30,7 +30,7 @@ public class BillingPlan {
     @Column(nullable = false)
     private Boolean active;
 
-    @ManyToMany(fetch = FetchType.LAZY)
+    @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
             name = "tb_billing_plan_feature",
             joinColumns = @JoinColumn(name = "billing_plan_id"),

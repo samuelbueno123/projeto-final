@@ -42,6 +42,9 @@ public class CommonArea {
     @Column(name = "closing_hour")
     private Integer closingHour = 22;
 
+    @Column(name = "image_url", length = 500)
+    private String imageUrl;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "condominium_id", nullable = false)
     private Condominium condominium;
