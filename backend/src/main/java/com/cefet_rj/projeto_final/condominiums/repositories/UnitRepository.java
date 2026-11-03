@@ -12,4 +12,6 @@ public interface UnitRepository extends JpaRepository<Unit, Long> {
 
     @Query("select count(u) from Unit u where u.sector.condominium.id = :condominiumId")
     long countForCondominium(@Param("condominiumId") Long condominiumId);
+
+    boolean existsBySectorIdAndIdentifierIgnoreCase(Long sectorId, String identifier);
 }

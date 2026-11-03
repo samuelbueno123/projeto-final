@@ -12,10 +12,18 @@ import java.util.List;
 public interface ReservationRepository
         extends JpaRepository<Reservation, Long> {
 
+    @Query("""
+            select r
+            from Reservation r
+            join fetch r.commonArea ca
+            join fetch r.reservedBy u
+            where u.id = :userId and ca.condominium.id = :condominiumId
+            order by r.startAt desc
+            """)
     List<Reservation>
     findByReservedByIdAndCommonAreaCondominiumIdOrderByStartAtDesc(
-            Long userId,
-            Long condominiumId
+            @Param("userId") Long userId,
+            @Param("condominiumId") Long condominiumId
     );
 
     @Query("""
@@ -58,9 +66,17 @@ public interface ReservationRepository
             @Param("endAt") LocalDateTime endAt
     );
 
+    @Query("""
+            select r
+            from Reservation r
+            join fetch r.commonArea ca
+            join fetch r.reservedBy u
+            where ca.condominium.id = :condominiumId
+            order by r.startAt desc
+            """)
     List<Reservation>
     findByCommonAreaCondominiumIdOrderByStartAtDesc(
-            Long condominiumId
+            @Param("condominiumId") Long condominiumId
     );
 
     @Query("""

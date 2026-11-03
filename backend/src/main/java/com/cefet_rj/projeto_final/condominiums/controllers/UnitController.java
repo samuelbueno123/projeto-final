@@ -1,5 +1,6 @@
 package com.cefet_rj.projeto_final.condominiums.controllers;
 
+import com.cefet_rj.projeto_final.condominiums.dtos.UnitCsvImportResultDTO;
 import com.cefet_rj.projeto_final.condominiums.dtos.UnitDTO;
 import com.cefet_rj.projeto_final.condominiums.dtos.insert.UnitInsertDTO;
 import com.cefet_rj.projeto_final.condominiums.dtos.update.UnitUpdateDTO;
@@ -9,9 +10,11 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.net.URI;
@@ -49,6 +52,16 @@ public class UnitController {
                 .buildAndExpand(newDto.id()).toUri();
 
         return ResponseEntity.created(uri).body(newDto);
+    }
+
+    @PostMapping(value = "/condominiums/{condominiumId}/import-csv", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    public ResponseEntity<UnitCsvImportResultDTO> importCsv(
+            @PathVariable Long condominiumId,
+            @RequestParam("file") MultipartFile file
+    ) {
+        UnitCsvImportResultDTO result = unitService.importCsv(condominiumId, file);
+        return ResponseEntity.ok(result);
     }
 
     @PutMapping ("/{id}")

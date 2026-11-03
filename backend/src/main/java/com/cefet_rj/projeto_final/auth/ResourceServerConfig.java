@@ -10,6 +10,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -50,28 +52,38 @@ public class ResourceServerConfig {
     @Order(3)
     public SecurityFilterChain resourceServerSecurityFilterChain(
             HttpSecurity http,
-            JwtAuthenticationConverter jwtAuthenticationConverter
+            JwtAuthenticationConverter jwtAuthenticationConverter,
+            Environment environment
     ) throws Exception {
+
+        boolean isDevOrTest = environment.acceptsProfiles(Profiles.of("dev", "test"));
 
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/h2-console/**").permitAll()
-                        .requestMatchers("/oauth2/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/auth/google").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/media/pictures/**").permitAll()
-                        .requestMatchers(
-                                "/v3/api-docs/**",
-                                "/swagger-ui/**",
-                                "/swagger-ui.html"
-                        ).permitAll()
-                        .requestMatchers(
-                                HttpMethod.POST,
-                                "/users"
-                        ).permitAll()
-                        .anyRequest().authenticated()
+                .headers(headers -> headers
+                        .frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin)
+                        .contentTypeOptions(org.springframework.security.config.Customizer.withDefaults())
                 )
+                .authorizeHttpRequests(authorize -> {
+                    if (isDevOrTest) {
+                        authorize.requestMatchers("/h2-console/**").permitAll();
+                    }
+                    authorize
+                            .requestMatchers("/oauth2/**").permitAll()
+                            .requestMatchers(HttpMethod.POST, "/auth/google").permitAll()
+                            .requestMatchers(HttpMethod.GET, "/media/pictures/**").permitAll()
+                            .requestMatchers(
+                                    "/v3/api-docs/**",
+                                    "/swagger-ui/**",
+                                    "/swagger-ui.html"
+                            ).permitAll()
+                            .requestMatchers(
+                                    HttpMethod.POST,
+                                    "/users"
+                            ).permitAll()
+                            .anyRequest().authenticated();
+                })
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter))
                 );
@@ -118,7 +130,7 @@ public class ResourceServerConfig {
         CorsConfiguration corsConfig = new CorsConfiguration();
         corsConfig.setAllowedOriginPatterns(Arrays.asList(corsOrigins.split(",")));
         corsConfig.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH"));
-        corsConfig.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type"));
+        corsConfig.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Accept", "Cache-Control", "Last-Event-ID", "X-Requested-With", "Origin"));
         corsConfig.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source =

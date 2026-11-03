@@ -1,5 +1,6 @@
 package com.cefet_rj.projeto_final.community.controllers;
 
+import com.cefet_rj.projeto_final.community.dtos.ChatConversationDTO;
 import com.cefet_rj.projeto_final.community.dtos.ChatMessageDTO;
 import com.cefet_rj.projeto_final.community.services.DoormanChatService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -21,6 +22,13 @@ import java.util.List;
 public class DoormanChatController {
 
     private final DoormanChatService doormanChatService;
+
+    @GetMapping("/conversations")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'DOORMAN')")
+    @Operation(summary = "Lista conversas de moradores para a portaria selecionar")
+    public ResponseEntity<List<ChatConversationDTO>> getConversations(@PathVariable Long condominiumId) {
+        return ResponseEntity.ok(doormanChatService.findConversations(condominiumId));
+    }
 
     @GetMapping("/messages")
     @PreAuthorize("isAuthenticated()")

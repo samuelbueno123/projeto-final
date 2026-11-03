@@ -14,6 +14,10 @@ public interface DoormanChatMessageRepository extends JpaRepository<DoormanChatM
 
     @Query("""
         SELECT m FROM DoormanChatMessage m
+        JOIN FETCH m.sender
+        LEFT JOIN FETCH m.recipient
+        LEFT JOIN FETCH m.unit u
+        LEFT JOIN FETCH u.sector
         WHERE m.condominium.id = :condoId
           AND (m.sender.id = :userId OR m.recipient.id = :userId OR (:unitId IS NOT NULL AND m.unit.id = :unitId))
         ORDER BY m.sentAt ASC
@@ -26,6 +30,10 @@ public interface DoormanChatMessageRepository extends JpaRepository<DoormanChatM
 
     @Query("""
         SELECT m FROM DoormanChatMessage m
+        JOIN FETCH m.sender
+        LEFT JOIN FETCH m.recipient
+        LEFT JOIN FETCH m.unit u
+        LEFT JOIN FETCH u.sector
         WHERE m.condominium.id = :condoId
           AND (:targetUserId IS NULL OR m.sender.id = :targetUserId OR m.recipient.id = :targetUserId)
         ORDER BY m.sentAt ASC

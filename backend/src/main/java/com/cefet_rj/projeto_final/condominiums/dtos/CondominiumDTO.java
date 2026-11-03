@@ -13,7 +13,8 @@ public record CondominiumDTO(
         String billingPlanName,
         Boolean isActive,
         Boolean planSelected,
-        List<String> features
+        List<String> features,
+        String imageUrl
 ) {
 
     public CondominiumDTO(
@@ -24,7 +25,7 @@ public record CondominiumDTO(
             String billingPlanName,
             Boolean isActive
     ) {
-        this(id, name, address, billingPlanId, billingPlanName, isActive, false, List.of());
+        this(id, name, address, billingPlanId, billingPlanName, isActive, false, List.of(), null);
     }
 
     public CondominiumDTO(
@@ -36,7 +37,20 @@ public record CondominiumDTO(
             Boolean isActive,
             Boolean planSelected
     ) {
-        this(id, name, address, billingPlanId, billingPlanName, isActive, planSelected, List.of());
+        this(id, name, address, billingPlanId, billingPlanName, isActive, planSelected, List.of(), null);
+    }
+
+    public CondominiumDTO(
+            Long id,
+            String name,
+            String address,
+            Long billingPlanId,
+            String billingPlanName,
+            Boolean isActive,
+            Boolean planSelected,
+            List<String> features
+    ) {
+        this(id, name, address, billingPlanId, billingPlanName, isActive, planSelected, features, null);
     }
 
     public CondominiumDTO(Condominium entity) {
@@ -50,7 +64,8 @@ public record CondominiumDTO(
                 entity.getPlanSelected() != null ? entity.getPlanSelected() : false,
                 entity.getBillingPlan() != null && entity.getBillingPlan().getFeatures() != null
                         ? entity.getBillingPlan().getFeatures().stream().map(Feature::getCode).toList()
-                        : List.of()
+                        : List.of(),
+                entity.getImageUrl()
         );
     }
 }

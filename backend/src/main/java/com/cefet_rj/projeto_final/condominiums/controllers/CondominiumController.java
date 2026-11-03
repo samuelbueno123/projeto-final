@@ -56,6 +56,14 @@ public class CondominiumController {
 		return ResponseEntity.ok().body(newDto);
 	}
 
+	@PatchMapping("/{id}/image")
+	@PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+	public ResponseEntity<CondominiumDTO> updateImage(@PathVariable Long id, @RequestBody java.util.Map<String, String> body){
+		String imageUrl = body != null ? body.get("imageUrl") : null;
+		CondominiumDTO newDto = condominiumService.updateImageUrl(id, imageUrl);
+		return ResponseEntity.ok().body(newDto);
+	}
+
 	@DeleteMapping("/{id}")
 	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<Void> delete(@PathVariable Long id){

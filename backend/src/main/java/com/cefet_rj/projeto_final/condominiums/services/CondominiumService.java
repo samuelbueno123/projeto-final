@@ -59,7 +59,7 @@ public class CondominiumService {
     @Transactional
     public CondominiumDTO insert(CondominiumInsertDTO dto) {
         Condominium entity = new Condominium();
-        linkAssociations(dto.name(), dto.address(), dto.billingPlan(), dto.isActive(), entity);
+        linkAssociations(dto.name(), dto.address(), dto.billingPlan(), dto.isActive(), dto.imageUrl(), entity);
         entity = condominiumRepository.save(entity);
         return new CondominiumDTO(entity);
     }
@@ -68,12 +68,25 @@ public class CondominiumService {
     public CondominiumDTO update(Long id, CondominiumUpdateDTO dto) {
         try {
             Condominium entity = condominiumRepository.getReferenceById(id);
-            linkAssociations(dto.name(), dto.address(), dto.billingPlan(), dto.isActive(), entity);
+            linkAssociations(dto.name(), dto.address(), dto.billingPlan(), dto.isActive(), dto.imageUrl(), entity);
             entity = condominiumRepository.save(entity);
             return new CondominiumDTO(entity);
         } catch (EntityNotFoundException e) {
             throw new ResourceNotFoundException("Id " + id + " not found");
         }
+    }
+
+    @Transactional
+    public CondominiumDTO updateImageUrl(Long id, String imageUrl) {
+        Condominium entity = condominiumRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Condomínio não encontrado: " + id));
+        User user = authenticatedUserService.getAuthenticatedUser();
+        if (!user.hasRole("ROLE_ADMIN")) {
+            condominiumAccessService.validateUserBelongsToCondominium(user.getId(), id);
+        }
+        entity.setImageUrl(imageUrl);
+        entity = condominiumRepository.save(entity);
+        return new CondominiumDTO(entity);
     }
 
     @Transactional(propagation = Propagation.SUPPORTS)
@@ -122,6 +135,7 @@ public class CondominiumService {
             String address,
             String billingPlan,
             Boolean isActive,
+            String imageUrl,
             Condominium entity
     ) {
         entity.setName(name.trim());
@@ -132,5 +146,8 @@ public class CondominiumService {
         entity.setBillingPlan(plan);
 
         entity.setIsActive(isActive != null ? isActive : Boolean.TRUE);
+        if (imageUrl != null) {
+            entity.setImageUrl(imageUrl.trim());
+        }
     }
 }

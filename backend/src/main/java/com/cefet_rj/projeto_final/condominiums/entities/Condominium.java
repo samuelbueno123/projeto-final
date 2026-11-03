@@ -37,6 +37,9 @@ public class Condominium {
     @Column(name = "plan_selected", nullable = false)
     private Boolean planSelected = false;
 
+    @Column(name = "image_url", columnDefinition = "TEXT")
+    private String imageUrl;
+
     @OneToMany(mappedBy = "condominium", fetch = FetchType.LAZY)
     private Set<Sector> sectors = new HashSet<>();
 }

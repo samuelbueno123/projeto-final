@@ -13,7 +13,9 @@ public record CondominiumUpdateDTO(
         @NotBlank
         String billingPlan,
 
-        Boolean isActive
+        Boolean isActive,
+
+        String imageUrl
 
 ) {
 }

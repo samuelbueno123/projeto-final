@@ -43,6 +43,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequiredArgsConstructor
@@ -66,8 +67,13 @@ public class ManagerDashboardController {
         User viewer = authenticatedUserService.getAuthenticatedUser();
         ensureAccess(viewer, condominiumId);
         Condominium condo = condominiumRepository.findById(condominiumId).orElseThrow();
-        var units = unitRepository.findAllForCondominium(condominiumId).stream().map(unit -> {
-            var payment = paymentRepository.findByUnitId(unit.getId()).orElse(null);
+        var rawUnits = unitRepository.findAllForCondominium(condominiumId);
+        List<Long> unitIds = rawUnits.stream().map(Unit::getId).toList();
+        Map<Long, UnitPayment> paymentMap = paymentRepository.findAllByUnitIdIn(unitIds).stream()
+                .collect(Collectors.toMap(p -> p.getUnit().getId(), p -> p, (a, b) -> a));
+
+        var units = rawUnits.stream().map(unit -> {
+            var payment = paymentMap.get(unit.getId());
             return new ManagerDashboardDTO.UnitInfo(
                     unit.getId(),
                     unit.getIdentifier(),
@@ -294,13 +300,14 @@ public class ManagerDashboardController {
             @PathVariable Long condominiumId
     ) {
         User user = authenticatedUserService.getAuthenticatedUser();
-        var residents = residentRepository.findByCondominiumId(condominiumId).stream()
-                .filter(r -> r.getUser().getId().equals(user.getId()))
-                .toList();
+        var residents = residentRepository.findByUserIdAndCondominiumId(user.getId(), condominiumId);
+        List<Long> unitIds = residents.stream().map(r -> r.getUnit().getId()).toList();
+        Map<Long, UnitPayment> paymentMap = paymentRepository.findAllByUnitIdIn(unitIds).stream()
+                .collect(Collectors.toMap(p -> p.getUnit().getId(), p -> p, (a, b) -> a));
 
         List<ManagerDashboardDTO.UnitInfo> list = residents.stream().map(r -> {
             Unit unit = r.getUnit();
-            UnitPayment payment = paymentRepository.findByUnitId(unit.getId()).orElse(null);
+            UnitPayment payment = paymentMap.get(unit.getId());
             return new ManagerDashboardDTO.UnitInfo(
                     unit.getId(),
                     unit.getIdentifier(),
