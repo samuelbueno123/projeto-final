@@ -80,6 +80,6 @@ public class CondominiumDirectoryController {
         if (user.hasRole("ROLE_ADMIN")) {
             return;
         }
-        condominiumAccessService.validateUserBelongsToCondominium(user.getId(), condominiumId);
+        condominiumAccessService.validateStaffAccess(condominiumId);
     }
 }

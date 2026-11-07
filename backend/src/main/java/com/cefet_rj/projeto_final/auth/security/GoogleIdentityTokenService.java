@@ -19,7 +19,13 @@ public class GoogleIdentityTokenService {
         NimbusJwtDecoder googleDecoder = NimbusJwtDecoder
                 .withJwkSetUri("https://www.googleapis.com/oauth2/v3/certs")
                 .build();
-        OAuth2TokenValidator<Jwt> issuer = JwtValidators.createDefaultWithIssuer("https://accounts.google.com");
+        OAuth2TokenValidator<Jwt> issuer = jwt -> {
+            String iss = jwt.getIssuer() != null ? jwt.getIssuer().toString() : "";
+            if ("https://accounts.google.com".equals(iss) || "accounts.google.com".equals(iss)) {
+                return OAuth2TokenValidatorResult.success();
+            }
+            return OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token", "Invalid Google token issuer: " + iss, null));
+        };
         OAuth2TokenValidator<Jwt> audience = jwt -> jwt.getAudience().contains(clientId)
                 ? OAuth2TokenValidatorResult.success()
                 : OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token", "Invalid Google token audience", null));

@@ -43,6 +43,17 @@ public interface DoormanChatMessageRepository extends JpaRepository<DoormanChatM
     );
 
     @Query("""
+        SELECT m FROM DoormanChatMessage m
+        JOIN FETCH m.sender
+        LEFT JOIN FETCH m.recipient
+        LEFT JOIN FETCH m.unit u
+        LEFT JOIN FETCH u.sector
+        WHERE m.condominium.id = :condoId
+        ORDER BY m.sentAt ASC
+    """)
+    List<DoormanChatMessage> findAllByCondominiumIdWithDetails(@Param("condoId") Long condoId);
+
+    @Query("""
         SELECT COUNT(m) FROM DoormanChatMessage m
         WHERE m.condominium.id = :condoId
           AND m.recipient.id = :userId

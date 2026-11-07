@@ -206,7 +206,7 @@ class AnnouncementNotificationIntegrationTests {
         assertEquals(1, notifications.size());
 
         Notification notification =
-                notifications.getFirst();
+                notifications.get(0);
 
         assertEquals(
                 NotificationType.ANNOUNCEMENT,

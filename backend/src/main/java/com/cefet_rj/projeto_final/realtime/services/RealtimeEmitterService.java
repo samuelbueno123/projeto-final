@@ -139,16 +139,17 @@ public class RealtimeEmitterService {
     }
 
     private void removeEmitter(Long userId, SseEmitter emitter) {
-        List<SseEmitter> emitters = userEmitters.get(userId);
-        if (emitters != null) {
+        if (userId == null || emitter == null) return;
+        userEmitters.computeIfPresent(userId, (k, emitters) -> {
             emitters.remove(emitter);
-            if (emitters.isEmpty()) {
-                userEmitters.remove(userId);
-                // Remove de condoUsers se não tiver mais nenhuma conexão
-                for (Set<Long> set : condoUsers.values()) {
-                    set.remove(userId);
-                }
-            }
+            return emitters.isEmpty() ? null : emitters;
+        });
+
+        if (!userEmitters.containsKey(userId)) {
+            condoUsers.entrySet().removeIf(entry -> {
+                entry.getValue().remove(userId);
+                return entry.getValue().isEmpty();
+            });
         }
     }
 }

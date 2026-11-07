@@ -26,6 +26,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -66,6 +68,18 @@ public class DoormanChatService {
     public List<ChatConversationDTO> findConversations(Long condominiumId) {
         condominiumAccessService.validateStaffAccess(condominiumId);
         List<Resident> residents = residentRepository.findByCondominiumId(condominiumId);
+        List<DoormanChatMessage> allMessages = chatMessageRepository.findAllByCondominiumIdWithDetails(condominiumId);
+
+        Map<Long, List<DoormanChatMessage>> messagesByResident = new HashMap<>();
+        for (DoormanChatMessage m : allMessages) {
+            if (m.getSender() != null) {
+                messagesByResident.computeIfAbsent(m.getSender().getId(), k -> new ArrayList<>()).add(m);
+            }
+            if (m.getRecipient() != null && (m.getSender() == null || !m.getRecipient().getId().equals(m.getSender().getId()))) {
+                messagesByResident.computeIfAbsent(m.getRecipient().getId(), k -> new ArrayList<>()).add(m);
+            }
+        }
+
         Map<Long, ChatConversationDTO> map = new LinkedHashMap<>();
 
         for (Resident r : residents) {
@@ -83,7 +97,7 @@ public class DoormanChatService {
                 unitLabel = (sec.isEmpty() ? "" : sec + " - ") + "Unidade " + num;
             }
 
-            List<DoormanChatMessage> history = chatMessageRepository.findDoormanConversation(condominiumId, uid);
+            List<DoormanChatMessage> history = messagesByResident.getOrDefault(uid, List.of());
             String lastMsg = null;
             LocalDateTime lastMsgAt = null;
             long unread = 0;

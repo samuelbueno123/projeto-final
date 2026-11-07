@@ -117,7 +117,7 @@ public class FinancialService {
 
         List<Unit> units = unitRepository.findAllForCondominium(condominiumId);
         List<Long> unitIds = units.stream().map(Unit::getId).toList();
-        List<UnitPayment> payments = paymentRepository.findAllByUnitIdIn(unitIds);
+        List<UnitPayment> payments = unitIds.isEmpty() ? List.of() : paymentRepository.findAllByUnitIdIn(unitIds);
 
         BigDecimal totalInvoiced = BigDecimal.ZERO;
         BigDecimal totalCollected = BigDecimal.ZERO;

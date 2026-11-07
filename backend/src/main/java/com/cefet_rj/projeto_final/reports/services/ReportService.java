@@ -502,7 +502,11 @@ public class ReportService {
 
     private String escapeCsv(String value) {
         if (value == null) return "";
-        return value.replace(";", ",").replace("\r", " ").replace("\n", " ");
+        String sanitized = value.replace(";", ",").replace("\r", " ").replace("\n", " ").trim();
+        if (sanitized.startsWith("=") || sanitized.startsWith("+") || sanitized.startsWith("-") || sanitized.startsWith("@") || sanitized.startsWith("\t")) {
+            sanitized = "'" + sanitized;
+        }
+        return sanitized;
     }
 
     private String sanitizePdfText(String value) {

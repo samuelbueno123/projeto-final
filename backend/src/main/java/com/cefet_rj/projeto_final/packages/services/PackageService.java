@@ -444,7 +444,7 @@ public class PackageService {
                     .orElseGet(() -> {
                         var residentUserIds = membershipRepository.findResidentUserIdsByCondominiumId(resolvedCondoId);
                         if (!residentUserIds.isEmpty()) {
-                            return userRepository.findById(residentUserIds.getFirst()).orElseGet(authenticatedUserService::getAuthenticatedUser);
+                            return userRepository.findById(residentUserIds.get(0)).orElseGet(authenticatedUserService::getAuthenticatedUser);
                         }
                         return authenticatedUserService.getAuthenticatedUser();
                     });

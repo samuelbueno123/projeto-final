@@ -69,7 +69,9 @@ public class ManagerDashboardController {
         Condominium condo = condominiumRepository.findById(condominiumId).orElseThrow();
         var rawUnits = unitRepository.findAllForCondominium(condominiumId);
         List<Long> unitIds = rawUnits.stream().map(Unit::getId).toList();
-        Map<Long, UnitPayment> paymentMap = paymentRepository.findAllByUnitIdIn(unitIds).stream()
+        Map<Long, UnitPayment> paymentMap = unitIds.isEmpty()
+                ? Map.of()
+                : paymentRepository.findAllByUnitIdIn(unitIds).stream()
                 .collect(Collectors.toMap(p -> p.getUnit().getId(), p -> p, (a, b) -> a));
 
         var units = rawUnits.stream().map(unit -> {
@@ -299,7 +301,7 @@ public class ManagerDashboardController {
         ));
     }
 
-    @GetMapping("/condominiums/{condominiumId}/my-invoices")
+    @GetMapping({"/condominiums/{condominiumId}/my-invoices", "/condominiums/{condominiumId}/units/my-payments"})
     @PreAuthorize("isAuthenticated()")
     @Transactional(readOnly = true)
     public ResponseEntity<List<ManagerDashboardDTO.UnitInfo>> getMyInvoices(
@@ -308,7 +310,9 @@ public class ManagerDashboardController {
         User user = authenticatedUserService.getAuthenticatedUser();
         var residents = residentRepository.findByUserIdAndCondominiumId(user.getId(), condominiumId);
         List<Long> unitIds = residents.stream().map(r -> r.getUnit().getId()).toList();
-        Map<Long, UnitPayment> paymentMap = paymentRepository.findAllByUnitIdIn(unitIds).stream()
+        Map<Long, UnitPayment> paymentMap = unitIds.isEmpty()
+                ? Map.of()
+                : paymentRepository.findAllByUnitIdIn(unitIds).stream()
                 .collect(Collectors.toMap(p -> p.getUnit().getId(), p -> p, (a, b) -> a));
 
         List<ManagerDashboardDTO.UnitInfo> list = residents.stream().map(r -> {
