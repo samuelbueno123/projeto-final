@@ -19,12 +19,17 @@ import com.cefet_rj.projeto_final.shared.exceptions.ResourceNotFoundException;
 import com.cefet_rj.projeto_final.users.entities.User;
 import com.cefet_rj.projeto_final.users.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.cefet_rj.projeto_final.reservations.events.ReservationCreatedEvent;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.web.server.ResponseStatusException;
 
+import java.time.DayOfWeek;
+import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 
 @Service
@@ -59,9 +64,33 @@ public class ReservationService {
 
         validateCondominiumAccess(condominiumId);
 
-        if (!commonArea.getActive()) {
+        if (!Boolean.TRUE.equals(commonArea.getActive())) {
             throw new ForbiddenException(
                     "Common area is not available for reservations"
+            );
+        }
+
+        User authenticatedUser =
+                authenticatedUserService.getAuthenticatedUser();
+
+        User user = authenticatedUser;
+        if (condominiumAccessService.isManagerOrAdmin(authenticatedUser, condominiumId) && dto.reservedById() != null) {
+            user = userRepository.findById(dto.reservedById())
+                    .orElseThrow(() -> new ResourceNotFoundException("User not found: " + dto.reservedById()));
+        }
+
+        boolean isManagerOrAdmin = condominiumAccessService.isManagerOrAdmin(authenticatedUser, condominiumId);
+
+        if (!isManagerOrAdmin) {
+            validateBookingRules(commonArea, user, dto.startAt(), dto.endAt());
+        }
+
+        long userDuplicates = reservationRepository.countUserOverlappingReservationsOrWaitlist(
+                commonAreaId, user.getId(), dto.startAt(), dto.endAt()
+        );
+        if (userDuplicates > 0) {
+            throw new ReservationConflictException(
+                    "You already have an active reservation or waitlist entry for this period"
             );
         }
 
@@ -74,31 +103,20 @@ public class ReservationService {
                                 ReservationStatus.CANCELLED
                         );
 
-        if (conflicts > 0) {
+        boolean allowWaitlist = commonArea.getAllowWaitlist() == null || commonArea.getAllowWaitlist();
+        boolean joinWaitlistRequested = Boolean.TRUE.equals(dto.joinWaitlist());
+
+        if (conflicts > 0 && (!joinWaitlistRequested || !allowWaitlist)) {
             throw new ReservationConflictException(
-                    "Common area is already reserved "
-                            + "for the selected period"
+                    "Common area is already reserved for the selected period"
             );
         }
 
-        User authenticatedUser =
-                authenticatedUserService.getAuthenticatedUser();
-
-        User user = authenticatedUser;
-        if (authenticatedUser.hasRole("ROLE_ADMIN") && dto.reservedById() != null) {
-            user = userRepository.findById(dto.reservedById())
-                    .orElseThrow(() -> new ResourceNotFoundException("User not found: " + dto.reservedById()));
-        }
-
-        boolean isAdminOrManager = authenticatedUser.hasRole("ROLE_ADMIN")
-                || authenticatedUser.hasRole("ROLE_MANAGER");
         boolean requiresApproval = commonArea.getRequiresApproval() != null
                 ? commonArea.getRequiresApproval()
                 : true;
 
-        Reservation reservation =
-                new Reservation();
-
+        Reservation reservation = new Reservation();
         reservation.setCommonArea(commonArea);
         reservation.setReservedBy(user);
         reservation.setStartAt(dto.startAt());
@@ -113,30 +131,116 @@ public class ReservationService {
                         ? null
                         : dto.notes().trim()
         );
-        reservation.setStatus(
-                isAdminOrManager
-                        ? ReservationStatus.CONFIRMED
-                        : ReservationStatus.PENDING
-        );
-        reservation.setCreatedAt(
-                LocalDateTime.now()
-        );
+        reservation.setCreatedAt(LocalDateTime.now());
 
-        reservation =
-                reservationRepository.save(reservation);
+        if (conflicts > 0) {
+            int nextPosition = reservationRepository
+                    .findWaitlistedOverlapping(commonAreaId, dto.startAt(), dto.endAt())
+                    .size() + 1;
+            reservation.setStatus(ReservationStatus.WAITLISTED);
+            reservation.setWaitlistPosition(nextPosition);
+        } else {
+            reservation.setStatus(
+                    (isManagerOrAdmin || !requiresApproval)
+                            ? ReservationStatus.CONFIRMED
+                            : ReservationStatus.PENDING
+            );
+        }
 
-        eventPublisher.publishEvent(
-                new ReservationCreatedEvent(
-                        reservation.getId(),
-                        condominiumId,
-                        user.getId(),
-                        commonArea.getName(),
-                        reservation.getStartAt(),
-                        LocalDateTime.now()
-                )
-        );
+        reservation = reservationRepository.save(reservation);
+
+        if (reservation.getStatus() != ReservationStatus.WAITLISTED) {
+            eventPublisher.publishEvent(
+                    new ReservationCreatedEvent(
+                            reservation.getId(),
+                            condominiumId,
+                            user.getId(),
+                            commonArea.getName(),
+                            reservation.getStartAt(),
+                            LocalDateTime.now()
+                    )
+            );
+        }
 
         return new ReservationDTO(reservation);
+    }
+
+    @Transactional
+    public ReservationDTO joinWaitlist(Long commonAreaId, ReservationRequestDTO dto) {
+        ReservationRequestDTO waitlistRequest = new ReservationRequestDTO(
+                dto.startAt(),
+                dto.endAt(),
+                dto.reservedById(),
+                dto.contactPhone(),
+                dto.notes(),
+                true
+        );
+        return create(commonAreaId, waitlistRequest);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ReservationDTO> findWaitlistByCommonArea(Long commonAreaId) {
+        CommonArea commonArea = commonAreaRepository.findById(commonAreaId)
+                .orElseThrow(() -> new ResourceNotFoundException("Common area not found: " + commonAreaId));
+        Long condominiumId = commonArea.getCondominium().getId();
+        featureAccessService.validateFeatureEnabled(condominiumId, FeatureCode.RESERVATIONS);
+        validateCondominiumAccess(condominiumId);
+
+        return reservationRepository.findWaitlistedByCommonArea(commonAreaId)
+                .stream()
+                .map(ReservationDTO::new)
+                .toList();
+    }
+
+    private void validateBookingRules(
+            CommonArea commonArea,
+            User user,
+            LocalDateTime startAt,
+            LocalDateTime endAt
+    ) {
+        LocalDateTime now = LocalDateTime.now();
+
+        int minAdvanceHours = commonArea.getMinAdvanceHours() != null ? commonArea.getMinAdvanceHours() : 1;
+        if (minAdvanceHours > 1 && startAt.isBefore(now.plusHours(minAdvanceHours).minusMinutes(5))) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "A reserva exige antecedência mínima de " + minAdvanceHours + "h."
+            );
+        }
+
+        int maxAdvanceDays = commonArea.getMaxAdvanceDays() != null ? commonArea.getMaxAdvanceDays() : 60;
+        if (maxAdvanceDays > 0 && startAt.isAfter(now.plusDays(maxAdvanceDays).plusHours(2))) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "A reserva não pode ser feita com mais de " + maxAdvanceDays + " dias de antecedência."
+            );
+        }
+
+        int maxDurationHours = commonArea.getMaxDurationHours() != null ? commonArea.getMaxDurationHours() : 8;
+        long durationMinutes = Duration.between(startAt, endAt).toMinutes();
+        if (maxDurationHours > 0 && durationMinutes > maxDurationHours * 60L) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "A duração máxima permitida para esta área comum é de " + maxDurationHours + "h."
+            );
+        }
+
+        int maxWeekly = commonArea.getMaxWeeklyBookingsPerUser() != null ? commonArea.getMaxWeeklyBookingsPerUser() : 3;
+        if (maxWeekly > 0) {
+            LocalDateTime weekStart = startAt.toLocalDate()
+                    .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+                    .atStartOfDay();
+            LocalDateTime weekEnd = weekStart.plusDays(7);
+            long weeklyBookings = reservationRepository.countActiveBookingsByUserInRange(
+                    commonArea.getId(), user.getId(), weekStart, weekEnd
+            );
+            if (weeklyBookings >= maxWeekly) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Limite semanal atingido (" + maxWeekly + " reservas por semana nesta área comum)."
+                );
+            }
+        }
     }
 
     @Transactional
@@ -145,10 +249,11 @@ public class ReservationService {
                 .orElseThrow(() -> new ResourceNotFoundException("Reservation not found: " + id));
         Long condominiumId = reservation.getCommonArea().getCondominium().getId();
         featureAccessService.validateFeatureEnabled(condominiumId, FeatureCode.RESERVATIONS);
-        validateCondominiumAccess(condominiumId);
+        condominiumAccessService.validateStaffAccess(condominiumId);
 
         User reviewer = authenticatedUserService.getAuthenticatedUser();
         reservation.setStatus(ReservationStatus.CONFIRMED);
+        reservation.setWaitlistPosition(null);
         reservation.setRejectionReason(null);
         reservation.setReviewedBy(reviewer);
         reservation.setReviewedAt(LocalDateTime.now());
@@ -173,13 +278,15 @@ public class ReservationService {
                 .orElseThrow(() -> new ResourceNotFoundException("Reservation not found: " + id));
         Long condominiumId = reservation.getCommonArea().getCondominium().getId();
         featureAccessService.validateFeatureEnabled(condominiumId, FeatureCode.RESERVATIONS);
-        validateCondominiumAccess(condominiumId);
+        condominiumAccessService.validateStaffAccess(condominiumId);
 
+        ReservationStatus previousStatus = reservation.getStatus();
         User reviewer = authenticatedUserService.getAuthenticatedUser();
         String cleanReason = reason == null || reason.isBlank()
                 ? "Solicitação não aprovada pela administração."
                 : reason.trim();
         reservation.setStatus(ReservationStatus.REJECTED);
+        reservation.setWaitlistPosition(null);
         reservation.setRejectionReason(cleanReason);
         reservation.setReviewedBy(reviewer);
         reservation.setReviewedAt(LocalDateTime.now());
@@ -195,6 +302,12 @@ public class ReservationService {
                 reservation.getCommonArea().getCondominium().getName()
         );
 
+        if (previousStatus == ReservationStatus.PENDING
+                || previousStatus == ReservationStatus.CONFIRMED
+                || previousStatus == ReservationStatus.COUNTER_PROPOSED) {
+            promoteNextFromWaitlist(reservation);
+        }
+
         return new ReservationDTO(reservation);
     }
 
@@ -204,7 +317,7 @@ public class ReservationService {
                 .orElseThrow(() -> new ResourceNotFoundException("Reservation not found: " + id));
         Long condominiumId = reservation.getCommonArea().getCondominium().getId();
         featureAccessService.validateFeatureEnabled(condominiumId, FeatureCode.RESERVATIONS);
-        validateCondominiumAccess(condominiumId);
+        condominiumAccessService.validateStaffAccess(condominiumId);
 
         User reviewer = authenticatedUserService.getAuthenticatedUser();
         reservation.setStatus(ReservationStatus.COUNTER_PROPOSED);
@@ -234,7 +347,7 @@ public class ReservationService {
                 .orElseThrow(() -> new ResourceNotFoundException("Reservation not found: " + id));
         Long condominiumId = reservation.getCommonArea().getCondominium().getId();
         featureAccessService.validateFeatureEnabled(condominiumId, FeatureCode.RESERVATIONS);
-        validateCondominiumAccess(condominiumId);
+        condominiumAccessService.validateStaffAccess(condominiumId);
 
         User reviewer = authenticatedUserService.getAuthenticatedUser();
         if (dto.startAt() != null) reservation.setStartAt(dto.startAt());
@@ -243,6 +356,7 @@ public class ReservationService {
             reservation.setNotes(dto.notes().trim());
         }
         reservation.setStatus(ReservationStatus.CONFIRMED);
+        reservation.setWaitlistPosition(null);
         reservation.setRejectionReason(null);
         reservation.setReviewedBy(reviewer);
         reservation.setReviewedAt(LocalDateTime.now());
@@ -267,10 +381,10 @@ public class ReservationService {
                 .orElseThrow(() -> new ResourceNotFoundException("Reservation not found: " + id));
         User user = authenticatedUserService.getAuthenticatedUser();
         if (!reservation.getReservedBy().getId().equals(user.getId()) && !user.hasRole("ROLE_ADMIN")) {
-            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN, "Não autorizado.");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Não autorizado.");
         }
         if (reservation.getStatus() != ReservationStatus.COUNTER_PROPOSED) {
-            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "Esta reserva não possui uma contraproposta ativa.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Esta reserva não possui uma contraproposta ativa.");
         }
         if (reservation.getProposedStartAt() != null) {
             reservation.setStartAt(reservation.getProposedStartAt());
@@ -289,11 +403,13 @@ public class ReservationService {
                 .orElseThrow(() -> new ResourceNotFoundException("Reservation not found: " + id));
         User user = authenticatedUserService.getAuthenticatedUser();
         if (!reservation.getReservedBy().getId().equals(user.getId()) && !user.hasRole("ROLE_ADMIN")) {
-            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN, "Não autorizado.");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Não autorizado.");
         }
         reservation.setStatus(ReservationStatus.CANCELLED);
+        reservation.setWaitlistPosition(null);
         reservation.setCancelledAt(LocalDateTime.now());
         reservation = reservationRepository.save(reservation);
+        promoteNextFromWaitlist(reservation);
         return new ReservationDTO(reservation);
     }
 
@@ -357,8 +473,7 @@ public class ReservationService {
                         .equals(user.getId());
 
         boolean isAdministrativeUser =
-                user.hasRole("ROLE_ADMIN")
-                        || user.hasRole("ROLE_MANAGER");
+                condominiumAccessService.isStaffOrAdmin(user, condominiumId);
 
         if (!isOwner && !isAdministrativeUser) {
             throw new ForbiddenException(
@@ -366,20 +481,86 @@ public class ReservationService {
             );
         }
 
-        if (reservation.getStatus()
-                == ReservationStatus.CANCELLED) {
+        ReservationStatus previousStatus = reservation.getStatus();
+        if (previousStatus == ReservationStatus.CANCELLED) {
             return;
         }
 
         reservation.setStatus(
                 ReservationStatus.CANCELLED
         );
-
+        reservation.setWaitlistPosition(null);
         reservation.setCancelledAt(
                 LocalDateTime.now()
         );
 
         reservationRepository.save(reservation);
+
+        if (previousStatus == ReservationStatus.PENDING
+                || previousStatus == ReservationStatus.CONFIRMED
+                || previousStatus == ReservationStatus.COUNTER_PROPOSED) {
+            promoteNextFromWaitlist(reservation);
+        } else if (previousStatus == ReservationStatus.WAITLISTED) {
+            reindexWaitlist(reservation.getCommonArea().getId(), reservation.getStartAt(), reservation.getEndAt());
+        }
+    }
+
+    private void promoteNextFromWaitlist(Reservation freedReservation) {
+        CommonArea commonArea = freedReservation.getCommonArea();
+        Long commonAreaId = commonArea.getId();
+        Long condominiumId = commonArea.getCondominium().getId();
+
+        List<Reservation> waitlisted = reservationRepository.findWaitlistedOverlapping(
+                commonAreaId,
+                freedReservation.getStartAt(),
+                freedReservation.getEndAt()
+        );
+        if (waitlisted.isEmpty()) {
+            return;
+        }
+
+        boolean promotedOne = false;
+        int position = 1;
+        for (Reservation candidate : waitlisted) {
+            if (!promotedOne) {
+                long remainingConflicts = reservationRepository.countConflictingReservations(
+                        commonAreaId,
+                        candidate.getStartAt(),
+                        candidate.getEndAt(),
+                        ReservationStatus.CANCELLED
+                );
+                if (remainingConflicts == 0) {
+                    boolean requiresApproval = commonArea.getRequiresApproval() == null || commonArea.getRequiresApproval();
+                    candidate.setStatus(requiresApproval ? ReservationStatus.PENDING : ReservationStatus.CONFIRMED);
+                    candidate.setWaitlistPosition(null);
+                    reservationRepository.save(candidate);
+                    promotedOne = true;
+
+                    notificationService.createDirectNotification(
+                            candidate.getReservedBy(),
+                            NotificationType.RESERVATION,
+                            "Vaga liberada na lista de espera!",
+                            "O horário que você aguardava em " + commonArea.getName()
+                                    + " ficou disponível e sua solicitação foi promovida automaticamente para "
+                                    + (requiresApproval ? "aprovação" : "confirmada") + "!",
+                            condominiumId,
+                            commonArea.getCondominium().getName()
+                    );
+                    continue;
+                }
+            }
+            candidate.setWaitlistPosition(position++);
+            reservationRepository.save(candidate);
+        }
+    }
+
+    private void reindexWaitlist(Long commonAreaId, LocalDateTime startAt, LocalDateTime endAt) {
+        List<Reservation> waitlisted = reservationRepository.findWaitlistedOverlapping(commonAreaId, startAt, endAt);
+        int position = 1;
+        for (Reservation entry : waitlisted) {
+            entry.setWaitlistPosition(position++);
+            reservationRepository.save(entry);
+        }
     }
 
     private CommonArea findCommonAreaByIdForUpdate(
@@ -424,7 +605,7 @@ public class ReservationService {
                 FeatureCode.RESERVATIONS
         );
 
-        validateCondominiumAccess(condominiumId);
+        condominiumAccessService.validateStaffAccess(condominiumId);
 
         return reservationRepository
                 .findByCommonAreaCondominiumIdOrderByStartAtDesc(

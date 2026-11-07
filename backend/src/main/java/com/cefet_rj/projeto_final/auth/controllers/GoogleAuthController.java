@@ -49,12 +49,16 @@ public class GoogleAuthController {
         String email = google.getClaimAsString("email").trim().toLowerCase();
         String subject = google.getSubject();
         User user = users.findByGoogleSubject(subject)
-                .or(() -> users.findByEmail(email))
+                .or(() -> users.findByEmailIgnoreCase(email))
                 .orElseGet(() -> createGoogleUser(google, email));
         if (user.getGoogleSubject() == null) {
             user.setGoogleSubject(subject);
-            user = users.save(user);
         }
+        String picture = google.getClaimAsString("picture");
+        if ((user.getProfileImage() == null || user.getProfileImage().isBlank()) && picture != null && !picture.isBlank()) {
+            user.setProfileImage(picture);
+        }
+        user = users.save(user);
         Instant now = Instant.now();
         var claims = JwtClaimsSet.builder()
                 .issuer("projeto-final")
@@ -78,6 +82,10 @@ public class GoogleAuthController {
         user.setLastName(familyName == null ? "" : familyName);
         user.setEmail(email);
         user.setGoogleSubject(google.getSubject());
+        String picture = google.getClaimAsString("picture");
+        if (picture != null && !picture.isBlank()) {
+            user.setProfileImage(picture);
+        }
         user.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
         Role resident = roles.findByAuthority("ROLE_RESIDENT");
         if (resident == null) throw new IllegalStateException("Role ROLE_RESIDENT is not configured");

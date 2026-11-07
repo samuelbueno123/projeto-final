@@ -74,6 +74,30 @@ public interface MembershipRepository extends JpaRepository<Membership, Long> {
     boolean isManagerOf(@Param("userId") Long userId, @Param("condominiumId") Long condominiumId);
 
     @Query("""
+            select case when count(m) > 0 then true else false end
+            from Membership m
+            where m.user.id = :userId
+              and m.condominium.id = :condominiumId
+              and m.role.authority in ('ROLE_MANAGER', 'ROLE_DOORMAN')
+              and m.status = com.cefet_rj.projeto_final.condominiums.enums.MembershipStatus.ACTIVE
+            """)
+    boolean isStaffOf(@Param("userId") Long userId, @Param("condominiumId") Long condominiumId);
+
+    @Query("""
+            select case when count(m) > 0 then true else false end
+            from Membership m
+            where m.user.id = :userId
+              and m.condominium.id = :condominiumId
+              and m.role.authority = :authority
+              and m.status = com.cefet_rj.projeto_final.condominiums.enums.MembershipStatus.ACTIVE
+            """)
+    boolean hasActiveRoleInCondominium(
+            @Param("userId") Long userId,
+            @Param("condominiumId") Long condominiumId,
+            @Param("authority") String authority
+    );
+
+    @Query("""
             select m.user.id
             from Membership m
             where m.condominium.id = :condominiumId

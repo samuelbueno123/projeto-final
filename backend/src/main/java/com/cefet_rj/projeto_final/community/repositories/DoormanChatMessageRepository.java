@@ -19,13 +19,12 @@ public interface DoormanChatMessageRepository extends JpaRepository<DoormanChatM
         LEFT JOIN FETCH m.unit u
         LEFT JOIN FETCH u.sector
         WHERE m.condominium.id = :condoId
-          AND (m.sender.id = :userId OR m.recipient.id = :userId OR (:unitId IS NOT NULL AND m.unit.id = :unitId))
+          AND (m.sender.id = :userId OR m.recipient.id = :userId)
         ORDER BY m.sentAt ASC
     """)
     List<DoormanChatMessage> findResidentConversation(
             @Param("condoId") Long condoId,
-            @Param("userId") Long userId,
-            @Param("unitId") Long unitId
+            @Param("userId") Long userId
     );
 
     @Query("""

@@ -28,16 +28,24 @@ public class CondominiumGalleryService {
     private final CommonAreaRepository commonAreaRepository;
     private final PictureStorageService pictureStorageService;
     private final AuthenticatedUserService authenticatedUserService;
+    private final com.cefet_rj.projeto_final.condominiums.security.CondominiumAccessService condominiumAccessService;
 
     @Transactional(readOnly = true)
     public List<CondominiumGalleryDTO> findByCondominium(Long condominiumId) {
+        condominiumAccessService.validateAccess(condominiumId);
         return galleryRepository.findByCondominiumIdOrderByCreatedAtDesc(condominiumId).stream()
                 .map(CondominiumGalleryDTO::new)
                 .toList();
     }
 
     @Transactional(readOnly = true)
-    public List<CondominiumGalleryDTO> findByCommonArea(Long commonAreaId) {
+    public List<CondominiumGalleryDTO> findByCommonArea(Long condominiumId, Long commonAreaId) {
+        condominiumAccessService.validateAccess(condominiumId);
+        CommonArea area = commonAreaRepository.findById(commonAreaId)
+                .orElseThrow(() -> new ResourceNotFoundException("Área comum não encontrada: " + commonAreaId));
+        if (!area.getCondominium().getId().equals(condominiumId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Área comum não pertence a este condomínio.");
+        }
         return galleryRepository.findByCommonAreaIdOrderByCreatedAtDesc(commonAreaId).stream()
                 .map(CondominiumGalleryDTO::new)
                 .toList();
@@ -45,6 +53,7 @@ public class CondominiumGalleryService {
 
     @Transactional
     public CondominiumGalleryDTO addImage(Long condominiumId, CondominiumGalleryDTO.CreateGalleryImageDTO dto) {
+        condominiumAccessService.validateManagerAccess(condominiumId);
         User user = authenticatedUserService.getAuthenticatedUser();
         Condominium condominium = condominiumRepository.findById(condominiumId)
                 .orElseThrow(() -> new ResourceNotFoundException("Condomínio não encontrado: " + condominiumId));
@@ -65,6 +74,9 @@ public class CondominiumGalleryService {
         if (dto.commonAreaId() != null) {
             CommonArea area = commonAreaRepository.findById(dto.commonAreaId())
                     .orElseThrow(() -> new ResourceNotFoundException("Área comum não encontrada: " + dto.commonAreaId()));
+            if (!area.getCondominium().getId().equals(condominiumId)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Área comum não pertence a este condomínio.");
+            }
             image.setCommonArea(area);
             if (area.getImageUrl() == null || area.getImageUrl().isBlank()) {
                 area.setImageUrl(storedPath);
@@ -78,6 +90,7 @@ public class CondominiumGalleryService {
 
     @Transactional
     public void deleteImage(Long condominiumId, Long imageId) {
+        condominiumAccessService.validateManagerAccess(condominiumId);
         CondominiumGalleryImage image = galleryRepository.findById(imageId)
                 .orElseThrow(() -> new ResourceNotFoundException("Imagem não encontrada: " + imageId));
 

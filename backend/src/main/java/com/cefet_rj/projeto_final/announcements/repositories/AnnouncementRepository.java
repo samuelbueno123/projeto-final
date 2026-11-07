@@ -16,6 +16,7 @@ public interface AnnouncementRepository
             from Announcement a
             join fetch a.condominium
             join fetch a.createdBy
+            left join fetch a.sector
             left join fetch a.unit u
             left join fetch u.sector
             where a.condominium.id = :condominiumId
@@ -31,6 +32,7 @@ public interface AnnouncementRepository
             from Announcement a
             join fetch a.condominium
             join fetch a.createdBy
+            left join fetch a.sector
             left join fetch a.unit u
             left join fetch u.sector
             where a.condominium.id = :condominiumId

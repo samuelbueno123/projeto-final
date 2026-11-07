@@ -32,10 +32,37 @@ public record CommonAreaUpdateDTO(
         @Max(24)
         Integer closingHour,
 
-        String imageUrl
+        String imageUrl,
+
+        @Min(0)
+        Integer minAdvanceHours,
+
+        @Min(1)
+        Integer maxAdvanceDays,
+
+        @Min(1)
+        Integer maxDurationHours,
+
+        @Min(1)
+        Integer maxWeeklyBookingsPerUser,
+
+        Boolean allowWaitlist
 
 ) {
     public CommonAreaUpdateDTO(String name, String description, Integer capacity) {
-        this(name, description, capacity, null, null, null, null, null);
+        this(name, description, capacity, null, null, null, null, null, null, null, null, null, null);
+    }
+
+    public CommonAreaUpdateDTO(
+            String name,
+            String description,
+            Integer capacity,
+            Boolean requiresApproval,
+            String rules,
+            Integer openingHour,
+            Integer closingHour,
+            String imageUrl
+    ) {
+        this(name, description, capacity, requiresApproval, rules, openingHour, closingHour, imageUrl, null, null, null, null, null);
     }
 }

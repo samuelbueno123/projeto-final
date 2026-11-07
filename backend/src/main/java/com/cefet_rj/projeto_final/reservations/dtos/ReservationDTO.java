@@ -28,7 +28,9 @@ public record ReservationDTO(
         LocalDateTime endAt,
         ReservationStatus status,
         LocalDateTime createdAt,
-        LocalDateTime cancelledAt
+        LocalDateTime cancelledAt,
+        String imageUrl,
+        Integer waitlistPosition
 
 ) {
 
@@ -52,7 +54,68 @@ public record ReservationDTO(
     ) {
         this(id, commonAreaId, commonAreaName, condominiumId, condominiumName,
                 reservedById, reservedByName, reservedByEmail, contactPhone, notes, rejectionReason,
-                null, null, null, null, null, null, startAt, endAt, status, createdAt, cancelledAt);
+                null, null, null, null, null, null, startAt, endAt, status, createdAt, cancelledAt, null, null);
+    }
+
+    public ReservationDTO(
+            Long id,
+            Long commonAreaId,
+            String commonAreaName,
+            Long condominiumId,
+            String condominiumName,
+            Long reservedById,
+            String reservedByName,
+            String reservedByEmail,
+            String contactPhone,
+            String notes,
+            String rejectionReason,
+            String counterProposalNotes,
+            LocalDateTime proposedStartAt,
+            LocalDateTime proposedEndAt,
+            Long reviewedById,
+            String reviewedByName,
+            LocalDateTime reviewedAt,
+            LocalDateTime startAt,
+            LocalDateTime endAt,
+            ReservationStatus status,
+            LocalDateTime createdAt,
+            LocalDateTime cancelledAt
+    ) {
+        this(id, commonAreaId, commonAreaName, condominiumId, condominiumName,
+                reservedById, reservedByName, reservedByEmail, contactPhone, notes, rejectionReason,
+                counterProposalNotes, proposedStartAt, proposedEndAt, reviewedById, reviewedByName,
+                reviewedAt, startAt, endAt, status, createdAt, cancelledAt, null, null);
+    }
+
+    public ReservationDTO(
+            Long id,
+            Long commonAreaId,
+            String commonAreaName,
+            Long condominiumId,
+            String condominiumName,
+            Long reservedById,
+            String reservedByName,
+            String reservedByEmail,
+            String contactPhone,
+            String notes,
+            String rejectionReason,
+            String counterProposalNotes,
+            LocalDateTime proposedStartAt,
+            LocalDateTime proposedEndAt,
+            Long reviewedById,
+            String reviewedByName,
+            LocalDateTime reviewedAt,
+            LocalDateTime startAt,
+            LocalDateTime endAt,
+            ReservationStatus status,
+            LocalDateTime createdAt,
+            LocalDateTime cancelledAt,
+            String imageUrl
+    ) {
+        this(id, commonAreaId, commonAreaName, condominiumId, condominiumName,
+                reservedById, reservedByName, reservedByEmail, contactPhone, notes, rejectionReason,
+                counterProposalNotes, proposedStartAt, proposedEndAt, reviewedById, reviewedByName,
+                reviewedAt, startAt, endAt, status, createdAt, cancelledAt, imageUrl, null);
     }
 
     public ReservationDTO(Reservation entity) {
@@ -80,7 +143,9 @@ public record ReservationDTO(
                 entity.getEndAt(),
                 entity.getStatus(),
                 entity.getCreatedAt(),
-                entity.getCancelledAt()
+                entity.getCancelledAt(),
+                entity.getCommonArea() != null ? entity.getCommonArea().getImageUrl() : null,
+                entity.getWaitlistPosition()
         );
     }
 

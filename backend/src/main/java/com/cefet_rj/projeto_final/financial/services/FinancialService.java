@@ -16,7 +16,6 @@ import com.cefet_rj.projeto_final.manager.enums.UnitPaymentStatus;
 import com.cefet_rj.projeto_final.manager.repositories.UnitPaymentRepository;
 import com.cefet_rj.projeto_final.realtime.dtos.RealtimeEventDTO;
 import com.cefet_rj.projeto_final.realtime.services.RealtimeEmitterService;
-import com.cefet_rj.projeto_final.shared.exceptions.ForbiddenException;
 import com.cefet_rj.projeto_final.shared.exceptions.ResourceNotFoundException;
 import com.cefet_rj.projeto_final.users.entities.User;
 import lombok.RequiredArgsConstructor;
@@ -49,12 +48,8 @@ public class FinancialService {
 
     @Transactional
     public ExpenseDTO createExpense(Long condominiumId, CreateExpenseDTO dto) {
+        condominiumAccessService.validateManagerAccess(condominiumId);
         User caller = authenticatedUserService.getAuthenticatedUser();
-        boolean isStaff = caller.hasRole("ROLE_ADMIN") || caller.hasRole("ROLE_MANAGER");
-        if (!isStaff) {
-            throw new ForbiddenException("Apenas o síndico ou administrador pode lançar despesas.");
-        }
-        condominiumAccessService.validateAccess(condominiumId);
 
         Condominium condo = condominiumRepository.findById(condominiumId)
                 .orElseThrow(() -> new ResourceNotFoundException("Condomínio não encontrado: " + condominiumId));
@@ -83,14 +78,10 @@ public class FinancialService {
 
     @Transactional
     public ExpenseDTO payExpense(Long expenseId) {
-        User caller = authenticatedUserService.getAuthenticatedUser();
-        boolean isStaff = caller.hasRole("ROLE_ADMIN") || caller.hasRole("ROLE_MANAGER");
-        if (!isStaff) {
-            throw new ForbiddenException("Apenas o síndico ou administrador pode liquidar despesas.");
-        }
-
         CondominiumExpense expense = expenseRepository.findById(expenseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Despesa não encontrada: " + expenseId));
+
+        condominiumAccessService.validateManagerAccess(expense.getCondominium().getId());
 
         expense.setStatus("PAID");
         expense.setPaidAt(LocalDateTime.now());
@@ -105,14 +96,10 @@ public class FinancialService {
 
     @Transactional
     public ExpenseDTO cancelExpense(Long expenseId) {
-        User caller = authenticatedUserService.getAuthenticatedUser();
-        boolean isStaff = caller.hasRole("ROLE_ADMIN") || caller.hasRole("ROLE_MANAGER");
-        if (!isStaff) {
-            throw new ForbiddenException("Apenas o síndico ou administrador pode cancelar despesas.");
-        }
-
         CondominiumExpense expense = expenseRepository.findById(expenseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Despesa não encontrada: " + expenseId));
+
+        condominiumAccessService.validateManagerAccess(expense.getCondominium().getId());
 
         expense.setStatus("CANCELLED");
         expense = expenseRepository.save(expense);

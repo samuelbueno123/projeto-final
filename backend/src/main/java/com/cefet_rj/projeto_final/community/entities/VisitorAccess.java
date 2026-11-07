@@ -54,14 +54,33 @@ public class VisitorAccess {
     @Column(name = "access_code", nullable = false, length = 20)
     private String accessCode;
 
+    @Column(name = "qr_code_payload", length = 250)
+    private String qrCodePayload;
+
     @Column(name = "expected_at")
     private LocalDateTime expectedAt;
+
+    @Column(name = "valid_from")
+    private LocalDateTime validFrom;
+
+    @Column(name = "valid_until")
+    private LocalDateTime validUntil;
 
     @Column(name = "checked_in_at")
     private LocalDateTime checkedInAt;
 
     @Column(name = "checked_out_at")
     private LocalDateTime checkedOutAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "checked_in_by_id")
+    @OnDelete(action = OnDeleteAction.SET_NULL)
+    private User checkedInBy;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "checked_out_by_id")
+    @OnDelete(action = OnDeleteAction.SET_NULL)
+    private User checkedOutBy;
 
     @Column(nullable = false, length = 30)
     private String status = "AUTHORIZED";

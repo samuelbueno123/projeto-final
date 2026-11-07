@@ -36,6 +36,11 @@ public class Vehicle {
     @OnDelete(action = OnDeleteAction.CASCADE)
     private User owner;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parking_spot_id")
+    @OnDelete(action = OnDeleteAction.SET_NULL)
+    private ParkingSpot parkingSpotEntity;
+
     @Column(nullable = false, length = 30)
     private String type = "CAR";
 
@@ -53,6 +58,9 @@ public class Vehicle {
 
     @Column(nullable = false, length = 30)
     private String status = "PENDING";
+
+    @Column(name = "rejection_reason", length = 300)
+    private String rejectionReason;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();

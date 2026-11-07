@@ -45,6 +45,9 @@ public class AssemblyTopic {
     @Column(name = "abstain_count", nullable = false)
     private int abstainCount = 0;
 
+    @Column(name = "result_status", nullable = false, length = 30)
+    private String resultStatus = "PENDING";
+
     @OneToMany(mappedBy = "topic", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<AssemblyVote> votes = new ArrayList<>();
 }

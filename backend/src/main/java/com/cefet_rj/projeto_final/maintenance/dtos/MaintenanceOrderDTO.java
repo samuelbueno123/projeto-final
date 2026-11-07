@@ -10,6 +10,10 @@ import java.time.LocalDateTime;
 public record MaintenanceOrderDTO(
         Long id,
         Long condominiumId,
+        Long equipmentId,
+        String equipmentName,
+        Long supplierId,
+        String supplierCompanyName,
         String title,
         String description,
         String category,
@@ -18,10 +22,14 @@ public record MaintenanceOrderDTO(
         String status,
         String contractorName,
         String contractorContact,
+        String responsibleName,
+        Integer recurrenceDays,
         LocalDate scheduledDate,
         LocalDateTime completedAt,
         BigDecimal estimatedCost,
         BigDecimal actualCost,
+        Integer supplierRating,
+        String supplierFeedback,
         String notes,
         String createdByName,
         LocalDateTime createdAt
@@ -30,6 +38,10 @@ public record MaintenanceOrderDTO(
         this(
                 entity.getId(),
                 entity.getCondominium().getId(),
+                entity.getEquipment() != null ? entity.getEquipment().getId() : null,
+                entity.getEquipment() != null ? entity.getEquipment().getName() : null,
+                entity.getSupplier() != null ? entity.getSupplier().getId() : null,
+                entity.getSupplier() != null ? entity.getSupplier().getCompanyName() : null,
                 entity.getTitle(),
                 entity.getDescription(),
                 entity.getCategory(),
@@ -38,10 +50,14 @@ public record MaintenanceOrderDTO(
                 entity.getStatus(),
                 entity.getContractorName(),
                 entity.getContractorContact(),
+                entity.getResponsibleName(),
+                entity.getRecurrenceDays(),
                 entity.getScheduledDate(),
                 entity.getCompletedAt(),
                 entity.getEstimatedCost(),
                 entity.getActualCost(),
+                entity.getSupplierRating(),
+                entity.getSupplierFeedback(),
                 entity.getNotes(),
                 entity.getCreatedBy() != null
                         ? (entity.getCreatedBy().getFirstName() + " " + entity.getCreatedBy().getLastName()).trim()
@@ -56,8 +72,12 @@ public record MaintenanceOrderDTO(
             @NotBlank String category,
             String type,
             String priority,
+            Long equipmentId,
+            Long supplierId,
             String contractorName,
             String contractorContact,
+            String responsibleName,
+            Integer recurrenceDays,
             LocalDate scheduledDate,
             BigDecimal estimatedCost,
             String notes
@@ -66,6 +86,8 @@ public record MaintenanceOrderDTO(
     public record UpdateStatusDTO(
             @NotBlank String status,
             BigDecimal actualCost,
+            Integer supplierRating,
+            String supplierFeedback,
             String notes
     ) {}
 }

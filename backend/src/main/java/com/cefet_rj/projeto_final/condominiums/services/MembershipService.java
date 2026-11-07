@@ -349,7 +349,7 @@ public class MembershipService {
                 Unit u = r.getUnit();
                 String label = u.getSector().getName() + " • Unid. " + u.getIdentifier();
                 String rType = r.getType() != null ? r.getType().name() : null;
-                return base.withUnitInfo(u.getId(), label, rType);
+                return base.withUnitInfo(u.getId(), label, rType, u.getIdentifier(), u.getSector().getName());
             }
         }
         return base;
@@ -378,6 +378,10 @@ public class MembershipService {
 
     @Transactional
     public MembershipDTO insert(MembershipInsertDTO dto) {
+        ensureViewerIsManagerOrAdminOf(dto.condominiumId());
+        if (dto.authority() != null && (dto.authority().contains("ADMIN") || dto.authority().contains("MANAGER"))) {
+            ensureViewerIsSystemAdmin();
+        }
         Membership entity = new Membership();
         linkAssociations(dto.condominiumId(), entity, dto.authority(), dto.userId());
         entity.setStatus(MembershipStatus.ACTIVE);
@@ -391,7 +395,13 @@ public class MembershipService {
     @Transactional
     public MembershipDTO update(Long id, MembershipUpdateDTO dto) {
         try {
-            Membership entity = membershipRepository.getReferenceById(id);
+            Membership entity = membershipRepository.findByIdWithDetails(id)
+                    .orElseThrow(() -> new ResourceNotFoundException("Id " + id + " not found"));
+            ensureViewerIsManagerOrAdminOf(entity.getCondominium().getId());
+            ensureViewerIsManagerOrAdminOf(dto.condominiumId());
+            if (dto.authority() != null && (dto.authority().contains("ADMIN") || dto.authority().contains("MANAGER"))) {
+                ensureViewerIsSystemAdmin();
+            }
             User previousUser = entity.getUser();
             linkAssociations(dto.condominiumId(), entity, dto.authority(), dto.userId());
             entity = membershipRepository.saveAndFlush(entity);
@@ -409,6 +419,7 @@ public class MembershipService {
     public void delete(Long id) {
         Membership entity = membershipRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Resource not found"));
+        ensureViewerIsManagerOrAdminOf(entity.getCondominium().getId());
         User targetUser = entity.getUser();
         try {
             membershipRepository.delete(entity);
@@ -476,6 +487,9 @@ public class MembershipService {
         if (dto.unitId() != null) {
             requestedUnit = unitRepository.findById(dto.unitId())
                     .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada: " + dto.unitId()));
+            if (!requestedUnit.getSector().getCondominium().getId().equals(condominiumId)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A unidade não pertence a este condomínio.");
+            }
         }
         ResidentType requestedType = ResidentType.OWNER;
         if (dto.residentType() != null && !dto.residentType().isBlank()) {

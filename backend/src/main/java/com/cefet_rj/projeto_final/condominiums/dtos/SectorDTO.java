@@ -5,26 +5,32 @@ import com.cefet_rj.projeto_final.condominiums.entities.Sector;
 public record SectorDTO(
         Long id,
         String name,
-		String structuralType,
+        String structuralType,
         Long condominiumId,
-        String condominiumName
+        String condominiumName,
+        String imageUrl
 ) {
 
     public SectorDTO(Long id, String name, String structuralType, Long condominiumId) {
-        this(id, name, structuralType, condominiumId, null);
+        this(id, name, structuralType, condominiumId, null, null);
+    }
+
+    public SectorDTO(Long id, String name, String structuralType, Long condominiumId, String condominiumName) {
+        this(id, name, structuralType, condominiumId, condominiumName, null);
     }
 
     public SectorDTO(Sector entity) {
         this(
                 entity.getId(),
                 entity.getName(),
-				entity.getStructuralType().toString(),
+                entity.getStructuralType().toString(),
                 entity.getCondominium() != null
                         ? entity.getCondominium().getId()
                         : null,
                 entity.getCondominium() != null
                         ? entity.getCondominium().getName()
-                        : null
+                        : null,
+                entity.getImageUrl()
         );
     }
 }

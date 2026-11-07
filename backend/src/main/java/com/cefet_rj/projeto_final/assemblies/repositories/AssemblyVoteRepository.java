@@ -14,6 +14,8 @@ public interface AssemblyVoteRepository extends JpaRepository<AssemblyVote, Long
 
     Optional<AssemblyVote> findByTopicIdAndUserId(Long topicId, Long userId);
 
+    Optional<AssemblyVote> findByTopicIdAndUnitId(Long topicId, Long unitId);
+
     @Query("SELECT v FROM AssemblyVote v WHERE v.topic.id IN :topicIds AND v.user.id = :userId")
     List<AssemblyVote> findAllByTopicIdsAndUserId(@Param("topicIds") List<Long> topicIds, @Param("userId") Long userId);
 

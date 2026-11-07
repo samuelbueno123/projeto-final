@@ -42,8 +42,23 @@ public class CommonArea {
     @Column(name = "closing_hour")
     private Integer closingHour = 22;
 
-    @Column(name = "image_url", length = 500)
+    @Column(name = "image_url", columnDefinition = "TEXT")
     private String imageUrl;
+
+    @Column(name = "min_advance_hours", nullable = false)
+    private Integer minAdvanceHours = 1;
+
+    @Column(name = "max_advance_days", nullable = false)
+    private Integer maxAdvanceDays = 60;
+
+    @Column(name = "max_duration_hours", nullable = false)
+    private Integer maxDurationHours = 8;
+
+    @Column(name = "max_weekly_bookings_per_user", nullable = false)
+    private Integer maxWeeklyBookingsPerUser = 3;
+
+    @Column(name = "allow_waitlist", nullable = false)
+    private Boolean allowWaitlist = true;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "condominium_id", nullable = false)

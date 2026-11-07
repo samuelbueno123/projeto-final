@@ -245,7 +245,13 @@ O sistema estrutura suas interações em torno de quatro atores principais:
 - **Porteiro:** Responsável pela operação rotineira de portaria e controle de acessos. Realiza o recebimento e a baixa de encomendas com vínculo mandatório à unidade, consulta unidades cadastradas, registra visitantes e mantém comunicação privativa e individualizada com cada morador através do canal de chat da portaria.
 - **Morador:** Usuário final vinculado a uma ou mais unidades. Acompanha em tempo real o recebimento de encomendas, solicita reservas de áreas comuns, autoriza visitantes e veículos, interage no chat direto com a portaria, consulta avisos e participa de votações em assembleias digitais.
 
-O diagrama a seguir sintetiza as interações de cada um dos quatro atores com os módulos da plataforma:
+O diagrama a seguir sintetiza as interações de cada um dos quatro atores com os módulos da plataforma, modelado no padrão visual do Astah UML:
+
+![Figura 1 - Diagrama de Casos de Uso Geral (Estilo Astah UML)](diagrams/4.1_diagrama_casos_de_uso_astah.png)
+*Figura 1: Diagrama de Casos de Uso Geral modelado no padrão visual do Astah UML.*
+
+<details>
+<summary><b>Visualizar representação em código Mermaid</b></summary>
 
 ```mermaid
 flowchart LR
@@ -308,10 +314,17 @@ flowchart LR
     Resident --> UC_ComHub
     Resident --> UC_Assistant
 ```
+</details>
 
 ### 4.2. Diagrama Entidade-Relacionamento (MER / DER)
 
-O diagrama abaixo reflete o modelo de dados relacional implementado e versionado via migrações Flyway (V1 a V14) no PostgreSQL 16:
+O diagrama a seguir apresenta o modelo de dados relacional implementado e versionado via migrações Flyway (V1 a V14) no PostgreSQL 16, estruturado no padrão visual Astah ERD:
+
+![Figura 2 - Modelo Entidade-Relacionamento e Lógico de Dados (Estilo Astah UML)](diagrams/4.2_diagrama_mer_erd_astah.png)
+*Figura 2: Diagrama Entidade-Relacionamento (MER/DER) modelado no padrão visual do Astah UML.*
+
+<details>
+<summary><b>Visualizar representação em código Mermaid</b></summary>
 
 ```mermaid
 erDiagram
@@ -400,6 +413,7 @@ erDiagram
         bigint unit_id FK
     }
 ```
+</details>
 
 ### 4.3. Diagrama de Classes e Arquitetura de Camadas
 
@@ -407,7 +421,13 @@ O diagrama de classes e arquitetura de camadas apresenta a organização estrutu
 
 Em substituição a modelos fortemente acoplados, a solução adota o padrão de arquitetura em camadas (*Layered Architecture*), particionando o software de maneira desacoplada entre a camada cliente no front-end e as camadas de controle, aplicação e persistência no back-end.
 
-O diagrama a seguir sintetiza a estrutura de classes e a integração entre os módulos do sistema:
+O diagrama a seguir sintetiza a estrutura de classes e a integração entre os módulos do sistema no padrão visual do Astah UML:
+
+![Figura 3 - Diagrama de Classes e Arquitetura em Camadas (Estilo Astah UML)](diagrams/4.3_diagrama_classes_camadas_astah.png)
+*Figura 3: Diagrama de Classes e Arquitetura em Camadas no padrão visual do Astah UML.*
+
+<details>
+<summary><b>Visualizar representação em código Mermaid</b></summary>
 
 ```mermaid
 classDiagram
@@ -463,6 +483,7 @@ classDiagram
     ReservationService --> ReservationRepository
     UnitService --> UnitRepository
 ```
+</details>
 
 A estrutura do diagrama é organizada em quatro camadas principais:
 
@@ -475,7 +496,13 @@ A estrutura do diagrama é organizada em quatro camadas principais:
 
 O diagrama de sequência descreve a ordem cronológica e a dinâmica de troca de mensagens entre os atores e os componentes do sistema durante a execução de um processo crítico da plataforma. No ecossistema Âncora Gestão, o fluxo modelado detalha o ciclo completo de comunicação em tempo real: o envio de uma mensagem privativa da portaria para o morador de uma unidade, com persistência transacional no banco de dados e notificação reativa instantânea via Server-Sent Events (SSE).
 
-O diagrama a seguir sintetiza as etapas desse processo:
+O diagrama a seguir sintetiza as etapas desse processo no padrão visual do Astah UML:
+
+![Figura 4 - Diagrama de Sequência: Comunicação e Tempo Real (Estilo Astah UML)](diagrams/4.4_diagrama_sequencia_astah.png)
+*Figura 4: Diagrama de Sequência modelado no padrão visual do Astah UML.*
+
+<details>
+<summary><b>Visualizar representação em código Mermaid</b></summary>
 
 ```mermaid
 sequenceDiagram
@@ -498,6 +525,7 @@ sequenceDiagram
     Note over Morador: Badge vermelho no chat e som/alerta de nova mensagem
     API-->>Porteiro: HTTP 201 Created (Mensagem confirmada)
 ```
+</details>
 
 #### 4.4.1. Participantes do Fluxo
 - **Porteiro (*Flutter Web*):** Operador que redige e envia o comunicado ou esclarecimento direcionado a um morador específico através do painel da portaria.
@@ -517,6 +545,14 @@ sequenceDiagram
 7. **Confirmação ao Emissor (Passo 10):** A API responde ao cliente do porteiro com status `HTTP 201 Created`, confirmando a entrega com sucesso e exibindo a mensagem com carimbo de envio no painel da portaria.
 
 ### 4.5. Diagrama de Implantação e Infraestrutura
+
+A topologia de implantação física e lógica dos contêineres Docker da solução é apresentada a seguir no padrão visual do Astah UML:
+
+![Figura 5 - Diagrama de Implantação e Infraestrutura Docker (Estilo Astah UML)](diagrams/4.5_diagrama_implantacao_astah.png)
+*Figura 5: Diagrama de Implantação dos nós e nós de execução Docker no padrão visual do Astah UML.*
+
+<details>
+<summary><b>Visualizar representação em código Mermaid</b></summary>
 
 ```mermaid
 graph TD
@@ -556,6 +592,7 @@ graph TD
     SpringBoot -->|JDBC /porta 5432| Postgres
     PgAdmin -->|Monitoramento| Postgres
 ```
+</details>
 
 ---
 

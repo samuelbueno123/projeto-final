@@ -1,16 +1,17 @@
 package com.cefet_rj.projeto_final.announcements.controllers;
 
 import com.cefet_rj.projeto_final.announcements.dtos.AnnouncementDTO;
+import com.cefet_rj.projeto_final.announcements.dtos.AnnouncementDTO.AnnouncementReadDTO;
 import com.cefet_rj.projeto_final.announcements.dtos.AnnouncementRequestDTO;
+import com.cefet_rj.projeto_final.announcements.dtos.AnnouncementUpdateDTO;
 import com.cefet_rj.projeto_final.announcements.services.AnnouncementService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import com.cefet_rj.projeto_final.announcements.dtos.AnnouncementUpdateDTO;
-import io.swagger.v3.oas.annotations.tags.Tag;
 
 import java.util.List;
 
@@ -30,7 +31,6 @@ public class AnnouncementController {
             @PathVariable Long condominiumId,
             @Valid @RequestBody AnnouncementRequestDTO dto
     ) {
-
         AnnouncementDTO created =
                 announcementService.create(condominiumId, dto);
 
@@ -44,11 +44,26 @@ public class AnnouncementController {
     public ResponseEntity<List<AnnouncementDTO>> findAll(
             @PathVariable Long condominiumId
     ) {
-
         return ResponseEntity.ok(
                 announcementService
                         .findActiveByCondominium(condominiumId)
         );
+    }
+
+    @PostMapping("/announcements/{id}/read")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<AnnouncementDTO> markAsRead(
+            @PathVariable Long id
+    ) {
+        return ResponseEntity.ok(announcementService.markAsRead(id));
+    }
+
+    @GetMapping("/announcements/{id}/reads")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'DOORMAN')")
+    public ResponseEntity<List<AnnouncementReadDTO>> listReads(
+            @PathVariable Long id
+    ) {
+        return ResponseEntity.ok(announcementService.listReads(id));
     }
 
     @PatchMapping("/announcements/{id}/deactivate")
@@ -56,9 +71,7 @@ public class AnnouncementController {
     public ResponseEntity<Void> deactivate(
             @PathVariable Long id
     ) {
-
         announcementService.deactivate(id);
-
         return ResponseEntity.noContent().build();
     }
 
@@ -67,7 +80,6 @@ public class AnnouncementController {
     public ResponseEntity<List<AnnouncementDTO>> findAllForAdmin(
             @PathVariable Long condominiumId
     ) {
-
         return ResponseEntity.ok(
                 announcementService
                         .findAllByCondominiumForAdmin(
@@ -82,7 +94,6 @@ public class AnnouncementController {
             @PathVariable Long id,
             @Valid @RequestBody AnnouncementUpdateDTO dto
     ) {
-
         return ResponseEntity.ok(
                 announcementService.update(id, dto)
         );
@@ -93,9 +104,7 @@ public class AnnouncementController {
     public ResponseEntity<Void> activate(
             @PathVariable Long id
     ) {
-
         announcementService.activate(id);
-
         return ResponseEntity.noContent().build();
     }
 }

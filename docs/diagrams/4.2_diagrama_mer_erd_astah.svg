@@ -1,0 +1,263 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="980" viewBox="0 0 1440 980">
+    <rect width="1440" height="980" fill="#FFFFFF" />
+    
+<defs>
+    <!-- Arrowhead markers -->
+    <marker id="astah-arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L9,3 z" fill="#000000" />
+    </marker>
+    <marker id="astah-open-arrow" markerWidth="12" markerHeight="12" refX="10" refY="4" orient="auto">
+        <path d="M1,1 L10,4 L1,7" fill="none" stroke="#000000" stroke-width="1.5" />
+    </marker>
+    <marker id="astah-triangle" markerWidth="14" markerHeight="14" refX="12" refY="5" orient="auto">
+        <path d="M1,1 L12,5 L1,9 z" fill="#FFFFFF" stroke="#000000" stroke-width="1.5" />
+    </marker>
+    <marker id="astah-diamond" markerWidth="16" markerHeight="16" refX="14" refY="5" orient="auto">
+        <path d="M1,5 L8,1 L15,5 L8,9 z" fill="#000000" stroke="#000000" stroke-width="1" />
+    </marker>
+    <marker id="astah-crow" markerWidth="14" markerHeight="14" refX="12" refY="5" orient="auto">
+        <path d="M1,1 L12,5 L1,9 M12,1 L12,9" fill="none" stroke="#000000" stroke-width="1.5" />
+    </marker>
+    
+    <!-- Astah Yellow Gradients -->
+    <linearGradient id="astah-yellow" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#FFFFE6" />
+        <stop offset="100%" stop-color="#FFFFCC" />
+    </linearGradient>
+    <linearGradient id="astah-yellow-dark" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#FFFECB" />
+        <stop offset="100%" stop-color="#FFF59D" />
+    </linearGradient>
+    <linearGradient id="astah-package-tab" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#FFFFF0" />
+        <stop offset="100%" stop-color="#FFFFCC" />
+    </linearGradient>
+    <linearGradient id="astah-node-side" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#EDEDED" />
+        <stop offset="100%" stop-color="#DCDCDC" />
+    </linearGradient>
+</defs>
+
+    
+    <!-- Title Frame -->
+    <rect x="20" y="15" width="1400" height="42" fill="#FAFAFA" stroke="#B0B0B0" stroke-width="1" />
+    <text x="35" y="41" font-family="Arial, Segoe UI, sans-serif" font-size="14" font-weight="bold" fill="#000000">erd [Diagrama] 4.2. Modelo Entidade-Relacionamento / Relacional (Estilo Astah ERD)</text>
+    
+    <!-- Row 1: Condominium Core & Billing -->
+    
+    <g>
+        <!-- Entity Container -->
+        <rect x="40" y="80" width="240" height="120" fill="url(#astah-yellow)" stroke="#000000" stroke-width="1.5" />
+        <!-- Header -->
+        <rect x="40" y="80" width="240" height="26" fill="url(#astah-yellow-dark)" stroke="#000000" stroke-width="1" />
+        <text x="160.0" y="98" font-family="Arial, Segoe UI, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#000000">tb_billing_plan</text>
+        <!-- PK Divider -->
+        <line x1="40" y1="128" x2="280" y2="128" stroke="#000000" stroke-width="1" />
+        <text x="50" y="122" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#000000">PK  id : bigint</text>
+        <text x="50" y="144" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">name : varchar(100)</text><text x="50" y="160" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">price : numeric(10,2)</text><text x="50" y="176" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">max_units : integer</text><text x="50" y="192" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">is_active : boolean</text>
+    </g>
+    
+    
+    <g>
+        <!-- Entity Container -->
+        <rect x="340" y="80" width="270" height="168" fill="url(#astah-yellow)" stroke="#000000" stroke-width="1.5" />
+        <!-- Header -->
+        <rect x="340" y="80" width="270" height="26" fill="url(#astah-yellow-dark)" stroke="#000000" stroke-width="1" />
+        <text x="475.0" y="98" font-family="Arial, Segoe UI, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#000000">tb_condominium</text>
+        <!-- PK Divider -->
+        <line x1="340" y1="128" x2="610" y2="128" stroke="#000000" stroke-width="1" />
+        <text x="350" y="122" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#000000">PK  id : bigint</text>
+        <text x="350" y="144" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">name : varchar(150)</text><text x="350" y="160" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">address : varchar(255)</text><text x="350" y="176" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">code : varchar(50)</text><text x="350" y="192" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">tax_id : varchar(20)</text><text x="350" y="208" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">image_url : text</text><text x="350" y="224" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">is_active : boolean</text><text x="350" y="240" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#990000">FK billing_plan_id : bigint</text>
+    </g>
+    
+    
+    <g>
+        <!-- Entity Container -->
+        <rect x="670" y="80" width="240" height="104" fill="url(#astah-yellow)" stroke="#000000" stroke-width="1.5" />
+        <!-- Header -->
+        <rect x="670" y="80" width="240" height="26" fill="url(#astah-yellow-dark)" stroke="#000000" stroke-width="1" />
+        <text x="790.0" y="98" font-family="Arial, Segoe UI, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#000000">tb_sector</text>
+        <!-- PK Divider -->
+        <line x1="670" y1="128" x2="910" y2="128" stroke="#000000" stroke-width="1" />
+        <text x="680" y="122" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#000000">PK  id : bigint</text>
+        <text x="680" y="144" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">name : varchar(100)</text><text x="680" y="160" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">structural_type : varchar</text><text x="680" y="176" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#990000">FK condominium_id : bigint</text>
+    </g>
+    
+    
+    <g>
+        <!-- Entity Container -->
+        <rect x="970" y="80" width="220" height="88" fill="url(#astah-yellow)" stroke="#000000" stroke-width="1.5" />
+        <!-- Header -->
+        <rect x="970" y="80" width="220" height="26" fill="url(#astah-yellow-dark)" stroke="#000000" stroke-width="1" />
+        <text x="1080.0" y="98" font-family="Arial, Segoe UI, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#000000">tb_unit</text>
+        <!-- PK Divider -->
+        <line x1="970" y1="128" x2="1190" y2="128" stroke="#000000" stroke-width="1" />
+        <text x="980" y="122" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#000000">PK  id : bigint</text>
+        <text x="980" y="144" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">identifier : varchar(50)</text><text x="980" y="160" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#990000">FK sector_id : bigint</text>
+    </g>
+    
+    
+    <g>
+        <!-- Entity Container -->
+        <rect x="1230" y="80" width="180" height="104" fill="url(#astah-yellow)" stroke="#000000" stroke-width="1.5" />
+        <!-- Header -->
+        <rect x="1230" y="80" width="180" height="26" fill="url(#astah-yellow-dark)" stroke="#000000" stroke-width="1" />
+        <text x="1320.0" y="98" font-family="Arial, Segoe UI, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#000000">tb_resident</text>
+        <!-- PK Divider -->
+        <line x1="1230" y1="128" x2="1410" y2="128" stroke="#000000" stroke-width="1" />
+        <text x="1240" y="122" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#000000">PK  id : bigint</text>
+        <text x="1240" y="144" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">role_type : varchar</text><text x="1240" y="160" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#990000">FK user_id : bigint</text><text x="1240" y="176" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#990000">FK unit_id : bigint</text>
+    </g>
+    
+    
+    <!-- Row 2: Packages, Chat, Notifications -->
+    
+    <g>
+        <!-- Entity Container -->
+        <rect x="970" y="260" width="230" height="184" fill="url(#astah-yellow)" stroke="#000000" stroke-width="1.5" />
+        <!-- Header -->
+        <rect x="970" y="260" width="230" height="26" fill="url(#astah-yellow-dark)" stroke="#000000" stroke-width="1" />
+        <text x="1085.0" y="278" font-family="Arial, Segoe UI, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#000000">tb_package</text>
+        <!-- PK Divider -->
+        <line x1="970" y1="308" x2="1200" y2="308" stroke="#000000" stroke-width="1" />
+        <text x="980" y="302" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#000000">PK  id : bigint</text>
+        <text x="980" y="324" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">description : varchar(255)</text><text x="980" y="340" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">status : varchar(30)</text><text x="980" y="356" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">received_at : timestamp</text><text x="980" y="372" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">picked_up_at : timestamp</text><text x="980" y="388" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#990000">FK unit_id : bigint</text><text x="980" y="404" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#990000">FK recipient_id : bigint</text><text x="980" y="420" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#990000">FK received_by_id : bigint</text><text x="980" y="436" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#990000">FK picked_up_by_id : bigint</text>
+    </g>
+    
+    
+    <g>
+        <!-- Entity Container -->
+        <rect x="650" y="310" width="260" height="168" fill="url(#astah-yellow)" stroke="#000000" stroke-width="1.5" />
+        <!-- Header -->
+        <rect x="650" y="310" width="260" height="26" fill="url(#astah-yellow-dark)" stroke="#000000" stroke-width="1" />
+        <text x="780.0" y="328" font-family="Arial, Segoe UI, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#000000">tb_doorman_chat_message</text>
+        <!-- PK Divider -->
+        <line x1="650" y1="358" x2="910" y2="358" stroke="#000000" stroke-width="1" />
+        <text x="660" y="352" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#000000">PK  id : bigint</text>
+        <text x="660" y="374" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">content : text</text><text x="660" y="390" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">sent_at : timestamp</text><text x="660" y="406" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">is_read : boolean</text><text x="660" y="422" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#990000">FK condominium_id : bigint</text><text x="660" y="438" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#990000">FK sender_id : bigint</text><text x="660" y="454" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#990000">FK recipient_id : bigint</text><text x="660" y="470" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#990000">FK unit_id : bigint</text>
+    </g>
+    
+    
+    <g>
+        <!-- Entity Container -->
+        <rect x="340" y="310" width="250" height="152" fill="url(#astah-yellow)" stroke="#000000" stroke-width="1.5" />
+        <!-- Header -->
+        <rect x="340" y="310" width="250" height="26" fill="url(#astah-yellow-dark)" stroke="#000000" stroke-width="1" />
+        <text x="465.0" y="328" font-family="Arial, Segoe UI, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#000000">tb_notification</text>
+        <!-- PK Divider -->
+        <line x1="340" y1="358" x2="590" y2="358" stroke="#000000" stroke-width="1" />
+        <text x="350" y="352" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#000000">PK  id : bigint</text>
+        <text x="350" y="374" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">title : varchar(150)</text><text x="350" y="390" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">message : text</text><text x="350" y="406" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">type : varchar(50)</text><text x="350" y="422" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">created_at : timestamp</text><text x="350" y="438" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">is_read : boolean</text><text x="350" y="454" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#990000">FK user_id : bigint</text>
+    </g>
+    
+    
+    <!-- Row 3: Users & Security -->
+    
+    <g>
+        <!-- Entity Container -->
+        <rect x="40" y="360" width="250" height="168" fill="url(#astah-yellow)" stroke="#000000" stroke-width="1.5" />
+        <!-- Header -->
+        <rect x="40" y="360" width="250" height="26" fill="url(#astah-yellow-dark)" stroke="#000000" stroke-width="1" />
+        <text x="165.0" y="378" font-family="Arial, Segoe UI, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#000000">tb_user</text>
+        <!-- PK Divider -->
+        <line x1="40" y1="408" x2="290" y2="408" stroke="#000000" stroke-width="1" />
+        <text x="50" y="402" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#000000">PK  id : bigint</text>
+        <text x="50" y="424" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">name : varchar(150)</text><text x="50" y="440" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">email : varchar(150)</text><text x="50" y="456" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">password : varchar(255)</text><text x="50" y="472" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">phone : varchar(30)</text><text x="50" y="488" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">profile_image_url : text</text><text x="50" y="504" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">provider : varchar(30)</text><text x="50" y="520" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">created_at : timestamp</text>
+    </g>
+    
+    
+    <g>
+        <!-- Entity Container -->
+        <rect x="40" y="600" width="250" height="120" fill="url(#astah-yellow)" stroke="#000000" stroke-width="1.5" />
+        <!-- Header -->
+        <rect x="40" y="600" width="250" height="26" fill="url(#astah-yellow-dark)" stroke="#000000" stroke-width="1" />
+        <text x="165.0" y="618" font-family="Arial, Segoe UI, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#000000">tb_membership</text>
+        <!-- PK Divider -->
+        <line x1="40" y1="648" x2="290" y2="648" stroke="#000000" stroke-width="1" />
+        <text x="50" y="642" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#000000">PK  id : bigint</text>
+        <text x="50" y="664" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">status : varchar(30)</text><text x="50" y="680" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">joined_at : timestamp</text><text x="50" y="696" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#990000">FK user_id : bigint</text><text x="50" y="712" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#990000">FK condominium_id : bigint</text>
+    </g>
+    
+    
+    <g>
+        <!-- Entity Container -->
+        <rect x="340" y="600" width="250" height="152" fill="url(#astah-yellow)" stroke="#000000" stroke-width="1.5" />
+        <!-- Header -->
+        <rect x="340" y="600" width="250" height="26" fill="url(#astah-yellow-dark)" stroke="#000000" stroke-width="1" />
+        <text x="465.0" y="618" font-family="Arial, Segoe UI, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#000000">tb_unit_payment</text>
+        <!-- PK Divider -->
+        <line x1="340" y1="648" x2="590" y2="648" stroke="#000000" stroke-width="1" />
+        <text x="350" y="642" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#000000">PK  id : bigint</text>
+        <text x="350" y="664" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">title : varchar(150)</text><text x="350" y="680" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">amount : numeric(10,2)</text><text x="350" y="696" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">due_date : date</text><text x="350" y="712" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">status : varchar(30)</text><text x="350" y="728" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">digitable_line : text</text><text x="350" y="744" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#990000">FK unit_id : bigint</text>
+    </g>
+    
+    
+    <!-- Row 4: Areas, Reservations, Assemblies -->
+    
+    <g>
+        <!-- Entity Container -->
+        <rect x="650" y="600" width="250" height="136" fill="url(#astah-yellow)" stroke="#000000" stroke-width="1.5" />
+        <!-- Header -->
+        <rect x="650" y="600" width="250" height="26" fill="url(#astah-yellow-dark)" stroke="#000000" stroke-width="1" />
+        <text x="775.0" y="618" font-family="Arial, Segoe UI, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#000000">tb_common_area</text>
+        <!-- PK Divider -->
+        <line x1="650" y1="648" x2="900" y2="648" stroke="#000000" stroke-width="1" />
+        <text x="660" y="642" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#000000">PK  id : bigint</text>
+        <text x="660" y="664" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">name : varchar(100)</text><text x="660" y="680" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">capacity : integer</text><text x="660" y="696" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">rules : text</text><text x="660" y="712" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">is_active : boolean</text><text x="660" y="728" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#990000">FK condominium_id : bigint</text>
+    </g>
+    
+    
+    <g>
+        <!-- Entity Container -->
+        <rect x="950" y="600" width="260" height="184" fill="url(#astah-yellow)" stroke="#000000" stroke-width="1.5" />
+        <!-- Header -->
+        <rect x="950" y="600" width="260" height="26" fill="url(#astah-yellow-dark)" stroke="#000000" stroke-width="1" />
+        <text x="1080.0" y="618" font-family="Arial, Segoe UI, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#000000">tb_reservation</text>
+        <!-- PK Divider -->
+        <line x1="950" y1="648" x2="1210" y2="648" stroke="#000000" stroke-width="1" />
+        <text x="960" y="642" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#000000">PK  id : bigint</text>
+        <text x="960" y="664" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">start_at : timestamp</text><text x="960" y="680" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">end_at : timestamp</text><text x="960" y="696" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">status : varchar(30)</text><text x="960" y="712" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">notes : text</text><text x="960" y="728" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">proposed_start_at : timestamp</text><text x="960" y="744" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">proposed_end_at : timestamp</text><text x="960" y="760" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#990000">FK common_area_id : bigint</text><text x="960" y="776" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#990000">FK user_id : bigint</text>
+    </g>
+    
+    
+    <g>
+        <!-- Entity Container -->
+        <rect x="1240" y="600" width="180" height="120" fill="url(#astah-yellow)" stroke="#000000" stroke-width="1.5" />
+        <!-- Header -->
+        <rect x="1240" y="600" width="180" height="26" fill="url(#astah-yellow-dark)" stroke="#000000" stroke-width="1" />
+        <text x="1330.0" y="618" font-family="Arial, Segoe UI, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#000000">tb_assembly</text>
+        <!-- PK Divider -->
+        <line x1="1240" y1="648" x2="1420" y2="648" stroke="#000000" stroke-width="1" />
+        <text x="1250" y="642" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#000000">PK  id : bigint</text>
+        <text x="1250" y="664" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">title : varchar</text><text x="1250" y="680" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">scheduled_at : time</text><text x="1250" y="696" font-family="Consolas, monospace" font-size="11" font-weight="normal" fill="#000000">status : varchar</text><text x="1250" y="712" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#990000">FK condo_id : bigint</text>
+    </g>
+    
+    
+    <!-- ER Connectors (Orthogonal lines with Astah 1..* crow's foot) -->
+    <!-- BillingPlan -> Condominium -->
+    <line x1="280" y1="140" x2="340" y2="140" stroke="#000000" stroke-width="1.5" marker-end="url(#astah-crow)" />
+    <!-- Condominium -> Sector -->
+    <line x1="610" y1="140" x2="670" y2="140" stroke="#000000" stroke-width="1.5" marker-end="url(#astah-crow)" />
+    <!-- Sector -> Unit -->
+    <line x1="910" y1="140" x2="970" y2="140" stroke="#000000" stroke-width="1.5" marker-end="url(#astah-crow)" />
+    <!-- Unit -> Resident -->
+    <line x1="1190" y1="140" x2="1230" y2="140" stroke="#000000" stroke-width="1.5" marker-end="url(#astah-crow)" />
+    
+    <!-- Unit -> Package -->
+    <line x1="1080" y1="180" x2="1080" y2="260" stroke="#000000" stroke-width="1.5" marker-end="url(#astah-crow)" />
+    <!-- Condominium -> Chat -->
+    <path d="M 470,240 L 470,280 L 780,280 L 780,310" fill="none" stroke="#000000" stroke-width="1.5" marker-end="url(#astah-crow)" />
+    <!-- User -> Resident -->
+    <path d="M 290,400 L 1320,400 L 1320,180" fill="none" stroke="#000000" stroke-width="1.5" marker-end="url(#astah-crow)" />
+    <!-- User -> Notification -->
+    <line x1="290" y1="380" x2="340" y2="380" stroke="#000000" stroke-width="1.5" marker-end="url(#astah-crow)" />
+    <!-- User -> Membership -->
+    <line x1="165" y1="530" x2="165" y2="600" stroke="#000000" stroke-width="1.5" marker-end="url(#astah-crow)" />
+    <!-- Unit -> UnitPayment -->
+    <path d="M 1030,180 L 1030,230 L 465,230 L 465,600" fill="none" stroke="#000000" stroke-width="1.5" marker-end="url(#astah-crow)" />
+    <!-- Condominium -> CommonArea -->
+    <path d="M 400,240 L 400,560 L 775,560 L 775,600" fill="none" stroke="#000000" stroke-width="1.5" marker-end="url(#astah-crow)" />
+    <!-- CommonArea -> Reservation -->
+    <line x1="900" y1="670" x2="950" y2="670" stroke="#000000" stroke-width="1.5" marker-end="url(#astah-crow)" />
+    
+    </svg>

@@ -6,6 +6,7 @@ import com.cefet_rj.projeto_final.condominiums.entities.Resident;
 import com.cefet_rj.projeto_final.condominiums.entities.Unit;
 import com.cefet_rj.projeto_final.condominiums.repositories.MembershipRepository;
 import com.cefet_rj.projeto_final.condominiums.repositories.ResidentRepository;
+import com.cefet_rj.projeto_final.condominiums.repositories.UnitRepository;
 import com.cefet_rj.projeto_final.condominiums.security.CondominiumAccessService;
 import com.cefet_rj.projeto_final.condominiums.security.CondominiumFeatureAccessService;
 import com.cefet_rj.projeto_final.packages.dtos.PackageDTO;
@@ -16,12 +17,12 @@ import com.cefet_rj.projeto_final.packages.enums.PackageStatus;
 import com.cefet_rj.projeto_final.packages.events.PackageStatusChangedEvent;
 import com.cefet_rj.projeto_final.packages.history.services.PackageHistoryService;
 import com.cefet_rj.projeto_final.packages.repositories.PackageRepository;
-import com.cefet_rj.projeto_final.condominiums.repositories.UnitRepository;
-import com.cefet_rj.projeto_final.users.repositories.UserRepository;
 import com.cefet_rj.projeto_final.shared.exceptions.DatabaseException;
+import com.cefet_rj.projeto_final.shared.exceptions.ForbiddenException;
 import com.cefet_rj.projeto_final.shared.exceptions.InvalidPackageStateTransitionException;
 import com.cefet_rj.projeto_final.shared.exceptions.ResourceNotFoundException;
 import com.cefet_rj.projeto_final.users.entities.User;
+import com.cefet_rj.projeto_final.users.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -33,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -54,7 +56,7 @@ public class PackageService {
         Package entity = packageRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Package not found"));
 
-        validatePackageAccess(entity);
+        validatePackageOwnerOrStaffAccess(entity);
 
         return new PackageDTO(entity);
     }
@@ -64,7 +66,6 @@ public class PackageService {
             PackageStatus nextStatus,
             String notes
     ) {
-
         PackageStatus currentStatus = entity.getStatus();
 
         if (currentStatus == null) {
@@ -103,6 +104,7 @@ public class PackageService {
         Package entity = new Package();
 
         linkAssociations(dto.condominiumId(), dto.description(), dto.recipientId(), dto.unitId(), entity);
+        condominiumAccessService.validateStaffAccess(getCondominiumId(entity.getUnit()));
 
         entity.setStatus(PackageStatus.RECEIVED);
         entity.setReceivedAt(LocalDateTime.now());
@@ -116,9 +118,27 @@ public class PackageService {
         Package entity = new Package();
         User caller = authenticatedUserService.getAuthenticatedUser();
         Long recipientId = dto.recipientId();
-        boolean isStaff = caller.hasRole("ROLE_ADMIN") || caller.hasRole("ROLE_MANAGER") || caller.hasRole("ROLE_DOORMAN");
-        if (recipientId == null && !isStaff) {
+
+        Unit tempUnit = null;
+        if (dto.unitId() != null) {
+            tempUnit = unitRepository.findById(dto.unitId()).orElse(null);
+        }
+        Long targetCondoId = dto.condominiumId() != null
+                ? dto.condominiumId()
+                : (tempUnit != null ? getCondominiumId(tempUnit) : null);
+
+        boolean isStaff = targetCondoId != null
+                ? condominiumAccessService.isStaffOrAdmin(caller, targetCondoId)
+                : caller.hasRole("ROLE_ADMIN");
+
+        if (!isStaff) {
             recipientId = caller.getId();
+            if (dto.unitId() != null) {
+                List<Long> myUnitIds = residentRepository.findUnitIdsByUserId(caller.getId());
+                if (!myUnitIds.contains(dto.unitId())) {
+                    throw new ForbiddenException("Você só pode cadastrar encomendas esperadas para sua própria unidade.");
+                }
+            }
         }
 
         linkAssociations(dto.condominiumId(), dto.description(), recipientId, dto.unitId(), entity);
@@ -133,7 +153,7 @@ public class PackageService {
     public PackageDTO requestPickup(Long id, String note) {
         Package entity = packageRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Package not found"));
-        validatePackageAccess(entity);
+        validatePackageOwnerOrStaffAccess(entity);
         String cleanNote = note == null || note.isBlank()
                 ? "Morador solicitou separação da encomenda para retirada na portaria."
                 : "Solicitação de retirada: " + note.trim();
@@ -151,7 +171,7 @@ public class PackageService {
         Package entity = packageRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Package not found"));
 
-        validatePackageAccess(entity);
+        condominiumAccessService.validateStaffAccess(getCondominiumId(entity.getUnit()));
 
         changeStatus(
                 entity,
@@ -168,7 +188,7 @@ public class PackageService {
         Package entity = packageRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Package not found"));
 
-        validatePackageAccess(entity);
+        condominiumAccessService.validateStaffAccess(getCondominiumId(entity.getUnit()));
 
         changeStatus(
                 entity,
@@ -185,7 +205,7 @@ public class PackageService {
         Package entity = packageRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Package not found"));
 
-        validatePackageAccess(entity);
+        condominiumAccessService.validateStaffAccess(getCondominiumId(entity.getUnit()));
 
         changeStatus(
                 entity,
@@ -202,7 +222,14 @@ public class PackageService {
         Package entity = packageRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Package not found"));
 
-        validatePackageAccess(entity);
+        validatePackageOwnerOrStaffAccess(entity);
+
+        User caller = authenticatedUserService.getAuthenticatedUser();
+        Long condoId = getCondominiumId(entity.getUnit());
+        if (!condominiumAccessService.isStaffOrAdmin(caller, condoId)
+                && entity.getStatus() != PackageStatus.EXPECTED) {
+            throw new ForbiddenException("Apenas a portaria ou administração pode cancelar encomendas já recebidas.");
+        }
 
         changeStatus(
                 entity,
@@ -219,7 +246,7 @@ public class PackageService {
         Package entity = packageRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Package not found"));
 
-        validatePackageAccess(entity);
+        condominiumAccessService.validateStaffAccess(getCondominiumId(entity.getUnit()));
 
         changeStatus(
                 entity,
@@ -237,7 +264,7 @@ public class PackageService {
                 .orElseThrow(() ->
                         new ResourceNotFoundException("Package not found: " + id));
 
-        validatePackageAccess(entity);
+        condominiumAccessService.validateStaffAccess(getCondominiumId(entity.getUnit()));
 
         linkAssociations(
                 null,
@@ -246,6 +273,7 @@ public class PackageService {
                 dto.unitId(),
                 entity
         );
+        condominiumAccessService.validateStaffAccess(getCondominiumId(entity.getUnit()));
 
         return new PackageDTO(entity);
     }
@@ -257,11 +285,10 @@ public class PackageService {
                     .orElseThrow(() ->
                             new ResourceNotFoundException("Package not found: " + id));
 
-            validatePackageAccess(entity);
+            condominiumAccessService.validateStaffAccess(getCondominiumId(entity.getUnit()));
 
             packageRepository.delete(entity);
-        }
-        catch (DataIntegrityViolationException e) {
+        } catch (DataIntegrityViolationException e) {
             throw new DatabaseException("Integrity violation");
         }
     }
@@ -273,14 +300,7 @@ public class PackageService {
             String status,
             Pageable pageable
     ) {
-        User user = authenticatedUserService.getAuthenticatedUser();
-
-        if (!user.hasRole("ROLE_ADMIN")) {
-            condominiumAccessService.validateUserBelongsToCondominium(
-                    user.getId(),
-                    condominiumId
-            );
-        }
+        condominiumAccessService.validateStaffAccess(condominiumId);
 
         PackageStatus packageStatus = null;
 
@@ -310,23 +330,32 @@ public class PackageService {
         return page.map(PackageDTO::new);
     }
 
-    private void validatePackageAccess(Package packageEntity) {
+    private void validatePackageOwnerOrStaffAccess(Package packageEntity) {
         User authenticatedUser = authenticatedUserService.getAuthenticatedUser();
 
         if (authenticatedUser.hasRole("ROLE_ADMIN")) {
             return;
         }
 
-        Long condominiumId = packageEntity
-                .getUnit()
-                .getSector()
-                .getCondominium()
-                .getId();
+        Long condominiumId = getCondominiumId(packageEntity.getUnit());
 
         condominiumAccessService.validateUserBelongsToCondominium(
                 authenticatedUser.getId(),
                 condominiumId
         );
+
+        if (condominiumAccessService.isStaffOrAdmin(authenticatedUser, condominiumId)) {
+            return;
+        }
+
+        boolean isRecipient = packageEntity.getRecipient() != null
+                && packageEntity.getRecipient().getId().equals(authenticatedUser.getId());
+        boolean isUnitResident = packageEntity.getUnit() != null
+                && residentRepository.findUnitIdsByUserId(authenticatedUser.getId()).contains(packageEntity.getUnit().getId());
+
+        if (!isRecipient && !isUnitResident) {
+            throw new ForbiddenException("Você não possui permissão para acessar esta encomenda.");
+        }
     }
 
     private void validateUnitAccess(Unit unit) {
@@ -336,10 +365,7 @@ public class PackageService {
             return;
         }
 
-        Long condominiumId = unit
-                .getSector()
-                .getCondominium()
-                .getId();
+        Long condominiumId = getCondominiumId(unit);
 
         condominiumAccessService.validateUserBelongsToCondominium(
                 authenticatedUser.getId(),
@@ -352,12 +378,7 @@ public class PackageService {
             PackageStatus previousStatus,
             PackageStatus newStatus
     ) {
-
-        Long condominiumId = entity
-                .getUnit()
-                .getSector()
-                .getCondominium()
-                .getId();
+        Long condominiumId = getCondominiumId(entity.getUnit());
 
         PackageStatusChangedEvent event =
                 new PackageStatusChangedEvent(

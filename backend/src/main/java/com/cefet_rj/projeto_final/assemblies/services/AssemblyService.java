@@ -1,23 +1,30 @@
 package com.cefet_rj.projeto_final.assemblies.services;
 
 import com.cefet_rj.projeto_final.assemblies.dtos.AssemblyDTO;
+import com.cefet_rj.projeto_final.assemblies.dtos.AssemblyDTO.AssemblyParticipantDTO;
 import com.cefet_rj.projeto_final.assemblies.dtos.AssemblyDTO.AssemblyTopicDTO;
 import com.cefet_rj.projeto_final.assemblies.dtos.AssemblyDTO.CastVoteDTO;
 import com.cefet_rj.projeto_final.assemblies.dtos.AssemblyDTO.CreateAssemblyDTO;
 import com.cefet_rj.projeto_final.assemblies.dtos.AssemblyDTO.CreateTopicDTO;
 import com.cefet_rj.projeto_final.assemblies.dtos.AssemblyDTO.UpdateAssemblyStatusDTO;
+import com.cefet_rj.projeto_final.assemblies.entities.AssemblyParticipant;
 import com.cefet_rj.projeto_final.assemblies.entities.AssemblyTopic;
 import com.cefet_rj.projeto_final.assemblies.entities.AssemblyVote;
 import com.cefet_rj.projeto_final.assemblies.entities.CondominiumAssembly;
+import com.cefet_rj.projeto_final.assemblies.repositories.AssemblyParticipantRepository;
 import com.cefet_rj.projeto_final.assemblies.repositories.AssemblyTopicRepository;
 import com.cefet_rj.projeto_final.assemblies.repositories.AssemblyVoteRepository;
 import com.cefet_rj.projeto_final.assemblies.repositories.CondominiumAssemblyRepository;
 import com.cefet_rj.projeto_final.auth.security.AuthenticatedUserService;
 import com.cefet_rj.projeto_final.condominiums.entities.Condominium;
 import com.cefet_rj.projeto_final.condominiums.entities.Resident;
+import com.cefet_rj.projeto_final.condominiums.entities.Unit;
 import com.cefet_rj.projeto_final.condominiums.repositories.CondominiumRepository;
 import com.cefet_rj.projeto_final.condominiums.repositories.ResidentRepository;
 import com.cefet_rj.projeto_final.condominiums.security.CondominiumAccessService;
+import com.cefet_rj.projeto_final.manager.entities.UnitPayment;
+import com.cefet_rj.projeto_final.manager.enums.UnitPaymentStatus;
+import com.cefet_rj.projeto_final.manager.repositories.UnitPaymentRepository;
 import com.cefet_rj.projeto_final.realtime.dtos.RealtimeEventDTO;
 import com.cefet_rj.projeto_final.realtime.services.RealtimeEmitterService;
 import com.cefet_rj.projeto_final.shared.exceptions.ForbiddenException;
@@ -40,8 +47,10 @@ public class AssemblyService {
     private final CondominiumAssemblyRepository assemblyRepository;
     private final AssemblyTopicRepository topicRepository;
     private final AssemblyVoteRepository voteRepository;
+    private final AssemblyParticipantRepository participantRepository;
     private final CondominiumRepository condominiumRepository;
     private final ResidentRepository residentRepository;
+    private final UnitPaymentRepository paymentRepository;
     private final AuthenticatedUserService authenticatedUserService;
     private final CondominiumAccessService condominiumAccessService;
     private final RealtimeEmitterService realtimeEmitterService;
@@ -62,31 +71,7 @@ public class AssemblyService {
                 : voteRepository.findAllByTopicIdsAndUserId(allTopicIds, caller.getId()).stream()
                 .collect(Collectors.toMap(v -> v.getTopic().getId(), AssemblyVote::getVoteChoice, (v1, v2) -> v1));
 
-        return assemblies.stream().map(assembly -> {
-            List<AssemblyTopicDTO> enrichedTopics = assembly.getTopics().stream().map(t -> {
-                String vote = userVotesByTopicId.get(t.getId());
-                return new AssemblyTopicDTO(t).withUserVote(vote);
-            }).toList();
-
-            return new AssemblyDTO(
-                    assembly.getId(),
-                    assembly.getCondominium().getId(),
-                    assembly.getTitle(),
-                    assembly.getDescription(),
-                    assembly.getType(),
-                    assembly.getMeetingDate(),
-                    assembly.getSecondCallDate(),
-                    assembly.getLocationOrLink(),
-                    assembly.getCallNoticeUrl(),
-                    assembly.getMinutesUrl(),
-                    assembly.getStatus(),
-                    assembly.getCreatedBy() != null
-                            ? (assembly.getCreatedBy().getFirstName() + " " + assembly.getCreatedBy().getLastName()).trim()
-                            : "Administração",
-                    assembly.getCreatedAt(),
-                    enrichedTopics
-            );
-        }).toList();
+        return assemblies.stream().map(assembly -> buildAssemblyDTO(assembly, caller.getId(), userVotesByTopicId)).toList();
     }
 
     @Transactional(readOnly = true)
@@ -101,39 +86,13 @@ public class AssemblyService {
                 voteRepository.findAllByTopicIdsAndUserId(topicIds, caller.getId()).stream()
                         .collect(Collectors.toMap(v -> v.getTopic().getId(), AssemblyVote::getVoteChoice, (v1, v2) -> v1));
 
-        List<AssemblyTopicDTO> enrichedTopics = assembly.getTopics().stream().map(t -> {
-            String vote = userVotes.get(t.getId());
-            return new AssemblyTopicDTO(t).withUserVote(vote);
-        }).toList();
-
-        return new AssemblyDTO(
-                assembly.getId(),
-                assembly.getCondominium().getId(),
-                assembly.getTitle(),
-                assembly.getDescription(),
-                assembly.getType(),
-                assembly.getMeetingDate(),
-                assembly.getSecondCallDate(),
-                assembly.getLocationOrLink(),
-                assembly.getCallNoticeUrl(),
-                assembly.getMinutesUrl(),
-                assembly.getStatus(),
-                assembly.getCreatedBy() != null
-                        ? (assembly.getCreatedBy().getFirstName() + " " + assembly.getCreatedBy().getLastName()).trim()
-                        : "Administração",
-                assembly.getCreatedAt(),
-                enrichedTopics
-        );
+        return buildAssemblyDTO(assembly, caller.getId(), userVotes);
     }
 
     @Transactional
     public AssemblyDTO createAssembly(Long condominiumId, CreateAssemblyDTO dto) {
+        condominiumAccessService.validateManagerAccess(condominiumId);
         User caller = authenticatedUserService.getAuthenticatedUser();
-        boolean isStaff = caller.hasRole("ROLE_ADMIN") || caller.hasRole("ROLE_MANAGER");
-        if (!isStaff) {
-            throw new ForbiddenException("Apenas o síndico ou administrador pode convocar assembleias.");
-        }
-        condominiumAccessService.validateAccess(condominiumId);
 
         Condominium condo = condominiumRepository.findById(condominiumId)
                 .orElseThrow(() -> new ResourceNotFoundException("Condomínio não encontrado: " + condominiumId));
@@ -147,6 +106,9 @@ public class AssemblyService {
         assembly.setSecondCallDate(dto.secondCallDate());
         assembly.setLocationOrLink(dto.locationOrLink() != null ? dto.locationOrLink().trim() : null);
         assembly.setCallNoticeUrl(dto.callNoticeUrl() != null ? dto.callNoticeUrl().trim() : null);
+        assembly.setBlockDelinquentUnits(dto.blockDelinquentUnits() == null || dto.blockDelinquentUnits());
+        assembly.setOneVotePerUnit(dto.oneVotePerUnit() == null || dto.oneVotePerUnit());
+        assembly.setQuorumMinimumPercent(dto.quorumMinimumPercent() != null ? dto.quorumMinimumPercent() : 50);
         assembly.setStatus("SCHEDULED");
         assembly.setCreatedBy(caller);
         assembly.setCreatedAt(LocalDateTime.now());
@@ -162,14 +124,9 @@ public class AssemblyService {
 
     @Transactional
     public AssemblyTopicDTO addTopic(Long assemblyId, CreateTopicDTO dto) {
-        User caller = authenticatedUserService.getAuthenticatedUser();
-        boolean isStaff = caller.hasRole("ROLE_ADMIN") || caller.hasRole("ROLE_MANAGER");
-        if (!isStaff) {
-            throw new ForbiddenException("Apenas o síndico ou administrador pode adicionar pautas.");
-        }
-
         CondominiumAssembly assembly = assemblyRepository.findById(assemblyId)
                 .orElseThrow(() -> new ResourceNotFoundException("Assembleia não encontrada: " + assemblyId));
+        condominiumAccessService.validateManagerAccess(assembly.getCondominium().getId());
 
         AssemblyTopic topic = new AssemblyTopic();
         topic.setAssembly(assembly);
@@ -177,6 +134,7 @@ public class AssemblyService {
         topic.setDescription(dto.description() != null ? dto.description().trim() : null);
         topic.setDisplayOrder(dto.displayOrder() != null ? dto.displayOrder() : (assembly.getTopics().size() + 1));
         topic.setVotingOpen(false);
+        topic.setResultStatus("PENDING");
 
         topic = topicRepository.save(topic);
         AssemblyTopicDTO result = new AssemblyTopicDTO(topic);
@@ -189,23 +147,63 @@ public class AssemblyService {
 
     @Transactional
     public AssemblyTopicDTO toggleTopicVoting(Long topicId, boolean open) {
-        User caller = authenticatedUserService.getAuthenticatedUser();
-        boolean isStaff = caller.hasRole("ROLE_ADMIN") || caller.hasRole("ROLE_MANAGER");
-        if (!isStaff) {
-            throw new ForbiddenException("Apenas o síndico ou administrador pode alterar o estado da votação.");
-        }
-
         AssemblyTopic topic = topicRepository.findByIdWithAssembly(topicId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pauta não encontrada: " + topicId));
+        Long condoId = topic.getAssembly().getCondominium().getId();
+        condominiumAccessService.validateManagerAccess(condoId);
 
         topic.setVotingOpen(open);
+        if (!open) {
+            topic.setResultStatus(computeTopicResult(topic));
+        } else {
+            topic.setResultStatus("OPEN");
+        }
         topic = topicRepository.save(topic);
         AssemblyTopicDTO result = new AssemblyTopicDTO(topic);
 
-        realtimeEmitterService.sendToCondominium(topic.getAssembly().getCondominium().getId(),
-                RealtimeEventDTO.of("ASSEMBLY_UPDATED", topic.getAssembly().getCondominium().getId(), result));
+        realtimeEmitterService.sendToCondominium(condoId,
+                RealtimeEventDTO.of("ASSEMBLY_UPDATED", condoId, result));
 
         return result;
+    }
+
+    @Transactional
+    public AssemblyParticipantDTO checkInParticipant(Long assemblyId, String proxyInfo) {
+        CondominiumAssembly assembly = assemblyRepository.findById(assemblyId)
+                .orElseThrow(() -> new ResourceNotFoundException("Assembleia não encontrada: " + assemblyId));
+        Long condoId = assembly.getCondominium().getId();
+        condominiumAccessService.validateAccess(condoId);
+
+        User caller = authenticatedUserService.getAuthenticatedUser();
+        Optional<Resident> residentOpt = residentRepository.findFirstByUserIdAndUnitSectorCondominiumId(caller.getId(), condoId);
+        if (residentOpt.isEmpty() && !condominiumAccessService.isManagerOrAdmin(caller, condoId)) {
+            throw new ForbiddenException("Apenas condôminos vinculados a uma unidade ou a administração podem registrar presença na assembleia.");
+        }
+
+        AssemblyParticipant participant = participantRepository.findByAssemblyIdAndUserId(assemblyId, caller.getId())
+                .orElseGet(AssemblyParticipant::new);
+        participant.setAssembly(assembly);
+        participant.setUser(caller);
+        if (residentOpt.isPresent()) {
+            participant.setUnit(residentOpt.get().getUnit());
+        }
+        if (proxyInfo != null && !proxyInfo.isBlank()) {
+            participant.setProxyInfo(proxyInfo.trim());
+        }
+        participant.setCheckedInAt(LocalDateTime.now());
+        participant = participantRepository.save(participant);
+
+        return new AssemblyParticipantDTO(participant);
+    }
+
+    @Transactional(readOnly = true)
+    public List<AssemblyParticipantDTO> listParticipants(Long assemblyId) {
+        CondominiumAssembly assembly = assemblyRepository.findById(assemblyId)
+                .orElseThrow(() -> new ResourceNotFoundException("Assembleia não encontrada: " + assemblyId));
+        condominiumAccessService.validateAccess(assembly.getCondominium().getId());
+        return participantRepository.findByAssemblyIdOrderByCheckedInAtAsc(assemblyId).stream()
+                .map(AssemblyParticipantDTO::new)
+                .toList();
     }
 
     @Transactional
@@ -215,15 +213,36 @@ public class AssemblyService {
         AssemblyTopic topic = topicRepository.findByIdWithAssembly(topicId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pauta não encontrada: " + topicId));
 
-        Long condoId = topic.getAssembly().getCondominium().getId();
+        CondominiumAssembly assembly = topic.getAssembly();
+        Long condoId = assembly.getCondominium().getId();
         condominiumAccessService.validateAccess(condoId);
 
-        if (!topic.isVotingOpen()) {
+        if (!topic.isVotingOpen() || "CONCLUDED".equalsIgnoreCase(assembly.getStatus()) || "CANCELLED".equalsIgnoreCase(assembly.getStatus())) {
             throw new ForbiddenException("A votação para esta pauta não está aberta no momento.");
         }
 
+        Optional<Resident> residentOpt = residentRepository.findFirstByUserIdAndUnitSectorCondominiumId(caller.getId(), condoId);
+        if (residentOpt.isEmpty() && !condominiumAccessService.isManagerOrAdmin(caller, condoId)) {
+            throw new ForbiddenException("Apenas moradores vinculados a uma unidade podem votar nas pautas da assembleia.");
+        }
+
+        Unit unit = residentOpt.map(Resident::getUnit).orElse(null);
+
         if (voteRepository.findByTopicIdAndUserId(topicId, caller.getId()).isPresent()) {
             throw new ForbiddenException("Você já registrou seu voto nesta pauta.");
+        }
+
+        if (assembly.isOneVotePerUnit() && unit != null) {
+            if (voteRepository.findByTopicIdAndUnitId(topicId, unit.getId()).isPresent()) {
+                throw new ForbiddenException("Sua unidade já registrou voto nesta pauta (regra de 1 voto por unidade).");
+            }
+        }
+
+        if (assembly.isBlockDelinquentUnits() && unit != null) {
+            Optional<UnitPayment> paymentOpt = paymentRepository.findByUnitId(unit.getId());
+            if (paymentOpt.isPresent() && paymentOpt.get().getStatus() == UnitPaymentStatus.OVERDUE) {
+                throw new ForbiddenException("Unidades com pendência financeira em atraso não estão elegíveis para votar nesta assembleia (Art. 1.335 III CC).");
+            }
         }
 
         String choice = dto.voteChoice().trim().toUpperCase();
@@ -231,12 +250,20 @@ public class AssemblyService {
             throw new IllegalArgumentException("Opção de voto inválida: " + choice + ". Use IN_FAVOR, AGAINST ou ABSTAIN.");
         }
 
-        Optional<Resident> residentOpt = residentRepository.findFirstByUserIdAndUnitSectorCondominiumId(caller.getId(), condoId);
+        // Automatically record presence if not yet checked in
+        if (participantRepository.findByAssemblyIdAndUserId(assembly.getId(), caller.getId()).isEmpty()) {
+            AssemblyParticipant part = new AssemblyParticipant();
+            part.setAssembly(assembly);
+            part.setUser(caller);
+            part.setUnit(unit);
+            part.setCheckedInAt(LocalDateTime.now());
+            participantRepository.save(part);
+        }
 
         AssemblyVote vote = new AssemblyVote();
         vote.setTopic(topic);
         vote.setUser(caller);
-        residentOpt.ifPresent(r -> vote.setUnit(r.getUnit()));
+        vote.setUnit(unit);
         vote.setVoteChoice(choice);
         vote.setVotedAt(LocalDateTime.now());
         voteRepository.save(vote);
@@ -258,26 +285,74 @@ public class AssemblyService {
 
     @Transactional
     public AssemblyDTO updateAssemblyStatus(Long id, UpdateAssemblyStatusDTO dto) {
-        User caller = authenticatedUserService.getAuthenticatedUser();
-        boolean isStaff = caller.hasRole("ROLE_ADMIN") || caller.hasRole("ROLE_MANAGER");
-        if (!isStaff) {
-            throw new ForbiddenException("Apenas o síndico ou administrador pode atualizar a assembleia.");
-        }
-
         CondominiumAssembly assembly = assemblyRepository.findByIdWithTopics(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Assembleia não encontrada: " + id));
+        Long condoId = assembly.getCondominium().getId();
+        condominiumAccessService.validateManagerAccess(condoId);
 
-        assembly.setStatus(dto.status().trim().toUpperCase());
+        String newStatus = dto.status().trim().toUpperCase();
+        assembly.setStatus(newStatus);
         if (dto.minutesUrl() != null && !dto.minutesUrl().isBlank()) {
             assembly.setMinutesUrl(dto.minutesUrl().trim());
         }
+        if ("CONCLUDED".equals(newStatus)) {
+            for (AssemblyTopic t : assembly.getTopics()) {
+                t.setVotingOpen(false);
+                t.setResultStatus(computeTopicResult(t));
+            }
+        }
 
         assembly = assemblyRepository.save(assembly);
-        AssemblyDTO result = new AssemblyDTO(assembly);
+        User caller = authenticatedUserService.getAuthenticatedUser();
+        AssemblyDTO result = buildAssemblyDTO(assembly, caller.getId(), Map.of());
 
-        realtimeEmitterService.sendToCondominium(assembly.getCondominium().getId(),
-                RealtimeEventDTO.of("ASSEMBLY_UPDATED", assembly.getCondominium().getId(), result));
+        realtimeEmitterService.sendToCondominium(condoId,
+                RealtimeEventDTO.of("ASSEMBLY_UPDATED", condoId, result));
 
         return result;
+    }
+
+    private AssemblyDTO buildAssemblyDTO(CondominiumAssembly assembly, Long viewerId, Map<Long, String> userVotes) {
+        List<AssemblyTopicDTO> enrichedTopics = assembly.getTopics().stream().map(t -> {
+            String vote = userVotes.get(t.getId());
+            return new AssemblyTopicDTO(t).withUserVote(vote);
+        }).toList();
+
+        List<AssemblyParticipant> partEntities = participantRepository.findByAssemblyIdOrderByCheckedInAtAsc(assembly.getId());
+        boolean checkedIn = partEntities.stream().anyMatch(p -> p.getUser().getId().equals(viewerId));
+        List<AssemblyParticipantDTO> partDtos = partEntities.stream().map(AssemblyParticipantDTO::new).toList();
+
+        return new AssemblyDTO(
+                assembly.getId(),
+                assembly.getCondominium().getId(),
+                assembly.getTitle(),
+                assembly.getDescription(),
+                assembly.getType(),
+                assembly.getMeetingDate(),
+                assembly.getSecondCallDate(),
+                assembly.getLocationOrLink(),
+                assembly.getCallNoticeUrl(),
+                assembly.getMinutesUrl(),
+                assembly.getStatus(),
+                assembly.isBlockDelinquentUnits(),
+                assembly.isOneVotePerUnit(),
+                assembly.getQuorumMinimumPercent(),
+                partDtos.size(),
+                checkedIn,
+                assembly.getCreatedBy() != null
+                        ? (assembly.getCreatedBy().getFirstName() + " " + assembly.getCreatedBy().getLastName()).trim()
+                        : "Administração",
+                assembly.getCreatedAt(),
+                enrichedTopics,
+                partDtos
+        );
+    }
+
+    private String computeTopicResult(AssemblyTopic topic) {
+        int total = topic.getInFavorCount() + topic.getAgainstCount() + topic.getAbstainCount();
+        if (total == 0) return "NO_VOTES";
+        if (topic.getInFavorCount() > topic.getAgainstCount()) return "APPROVED";
+        if (topic.getAgainstCount() > topic.getInFavorCount()) return "REJECTED";
+        return "TIED";
     }
 }

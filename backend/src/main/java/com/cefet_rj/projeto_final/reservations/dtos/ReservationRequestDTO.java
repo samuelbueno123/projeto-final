@@ -25,11 +25,13 @@ public record ReservationRequestDTO(
         String contactPhone,
 
         @Size(max = 500)
-        String notes
+        String notes,
+
+        Boolean joinWaitlist
 
 ) {
     public ReservationRequestDTO(LocalDateTime startAt, LocalDateTime endAt) {
-        this(startAt, endAt, null, null, null);
+        this(startAt, endAt, null, null, null, false);
     }
 
     public ReservationRequestDTO(
@@ -37,7 +39,7 @@ public record ReservationRequestDTO(
             LocalDateTime endAt,
             Long reservedById
     ) {
-        this(startAt, endAt, reservedById, null, null);
+        this(startAt, endAt, reservedById, null, null, false);
     }
 
     public ReservationRequestDTO(
@@ -46,7 +48,17 @@ public record ReservationRequestDTO(
             Long reservedById,
             String contactPhone
     ) {
-        this(startAt, endAt, reservedById, contactPhone, null);
+        this(startAt, endAt, reservedById, contactPhone, null, false);
+    }
+
+    public ReservationRequestDTO(
+            LocalDateTime startAt,
+            LocalDateTime endAt,
+            Long reservedById,
+            String contactPhone,
+            String notes
+    ) {
+        this(startAt, endAt, reservedById, contactPhone, notes, false);
     }
 
     @AssertTrue(message = "Reservation end time must be after start time")

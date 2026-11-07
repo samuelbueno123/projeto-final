@@ -28,12 +28,14 @@ public class CondominiumController {
     private final CondominiumService condominiumService;
 
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Page<CondominiumDTO>> findAll(Pageable pageable){
         Page<CondominiumDTO> list = condominiumService.findAllPaged(pageable);
         return ResponseEntity.ok().body(list);
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<CondominiumDTO> findById(@PathVariable Long id){
         CondominiumDTO dto = condominiumService.findById(id);
         return ResponseEntity.ok().body(dto);

@@ -68,4 +68,7 @@ public class Reservation {
 
     @Column(name = "reviewed_at")
     private LocalDateTime reviewedAt;
+
+    @Column(name = "waitlist_position")
+    private Integer waitlistPosition;
 }

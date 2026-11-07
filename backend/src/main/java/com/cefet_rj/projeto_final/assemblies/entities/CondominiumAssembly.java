@@ -34,7 +34,7 @@ public class CondominiumAssembly {
     private String description;
 
     @Column(nullable = false, length = 30)
-    private String type = "ORDINARY"; // ORDINARY, EXTRAORDINARY
+    private String type = "ORDINARY";
 
     @Column(name = "meeting_date", nullable = false)
     private LocalDateTime meetingDate;
@@ -52,7 +52,16 @@ public class CondominiumAssembly {
     private String minutesUrl;
 
     @Column(nullable = false, length = 30)
-    private String status = "SCHEDULED"; // SCHEDULED, IN_PROGRESS, CONCLUDED, CANCELLED
+    private String status = "SCHEDULED";
+
+    @Column(name = "block_delinquent_units", nullable = false)
+    private boolean blockDelinquentUnits = true;
+
+    @Column(name = "one_vote_per_unit", nullable = false)
+    private boolean oneVotePerUnit = true;
+
+    @Column(name = "quorum_minimum_percent", nullable = false)
+    private int quorumMinimumPercent = 50;
 
     @OneToMany(mappedBy = "assembly", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("displayOrder ASC, id ASC")

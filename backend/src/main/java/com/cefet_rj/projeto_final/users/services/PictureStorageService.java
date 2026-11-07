@@ -85,7 +85,14 @@ public class PictureStorageService {
             String normalized = trimmed.startsWith("/") ? trimmed.substring(1) : trimmed;
             String relative = normalized.substring(PICTURES_DB_PREFIX.length());
             validateSafeRelativePath(relative);
-            return PICTURES_DB_PREFIX + relative;
+            String fullNormalized = PICTURES_DB_PREFIX + relative;
+            if (existingPath != null && existingPath.equals(fullNormalized)) {
+                return fullNormalized;
+            }
+            if (!relative.startsWith(folder + "/" + prefix + "_") && !relative.startsWith(prefix + "_")) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Caminho de imagem não pertence a este recurso.");
+            }
+            return fullNormalized;
         }
 
         Matcher matcher = DATA_IMAGE_PATTERN.matcher(trimmed);

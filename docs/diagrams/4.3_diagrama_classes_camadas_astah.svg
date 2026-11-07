@@ -1,0 +1,359 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1380" height="920" viewBox="0 0 1380 920">
+    <rect width="1380" height="920" fill="#FFFFFF" />
+    
+<defs>
+    <!-- Arrowhead markers -->
+    <marker id="astah-arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L9,3 z" fill="#000000" />
+    </marker>
+    <marker id="astah-open-arrow" markerWidth="12" markerHeight="12" refX="10" refY="4" orient="auto">
+        <path d="M1,1 L10,4 L1,7" fill="none" stroke="#000000" stroke-width="1.5" />
+    </marker>
+    <marker id="astah-triangle" markerWidth="14" markerHeight="14" refX="12" refY="5" orient="auto">
+        <path d="M1,1 L12,5 L1,9 z" fill="#FFFFFF" stroke="#000000" stroke-width="1.5" />
+    </marker>
+    <marker id="astah-diamond" markerWidth="16" markerHeight="16" refX="14" refY="5" orient="auto">
+        <path d="M1,5 L8,1 L15,5 L8,9 z" fill="#000000" stroke="#000000" stroke-width="1" />
+    </marker>
+    <marker id="astah-crow" markerWidth="14" markerHeight="14" refX="12" refY="5" orient="auto">
+        <path d="M1,1 L12,5 L1,9 M12,1 L12,9" fill="none" stroke="#000000" stroke-width="1.5" />
+    </marker>
+    
+    <!-- Astah Yellow Gradients -->
+    <linearGradient id="astah-yellow" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#FFFFE6" />
+        <stop offset="100%" stop-color="#FFFFCC" />
+    </linearGradient>
+    <linearGradient id="astah-yellow-dark" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#FFFECB" />
+        <stop offset="100%" stop-color="#FFF59D" />
+    </linearGradient>
+    <linearGradient id="astah-package-tab" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#FFFFF0" />
+        <stop offset="100%" stop-color="#FFFFCC" />
+    </linearGradient>
+    <linearGradient id="astah-node-side" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#EDEDED" />
+        <stop offset="100%" stop-color="#DCDCDC" />
+    </linearGradient>
+</defs>
+
+    
+    <!-- Title Frame -->
+    <rect x="20" y="15" width="1340" height="42" fill="#FAFAFA" stroke="#B0B0B0" stroke-width="1" />
+    <text x="35" y="41" font-family="Arial, Segoe UI, sans-serif" font-size="14" font-weight="bold" fill="#000000">class [Diagrama] 4.3. Diagrama de Classes e Arquitetura em Camadas (Estilo Astah UML)</text>
+    
+    <!-- Package 1: Client Layer (Flutter) -->
+    
+    <g>
+        <path d="M 30,95 L 30,235 L 1350,235 L 1350,95 L 190,95 L 180,75 L 30,75 Z" fill="#FCFCFC" stroke="#000000" stroke-width="1.5" />
+        <path d="M 30,75 L 180,75 L 190,95 L 30,95 Z" fill="url(#astah-package-tab)" stroke="#000000" stroke-width="1.5" />
+        <text x="40" y="89" font-family="Arial, Segoe UI, sans-serif" font-size="11" font-weight="bold" fill="#000000">Client Layer (Flutter Front-End)</text>
+    </g>
+    
+    
+    <g>
+        <!-- Class Box -->
+        <rect x="50" y="110" width="180" height="108" fill="url(#astah-yellow)" stroke="#000000" stroke-width="1.5" />
+        <text x="140.0" y="124" font-family="Arial, Segoe UI, sans-serif" font-size="10" font-style="italic" text-anchor="middle" fill="#333333">«Widget»</text>
+        <text x="140.0" y="138" font-family="Arial, Segoe UI, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#000000">HomePage</text>
+        <line x1="50" y1="146" x2="230" y2="146" stroke="#000000" stroke-width="1" />
+        <text x="58" y="159" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">- _tab: int</text><text x="58" y="174" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">- _packages: List</text>
+        <line x1="50" y1="182" x2="230" y2="182" stroke="#000000" stroke-width="1" />
+        <text x="58" y="195" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ build(): Widget</text><text x="58" y="210" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ _load(): Future</text>
+    </g>
+    
+    
+    <g>
+        <!-- Class Box -->
+        <rect x="250" y="110" width="180" height="108" fill="url(#astah-yellow)" stroke="#000000" stroke-width="1.5" />
+        <text x="340.0" y="124" font-family="Arial, Segoe UI, sans-serif" font-size="10" font-style="italic" text-anchor="middle" fill="#333333">«Widget»</text>
+        <text x="340.0" y="138" font-family="Arial, Segoe UI, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#000000">DoormanPage</text>
+        <line x1="250" y1="146" x2="430" y2="146" stroke="#000000" stroke-width="1" />
+        <text x="258" y="159" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">- _selectedUnit: Unit</text><text x="258" y="174" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">- _activeTab: int</text>
+        <line x1="250" y1="182" x2="430" y2="182" stroke="#000000" stroke-width="1" />
+        <text x="258" y="195" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ build(): Widget</text><text x="258" y="210" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ _receivePkg(): void</text>
+    </g>
+    
+    
+    <g>
+        <!-- Class Box -->
+        <rect x="450" y="110" width="180" height="108" fill="url(#astah-yellow)" stroke="#000000" stroke-width="1.5" />
+        <text x="540.0" y="124" font-family="Arial, Segoe UI, sans-serif" font-size="10" font-style="italic" text-anchor="middle" fill="#333333">«Widget»</text>
+        <text x="540.0" y="138" font-family="Arial, Segoe UI, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#000000">ManagerPage</text>
+        <line x1="450" y1="146" x2="630" y2="146" stroke="#000000" stroke-width="1" />
+        <text x="458" y="159" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">- _condoId: int</text><text x="458" y="174" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">- _members: List</text>
+        <line x1="450" y1="182" x2="630" y2="182" stroke="#000000" stroke-width="1" />
+        <text x="458" y="195" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ build(): Widget</text><text x="458" y="210" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ _exportReport(): void</text>
+    </g>
+    
+    
+    <g>
+        <!-- Class Box -->
+        <rect x="650" y="110" width="180" height="108" fill="url(#astah-yellow)" stroke="#000000" stroke-width="1.5" />
+        <text x="740.0" y="124" font-family="Arial, Segoe UI, sans-serif" font-size="10" font-style="italic" text-anchor="middle" fill="#333333">«Widget»</text>
+        <text x="740.0" y="138" font-family="Arial, Segoe UI, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#000000">AdminPage</text>
+        <line x1="650" y1="146" x2="830" y2="146" stroke="#000000" stroke-width="1" />
+        <text x="658" y="159" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">- _selectedTable: int</text><text x="658" y="174" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">- _page: int</text>
+        <line x1="650" y1="182" x2="830" y2="182" stroke="#000000" stroke-width="1" />
+        <text x="658" y="195" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ build(): Widget</text><text x="658" y="210" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ _saveRecord(): void</text>
+    </g>
+    
+    
+    <g>
+        <!-- Class Box -->
+        <rect x="870" y="110" width="220" height="108" fill="url(#astah-yellow)" stroke="#000000" stroke-width="1.5" />
+        <text x="980.0" y="124" font-family="Arial, Segoe UI, sans-serif" font-size="10" font-style="italic" text-anchor="middle" fill="#333333">«Service»</text>
+        <text x="980.0" y="138" font-family="Arial, Segoe UI, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#000000">CommunityApi</text>
+        <line x1="870" y1="146" x2="1090" y2="146" stroke="#000000" stroke-width="1" />
+        <text x="878" y="159" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ baseUrl: String</text><text x="878" y="174" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">- dio: Dio</text>
+        <line x1="870" y1="182" x2="1090" y2="182" stroke="#000000" stroke-width="1" />
+        <text x="878" y="195" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ getPackages(): Future</text><text x="878" y="210" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ sendChatMessage(): Future</text>
+    </g>
+    
+    
+    <g>
+        <!-- Class Box -->
+        <rect x="1110" y="110" width="220" height="108" fill="url(#astah-yellow)" stroke="#000000" stroke-width="1.5" />
+        <text x="1220.0" y="124" font-family="Arial, Segoe UI, sans-serif" font-size="10" font-style="italic" text-anchor="middle" fill="#333333">«Service»</text>
+        <text x="1220.0" y="138" font-family="Arial, Segoe UI, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#000000">RealtimeService</text>
+        <line x1="1110" y1="146" x2="1330" y2="146" stroke="#000000" stroke-width="1" />
+        <text x="1118" y="159" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">- stream: EventSource</text><text x="1118" y="174" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ isConnected: bool</text>
+        <line x1="1110" y1="182" x2="1330" y2="182" stroke="#000000" stroke-width="1" />
+        <text x="1118" y="195" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ connect(token): void</text><text x="1118" y="210" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ onEvent(): Stream</text>
+    </g>
+    
+    
+    <!-- Package 2: Controller Layer (Spring Boot Web) -->
+    
+    <g>
+        <path d="M 30,280 L 30,425 L 1350,425 L 1350,280 L 190,280 L 180,260 L 30,260 Z" fill="#FCFCFC" stroke="#000000" stroke-width="1.5" />
+        <path d="M 30,260 L 180,260 L 190,280 L 30,280 Z" fill="url(#astah-package-tab)" stroke="#000000" stroke-width="1.5" />
+        <text x="40" y="274" font-family="Arial, Segoe UI, sans-serif" font-size="11" font-weight="bold" fill="#000000">Controller Layer (Spring Boot REST API)</text>
+    </g>
+    
+    
+    <g>
+        <!-- Class Box -->
+        <rect x="50" y="295" width="240" height="93" fill="url(#astah-yellow)" stroke="#000000" stroke-width="1.5" />
+        <text x="170.0" y="309" font-family="Arial, Segoe UI, sans-serif" font-size="10" font-style="italic" text-anchor="middle" fill="#333333">«RestController»</text>
+        <text x="170.0" y="323" font-family="Arial, Segoe UI, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#000000">PackageController</text>
+        <line x1="50" y1="331" x2="290" y2="331" stroke="#000000" stroke-width="1" />
+        <text x="58" y="344" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">- service: PackageService</text>
+        <line x1="50" y1="352" x2="290" y2="352" stroke="#000000" stroke-width="1" />
+        <text x="58" y="365" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ receive(dto): ResponseEntity</text><text x="58" y="380" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ pickup(id, dto): ResponseEntity</text>
+    </g>
+    
+    
+    <g>
+        <!-- Class Box -->
+        <rect x="310" y="295" width="250" height="93" fill="url(#astah-yellow)" stroke="#000000" stroke-width="1.5" />
+        <text x="435.0" y="309" font-family="Arial, Segoe UI, sans-serif" font-size="10" font-style="italic" text-anchor="middle" fill="#333333">«RestController»</text>
+        <text x="435.0" y="323" font-family="Arial, Segoe UI, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#000000">DoormanChatController</text>
+        <line x1="310" y1="331" x2="560" y2="331" stroke="#000000" stroke-width="1" />
+        <text x="318" y="344" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">- service: DoormanChatService</text>
+        <line x1="310" y1="352" x2="560" y2="352" stroke="#000000" stroke-width="1" />
+        <text x="318" y="365" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ sendMessage(dto): ResponseEntity</text><text x="318" y="380" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ getMessages(uId): ResponseEntity</text>
+    </g>
+    
+    
+    <g>
+        <!-- Class Box -->
+        <rect x="580" y="295" width="240" height="93" fill="url(#astah-yellow)" stroke="#000000" stroke-width="1.5" />
+        <text x="700.0" y="309" font-family="Arial, Segoe UI, sans-serif" font-size="10" font-style="italic" text-anchor="middle" fill="#333333">«RestController»</text>
+        <text x="700.0" y="323" font-family="Arial, Segoe UI, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#000000">ReservationController</text>
+        <line x1="580" y1="331" x2="820" y2="331" stroke="#000000" stroke-width="1" />
+        <text x="588" y="344" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">- service: ReservationService</text>
+        <line x1="580" y1="352" x2="820" y2="352" stroke="#000000" stroke-width="1" />
+        <text x="588" y="365" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ request(dto): ResponseEntity</text><text x="588" y="380" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ counterPropose(): ResponseEntity</text>
+    </g>
+    
+    
+    <g>
+        <!-- Class Box -->
+        <rect x="840" y="295" width="240" height="93" fill="url(#astah-yellow)" stroke="#000000" stroke-width="1.5" />
+        <text x="960.0" y="309" font-family="Arial, Segoe UI, sans-serif" font-size="10" font-style="italic" text-anchor="middle" fill="#333333">«RestController»</text>
+        <text x="960.0" y="323" font-family="Arial, Segoe UI, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#000000">UnitController</text>
+        <line x1="840" y1="331" x2="1080" y2="331" stroke="#000000" stroke-width="1" />
+        <text x="848" y="344" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">- service: UnitService</text>
+        <line x1="840" y1="352" x2="1080" y2="352" stroke="#000000" stroke-width="1" />
+        <text x="848" y="365" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ importCsv(file): ResponseEntity</text><text x="848" y="380" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ findByCondo(): ResponseEntity</text>
+    </g>
+    
+    
+    <g>
+        <!-- Class Box -->
+        <rect x="1100" y="295" width="230" height="93" fill="url(#astah-yellow)" stroke="#000000" stroke-width="1.5" />
+        <text x="1215.0" y="309" font-family="Arial, Segoe UI, sans-serif" font-size="10" font-style="italic" text-anchor="middle" fill="#333333">«RestController»</text>
+        <text x="1215.0" y="323" font-family="Arial, Segoe UI, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#000000">CondominiumController</text>
+        <line x1="1100" y1="331" x2="1330" y2="331" stroke="#000000" stroke-width="1" />
+        <text x="1108" y="344" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">- service: CondominiumService</text>
+        <line x1="1100" y1="352" x2="1330" y2="352" stroke="#000000" stroke-width="1" />
+        <text x="1108" y="365" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ create(dto): ResponseEntity</text><text x="1108" y="380" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ updateImage(): ResponseEntity</text>
+    </g>
+    
+    
+    <!-- Package 3: Service Layer (Business) -->
+    
+    <g>
+        <path d="M 30,475 L 30,645 L 1350,645 L 1350,475 L 190,475 L 180,455 L 30,455 Z" fill="#FCFCFC" stroke="#000000" stroke-width="1.5" />
+        <path d="M 30,455 L 180,455 L 190,475 L 30,475 Z" fill="url(#astah-package-tab)" stroke="#000000" stroke-width="1.5" />
+        <text x="40" y="469" font-family="Arial, Segoe UI, sans-serif" font-size="11" font-weight="bold" fill="#000000">Service Layer (Spring Boot Business Logic)</text>
+    </g>
+    
+    
+    <g>
+        <!-- Class Box -->
+        <rect x="50" y="490" width="240" height="108" fill="url(#astah-yellow)" stroke="#000000" stroke-width="1.5" />
+        <text x="170.0" y="504" font-family="Arial, Segoe UI, sans-serif" font-size="10" font-style="italic" text-anchor="middle" fill="#333333">«Service»</text>
+        <text x="170.0" y="518" font-family="Arial, Segoe UI, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#000000">PackageService</text>
+        <line x1="50" y1="526" x2="290" y2="526" stroke="#000000" stroke-width="1" />
+        <text x="58" y="539" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">- repo: PackageRepository</text><text x="58" y="554" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">- realtime: RealtimeService</text>
+        <line x1="50" y1="562" x2="290" y2="562" stroke="#000000" stroke-width="1" />
+        <text x="58" y="575" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ receivePackage(dto): PackageDTO</text><text x="58" y="590" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ markAsPickedUp(id): void</text>
+    </g>
+    
+    
+    <g>
+        <!-- Class Box -->
+        <rect x="310" y="490" width="250" height="108" fill="url(#astah-yellow)" stroke="#000000" stroke-width="1.5" />
+        <text x="435.0" y="504" font-family="Arial, Segoe UI, sans-serif" font-size="10" font-style="italic" text-anchor="middle" fill="#333333">«Service»</text>
+        <text x="435.0" y="518" font-family="Arial, Segoe UI, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#000000">DoormanChatService</text>
+        <line x1="310" y1="526" x2="560" y2="526" stroke="#000000" stroke-width="1" />
+        <text x="318" y="539" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">- repo: ChatRepository</text><text x="318" y="554" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">- realtime: RealtimeService</text>
+        <line x1="310" y1="562" x2="560" y2="562" stroke="#000000" stroke-width="1" />
+        <text x="318" y="575" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ sendMessage(dto): MessageDTO</text><text x="318" y="590" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ getConversation(): List</text>
+    </g>
+    
+    
+    <g>
+        <!-- Class Box -->
+        <rect x="580" y="490" width="240" height="108" fill="url(#astah-yellow)" stroke="#000000" stroke-width="1.5" />
+        <text x="700.0" y="504" font-family="Arial, Segoe UI, sans-serif" font-size="10" font-style="italic" text-anchor="middle" fill="#333333">«Service»</text>
+        <text x="700.0" y="518" font-family="Arial, Segoe UI, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#000000">ReservationService</text>
+        <line x1="580" y1="526" x2="820" y2="526" stroke="#000000" stroke-width="1" />
+        <text x="588" y="539" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">- repo: ReservationRepository</text><text x="588" y="554" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">- realtime: RealtimeService</text>
+        <line x1="580" y1="562" x2="820" y2="562" stroke="#000000" stroke-width="1" />
+        <text x="588" y="575" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ checkAvailability(): boolean</text><text x="588" y="590" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ approve(id): ReservationDTO</text>
+    </g>
+    
+    
+    <g>
+        <!-- Class Box -->
+        <rect x="840" y="490" width="240" height="108" fill="url(#astah-yellow)" stroke="#000000" stroke-width="1.5" />
+        <text x="960.0" y="504" font-family="Arial, Segoe UI, sans-serif" font-size="10" font-style="italic" text-anchor="middle" fill="#333333">«Service»</text>
+        <text x="960.0" y="518" font-family="Arial, Segoe UI, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#000000">UnitService</text>
+        <line x1="840" y1="526" x2="1080" y2="526" stroke="#000000" stroke-width="1" />
+        <text x="848" y="539" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">- repo: UnitRepository</text><text x="848" y="554" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">- sectorRepo: SectorRepo</text>
+        <line x1="840" y1="562" x2="1080" y2="562" stroke="#000000" stroke-width="1" />
+        <text x="848" y="575" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ importCsv(condoId, file): Result</text><text x="848" y="590" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ validateIdentifier(): boolean</text>
+    </g>
+    
+    
+    <g>
+        <!-- Class Box -->
+        <rect x="1100" y="490" width="230" height="93" fill="url(#astah-yellow)" stroke="#000000" stroke-width="1.5" />
+        <text x="1215.0" y="504" font-family="Arial, Segoe UI, sans-serif" font-size="10" font-style="italic" text-anchor="middle" fill="#333333">«Service»</text>
+        <text x="1215.0" y="518" font-family="Arial, Segoe UI, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#000000">RealtimeService (Backend)</text>
+        <line x1="1100" y1="526" x2="1330" y2="526" stroke="#000000" stroke-width="1" />
+        <text x="1108" y="539" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">- emitters: Map<Long, SseEmitter></text>
+        <line x1="1100" y1="547" x2="1330" y2="547" stroke="#000000" stroke-width="1" />
+        <text x="1108" y="560" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ emitToUser(uId, event): void</text><text x="1108" y="575" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ emitToCondo(cId, ev): void</text>
+    </g>
+    
+    
+    <!-- Package 4: Repository Layer (Spring Data JPA) -->
+    
+    <g>
+        <path d="M 30,695 L 30,870 L 1350,870 L 1350,695 L 190,695 L 180,675 L 30,675 Z" fill="#FCFCFC" stroke="#000000" stroke-width="1.5" />
+        <path d="M 30,675 L 180,675 L 190,695 L 30,695 Z" fill="url(#astah-package-tab)" stroke="#000000" stroke-width="1.5" />
+        <text x="40" y="689" font-family="Arial, Segoe UI, sans-serif" font-size="11" font-weight="bold" fill="#000000">Repository Layer (Spring Data JPA / PostgreSQL)</text>
+    </g>
+    
+    
+    <g>
+        <!-- Class Box -->
+        <rect x="50" y="715" width="240" height="93" fill="url(#astah-yellow)" stroke="#000000" stroke-width="1.5" />
+        <text x="170.0" y="729" font-family="Arial, Segoe UI, sans-serif" font-size="10" font-style="italic" text-anchor="middle" fill="#333333">«Repository»</text>
+        <text x="170.0" y="743" font-family="Arial, Segoe UI, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#000000">PackageRepository</text>
+        <line x1="50" y1="751" x2="290" y2="751" stroke="#000000" stroke-width="1" />
+        <text x="58" y="764" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">«JpaRepository<Package, Long>»</text>
+        <line x1="50" y1="772" x2="290" y2="772" stroke="#000000" stroke-width="1" />
+        <text x="58" y="785" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ findByUnitId(uId): List</text><text x="58" y="800" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ findPendingByCondo(): List</text>
+    </g>
+    
+    
+    <g>
+        <!-- Class Box -->
+        <rect x="310" y="715" width="250" height="93" fill="url(#astah-yellow)" stroke="#000000" stroke-width="1.5" />
+        <text x="435.0" y="729" font-family="Arial, Segoe UI, sans-serif" font-size="10" font-style="italic" text-anchor="middle" fill="#333333">«Repository»</text>
+        <text x="435.0" y="743" font-family="Arial, Segoe UI, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#000000">DoormanChatMessageRepository</text>
+        <line x1="310" y1="751" x2="560" y2="751" stroke="#000000" stroke-width="1" />
+        <text x="318" y="764" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">«JpaRepository<Message, Long>»</text>
+        <line x1="310" y1="772" x2="560" y2="772" stroke="#000000" stroke-width="1" />
+        <text x="318" y="785" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ findByConversation(): List</text><text x="318" y="800" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ markAllAsRead(uId): void</text>
+    </g>
+    
+    
+    <g>
+        <!-- Class Box -->
+        <rect x="580" y="715" width="240" height="93" fill="url(#astah-yellow)" stroke="#000000" stroke-width="1.5" />
+        <text x="700.0" y="729" font-family="Arial, Segoe UI, sans-serif" font-size="10" font-style="italic" text-anchor="middle" fill="#333333">«Repository»</text>
+        <text x="700.0" y="743" font-family="Arial, Segoe UI, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#000000">ReservationRepository</text>
+        <line x1="580" y1="751" x2="820" y2="751" stroke="#000000" stroke-width="1" />
+        <text x="588" y="764" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">«JpaRepository<Reservation, Long>»</text>
+        <line x1="580" y1="772" x2="820" y2="772" stroke="#000000" stroke-width="1" />
+        <text x="588" y="785" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ findOverlapping(): List</text><text x="588" y="800" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ findByUserId(uId): List</text>
+    </g>
+    
+    
+    <g>
+        <!-- Class Box -->
+        <rect x="840" y="715" width="240" height="93" fill="url(#astah-yellow)" stroke="#000000" stroke-width="1.5" />
+        <text x="960.0" y="729" font-family="Arial, Segoe UI, sans-serif" font-size="10" font-style="italic" text-anchor="middle" fill="#333333">«Repository»</text>
+        <text x="960.0" y="743" font-family="Arial, Segoe UI, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#000000">UnitRepository</text>
+        <line x1="840" y1="751" x2="1080" y2="751" stroke="#000000" stroke-width="1" />
+        <text x="848" y="764" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">«JpaRepository<Unit, Long>»</text>
+        <line x1="840" y1="772" x2="1080" y2="772" stroke="#000000" stroke-width="1" />
+        <text x="848" y="785" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ existsBySectorAndId(): boolean</text><text x="848" y="800" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ findBySectorCondoId(): List</text>
+    </g>
+    
+    
+    <g>
+        <!-- Class Box -->
+        <rect x="1100" y="715" width="230" height="93" fill="url(#astah-yellow)" stroke="#000000" stroke-width="1.5" />
+        <text x="1215.0" y="729" font-family="Arial, Segoe UI, sans-serif" font-size="10" font-style="italic" text-anchor="middle" fill="#333333">«Repository»</text>
+        <text x="1215.0" y="743" font-family="Arial, Segoe UI, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#000000">CondominiumRepository</text>
+        <line x1="1100" y1="751" x2="1330" y2="751" stroke="#000000" stroke-width="1" />
+        <text x="1108" y="764" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">«JpaRepository<Condo, Long>»</text>
+        <line x1="1100" y1="772" x2="1330" y2="772" stroke="#000000" stroke-width="1" />
+        <text x="1108" y="785" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ findByCode(code): Optional</text><text x="1108" y="800" font-family="Arial, Segoe UI, sans-serif" font-size="11" fill="#000000">+ findAllActive(): List</text>
+    </g>
+    
+    
+    <!-- Astah Dependency / Association Arrows -->
+    <!-- Client to Controller: HTTP REST -->
+    <line x1="980" y1="210" x2="980" y2="260" stroke="#000000" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#astah-open-arrow)" />
+    <text x="1000" y="248" font-family="Arial, Segoe UI, sans-serif" font-size="11" font-weight="bold" fill="#000000">HTTP REST (JSON)</text>
+    
+    <!-- Client Realtime to Backend Realtime: SSE -->
+    <path d="M 1220,210 L 1220,490" fill="none" stroke="#000000" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#astah-open-arrow)" />
+    <text x="1230" y="248" font-family="Arial, Segoe UI, sans-serif" font-size="11" font-weight="bold" fill="#000000">Server-Sent Events (SSE)</text>
+    
+    <!-- Controllers to Services -->
+    <line x1="170" y1="390" x2="170" y2="490" stroke="#000000" stroke-width="1.5" marker-end="url(#astah-open-arrow)" />
+    <line x1="435" y1="390" x2="435" y2="490" stroke="#000000" stroke-width="1.5" marker-end="url(#astah-open-arrow)" />
+    <line x1="700" y1="390" x2="700" y2="490" stroke="#000000" stroke-width="1.5" marker-end="url(#astah-open-arrow)" />
+    <line x1="960" y1="390" x2="960" y2="490" stroke="#000000" stroke-width="1.5" marker-end="url(#astah-open-arrow)" />
+    <line x1="1215" y1="390" x2="1215" y2="490" stroke="#000000" stroke-width="1.5" marker-end="url(#astah-open-arrow)" />
+    
+    <!-- Services to Repositories -->
+    <line x1="170" y1="585" x2="170" y2="715" stroke="#000000" stroke-width="1.5" marker-end="url(#astah-open-arrow)" />
+    <line x1="435" y1="585" x2="435" y2="715" stroke="#000000" stroke-width="1.5" marker-end="url(#astah-open-arrow)" />
+    <line x1="700" y1="585" x2="700" y2="715" stroke="#000000" stroke-width="1.5" marker-end="url(#astah-open-arrow)" />
+    <line x1="960" y1="585" x2="960" y2="715" stroke="#000000" stroke-width="1.5" marker-end="url(#astah-open-arrow)" />
+    
+    <!-- Services to Backend RealtimeService -->
+    <path d="M 290,520 L 1100,520" fill="none" stroke="#000000" stroke-width="1.2" stroke-dasharray="4,4" marker-end="url(#astah-open-arrow)" />
+    
+    </svg>

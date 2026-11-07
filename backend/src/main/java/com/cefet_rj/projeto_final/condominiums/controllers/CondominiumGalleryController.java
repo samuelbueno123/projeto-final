@@ -38,7 +38,7 @@ public class CondominiumGalleryController {
             @PathVariable Long condominiumId,
             @PathVariable Long areaId
     ) {
-        return ResponseEntity.ok(galleryService.findByCommonArea(areaId));
+        return ResponseEntity.ok(galleryService.findByCommonArea(condominiumId, areaId));
     }
 
     @PostMapping

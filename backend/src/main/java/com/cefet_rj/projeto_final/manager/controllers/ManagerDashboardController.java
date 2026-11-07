@@ -237,6 +237,7 @@ public class ManagerDashboardController {
         if (!unit.getSector().getCondominium().getId().equals(condominiumId)) {
             throw new AccessDeniedException("Unidade fora deste condomínio");
         }
+        ensureUnitOrManagerAccess(user, condominiumId, unitId);
         UnitPayment payment = paymentRepository.findByUnitId(unitId)
                 .orElseThrow(() -> new ResourceNotFoundException("Cobrança não encontrada para esta unidade"));
 
@@ -269,8 +270,13 @@ public class ManagerDashboardController {
             @PathVariable Long condominiumId,
             @PathVariable Long unitId
     ) {
+        User user = authenticatedUserService.getAuthenticatedUser();
         Unit unit = unitRepository.findById(unitId)
                 .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada: " + unitId));
+        if (!unit.getSector().getCondominium().getId().equals(condominiumId)) {
+            throw new AccessDeniedException("Unidade fora deste condomínio");
+        }
+        ensureUnitOrManagerAccess(user, condominiumId, unitId);
         UnitPayment payment = paymentRepository.findByUnitId(unitId).orElse(null);
         if (payment == null) {
             return ResponseEntity.ok(new ManagerDashboardDTO.UnitInfo(
@@ -343,6 +349,7 @@ public class ManagerDashboardController {
         if (!unit.getSector().getCondominium().getId().equals(condominiumId)) {
             throw new AccessDeniedException("Unidade fora deste condomínio");
         }
+        ensureUnitOrManagerAccess(user, condominiumId, unitId);
 
         String note = body != null && body.get("note") != null && !body.get("note").isBlank()
                 ? body.get("note").trim()
@@ -393,8 +400,7 @@ public class ManagerDashboardController {
     public ResponseEntity<List<SectorDTO>> listSectors(@PathVariable Long condominiumId) {
         User viewer = authenticatedUserService.getAuthenticatedUser();
         ensureAccess(viewer, condominiumId);
-        var list = sectorRepository.findAll().stream()
-                .filter(s -> s.getCondominium().getId().equals(condominiumId))
+        var list = sectorRepository.findByCondominiumId(condominiumId).stream()
                 .map(SectorDTO::new)
                 .toList();
         return ResponseEntity.ok(list);
@@ -460,5 +466,15 @@ public class ManagerDashboardController {
     private void ensureAccess(User viewer, Long condominiumId) {
         if (!viewer.hasRole("ROLE_ADMIN") && !membershipRepository.isManagerOf(viewer.getId(), condominiumId))
             throw new AccessDeniedException("Você não administra este condomínio");
+    }
+
+    private void ensureUnitOrManagerAccess(User viewer, Long condominiumId, Long unitId) {
+        if (viewer.hasRole("ROLE_ADMIN") || membershipRepository.isManagerOf(viewer.getId(), condominiumId)) {
+            return;
+        }
+        List<Long> myUnitIds = residentRepository.findUnitIdsByUserId(viewer.getId());
+        if (!myUnitIds.contains(unitId)) {
+            throw new AccessDeniedException("Você não possui vínculo com esta unidade");
+        }
     }
 }

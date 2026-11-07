@@ -35,4 +35,7 @@ public class Sector {
     @JoinColumn(name = "condominium_id", nullable = false)
     private Condominium condominium;
 
+    @Column(name = "image_url", columnDefinition = "TEXT")
+    private String imageUrl;
+
 }

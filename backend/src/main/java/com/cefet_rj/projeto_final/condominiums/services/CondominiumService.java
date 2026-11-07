@@ -80,10 +80,7 @@ public class CondominiumService {
     public CondominiumDTO updateImageUrl(Long id, String imageUrl) {
         Condominium entity = condominiumRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Condomínio não encontrado: " + id));
-        User user = authenticatedUserService.getAuthenticatedUser();
-        if (!user.hasRole("ROLE_ADMIN")) {
-            condominiumAccessService.validateUserBelongsToCondominium(user.getId(), id);
-        }
+        condominiumAccessService.validateManagerAccess(id);
         entity.setImageUrl(imageUrl);
         entity = condominiumRepository.save(entity);
         return new CondominiumDTO(entity);

@@ -9,4 +9,6 @@ public interface VehicleRepository extends JpaRepository<Vehicle, Long> {
     List<Vehicle> findByCondominiumIdOrderByCreatedAtDesc(Long condominiumId);
     List<Vehicle> findByCondominiumIdAndOwnerIdOrderByCreatedAtDesc(Long condominiumId, Long ownerId);
     List<Vehicle> findByCondominiumIdAndLicensePlateContainingIgnoreCaseOrderByCreatedAtDesc(Long condominiumId, String licensePlate);
+    boolean existsByCondominiumIdAndLicensePlateIgnoreCase(Long condominiumId, String licensePlate);
+    List<Vehicle> findByParkingSpotEntityId(Long parkingSpotId);
 }

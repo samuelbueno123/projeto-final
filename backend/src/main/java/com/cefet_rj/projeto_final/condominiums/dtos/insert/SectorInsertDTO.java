@@ -7,16 +7,22 @@ import jakarta.validation.constraints.NotNull;
 public record SectorInsertDTO(
         @NotBlank String name,
         @NotBlank String structuralType,
-        @NotNull Long condominiumId
+        @NotNull Long condominiumId,
+        String imageUrl
 ) {
+
+    public SectorInsertDTO(String name, String structuralType, Long condominiumId) {
+        this(name, structuralType, condominiumId, null);
+    }
 
     public SectorInsertDTO(Sector entity) {
         this(
                 entity.getName(),
-				entity.getStructuralType().toString(),
+                entity.getStructuralType().toString(),
                 entity.getCondominium() != null
                         ? entity.getCondominium().getId()
-                        : null
+                        : null,
+                entity.getImageUrl()
         );
     }
 }

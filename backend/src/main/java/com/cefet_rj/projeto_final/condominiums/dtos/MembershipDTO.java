@@ -16,7 +16,9 @@ public record MembershipDTO(
         String unitLabel,
         String residentType,
         String requestMessage,
-        Boolean hasSeenWelcome
+        Boolean hasSeenWelcome,
+        String unitIdentifier,
+        String sectorName
 ) {
 
     public MembershipDTO(
@@ -30,7 +32,25 @@ public record MembershipDTO(
             String status,
             Long unitId
     ) {
-        this(id, userId, condominiumId, condominiumName, authority, userName, email, status, unitId, null, null, null, false);
+        this(id, userId, condominiumId, condominiumName, authority, userName, email, status, unitId, null, null, null, false, null, null);
+    }
+
+    public MembershipDTO(
+            Long id,
+            Long userId,
+            Long condominiumId,
+            String condominiumName,
+            String authority,
+            String userName,
+            String email,
+            String status,
+            Long unitId,
+            String unitLabel,
+            String residentType,
+            String requestMessage,
+            Boolean hasSeenWelcome
+    ) {
+        this(id, userId, condominiumId, condominiumName, authority, userName, email, status, unitId, unitLabel, residentType, requestMessage, hasSeenWelcome, null, null);
     }
 
     public MembershipDTO(Membership entity) {
@@ -49,7 +69,9 @@ public record MembershipDTO(
                         : null,
                 entity.getRequestedResidentType() != null ? entity.getRequestedResidentType().name() : null,
                 entity.getRequestMessage(),
-                entity.getHasSeenWelcome() != null ? entity.getHasSeenWelcome() : false
+                entity.getHasSeenWelcome() != null ? entity.getHasSeenWelcome() : false,
+                entity.getRequestedUnit() != null ? entity.getRequestedUnit().getIdentifier() : null,
+                entity.getRequestedUnit() != null ? entity.getRequestedUnit().getSector().getName() : null
         );
     }
 
@@ -67,7 +89,29 @@ public record MembershipDTO(
                 resolvedUnitLabel != null ? resolvedUnitLabel : unitLabel,
                 resolvedResidentType != null ? resolvedResidentType : residentType,
                 requestMessage,
-                hasSeenWelcome
+                hasSeenWelcome,
+                unitIdentifier,
+                sectorName
+        );
+    }
+
+    public MembershipDTO withUnitInfo(Long resolvedUnitId, String resolvedUnitLabel, String resolvedResidentType, String resolvedUnitIdentifier, String resolvedSectorName) {
+        return new MembershipDTO(
+                id,
+                userId,
+                condominiumId,
+                condominiumName,
+                authority,
+                userName,
+                email,
+                status,
+                resolvedUnitId != null ? resolvedUnitId : unitId,
+                resolvedUnitLabel != null ? resolvedUnitLabel : unitLabel,
+                resolvedResidentType != null ? resolvedResidentType : residentType,
+                requestMessage,
+                hasSeenWelcome,
+                resolvedUnitIdentifier != null ? resolvedUnitIdentifier : unitIdentifier,
+                resolvedSectorName != null ? resolvedSectorName : sectorName
         );
     }
 }

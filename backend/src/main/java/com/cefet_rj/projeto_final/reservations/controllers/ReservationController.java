@@ -21,7 +21,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 @Tag(
         name = "Reservations",
-        description = "Reservas e solicitações de reserva de áreas comuns"
+        description = "Reservas, fila de espera e solicitações de reserva de áreas comuns"
 )
 public class ReservationController {
 
@@ -32,13 +32,12 @@ public class ReservationController {
     )
     @PreAuthorize("isAuthenticated()")
     @Operation(
-            summary = "Solicitar ou criar reserva",
-            description = "Solicita uma reserva para uma área comum disponível (entra sempre como PENDING para análise)."
+            summary = "Solicitar ou criar reserva (ou entrar na fila de espera quando joinWaitlist=true)"
     )
     @ApiResponses({
             @ApiResponse(
                     responseCode = "201",
-                    description = "Reserva ou solicitação criada"
+                    description = "Reserva, solicitação ou inscrição na lista de espera criada"
             ),
             @ApiResponse(
                     responseCode = "409",
@@ -56,6 +55,26 @@ public class ReservationController {
     ) {
         ReservationDTO created = reservationService.create(commonAreaId, dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    }
+
+    @PostMapping("/common-areas/{commonAreaId}/waitlist")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Entrar na lista de espera de uma área comum indisponível")
+    public ResponseEntity<ReservationDTO> joinWaitlist(
+            @PathVariable Long commonAreaId,
+            @Valid @RequestBody ReservationRequestDTO dto
+    ) {
+        ReservationDTO created = reservationService.joinWaitlist(commonAreaId, dto);
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    }
+
+    @GetMapping("/common-areas/{commonAreaId}/waitlist")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Listar fila de espera de uma área comum")
+    public ResponseEntity<List<ReservationDTO>> findWaitlist(
+            @PathVariable Long commonAreaId
+    ) {
+        return ResponseEntity.ok(reservationService.findWaitlistByCommonArea(commonAreaId));
     }
 
     @GetMapping(

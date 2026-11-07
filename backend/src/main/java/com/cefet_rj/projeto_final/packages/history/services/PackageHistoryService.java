@@ -1,6 +1,7 @@
 package com.cefet_rj.projeto_final.packages.history.services;
 
 import com.cefet_rj.projeto_final.auth.security.AuthenticatedUserService;
+import com.cefet_rj.projeto_final.condominiums.repositories.ResidentRepository;
 import com.cefet_rj.projeto_final.condominiums.security.CondominiumAccessService;
 import com.cefet_rj.projeto_final.packages.entities.Package;
 import com.cefet_rj.projeto_final.packages.enums.PackageStatus;
@@ -9,6 +10,7 @@ import com.cefet_rj.projeto_final.packages.history.entities.PackageHistory;
 import com.cefet_rj.projeto_final.packages.history.enums.PackageHistoryActorType;
 import com.cefet_rj.projeto_final.packages.history.repositories.PackageHistoryRepository;
 import com.cefet_rj.projeto_final.packages.repositories.PackageRepository;
+import com.cefet_rj.projeto_final.shared.exceptions.ForbiddenException;
 import com.cefet_rj.projeto_final.shared.exceptions.ResourceNotFoundException;
 import com.cefet_rj.projeto_final.users.entities.User;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +27,7 @@ public class PackageHistoryService {
     private final PackageHistoryRepository packageHistoryRepository;
     private final AuthenticatedUserService authenticatedUserService;
     private final PackageRepository packageRepository;
+    private final ResidentRepository residentRepository;
     private final CondominiumAccessService condominiumAccessService;
 
     @Transactional
@@ -81,6 +84,19 @@ public class PackageHistoryService {
                 authenticatedUser.getId(),
                 condominiumId
         );
+
+        if (condominiumAccessService.isStaffOrAdmin(authenticatedUser, condominiumId)) {
+            return packageEntity;
+        }
+
+        boolean isRecipient = packageEntity.getRecipient() != null
+                && packageEntity.getRecipient().getId().equals(authenticatedUser.getId());
+        boolean isUnitResident = packageEntity.getUnit() != null
+                && residentRepository.findUnitIdsByUserId(authenticatedUser.getId()).contains(packageEntity.getUnit().getId());
+
+        if (!isRecipient && !isUnitResident) {
+            throw new ForbiddenException("Você não possui permissão para visualizar o histórico desta encomenda.");
+        }
 
         return packageEntity;
     }

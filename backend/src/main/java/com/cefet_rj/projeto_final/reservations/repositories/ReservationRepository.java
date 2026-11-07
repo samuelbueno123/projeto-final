@@ -32,6 +32,7 @@ public interface ReservationRepository
             where r.commonArea.id = :commonAreaId
               and r.status <> :cancelledStatus
               and r.status <> com.cefet_rj.projeto_final.reservations.enums.ReservationStatus.REJECTED
+              and r.status <> com.cefet_rj.projeto_final.reservations.enums.ReservationStatus.WAITLISTED
               and r.startAt < :endAt
               and r.endAt > :startAt
             """)
@@ -56,12 +57,78 @@ public interface ReservationRepository
             where r.commonArea.id = :commonAreaId
               and r.status <> com.cefet_rj.projeto_final.reservations.enums.ReservationStatus.CANCELLED
               and r.status <> com.cefet_rj.projeto_final.reservations.enums.ReservationStatus.REJECTED
+              and r.status <> com.cefet_rj.projeto_final.reservations.enums.ReservationStatus.WAITLISTED
               and r.startAt < :endAt
               and r.endAt > :startAt
             order by r.startAt asc
             """)
     List<Reservation> findActiveOverlapping(
             @Param("commonAreaId") Long commonAreaId,
+            @Param("startAt") LocalDateTime startAt,
+            @Param("endAt") LocalDateTime endAt
+    );
+
+    @Query("""
+            select r
+            from Reservation r
+            join fetch r.commonArea ca
+            join fetch r.reservedBy
+            where r.commonArea.id = :commonAreaId
+              and r.status = com.cefet_rj.projeto_final.reservations.enums.ReservationStatus.WAITLISTED
+              and r.startAt < :endAt
+              and r.endAt > :startAt
+            order by coalesce(r.waitlistPosition, 999999) asc, r.createdAt asc
+            """)
+    List<Reservation> findWaitlistedOverlapping(
+            @Param("commonAreaId") Long commonAreaId,
+            @Param("startAt") LocalDateTime startAt,
+            @Param("endAt") LocalDateTime endAt
+    );
+
+    @Query("""
+            select r
+            from Reservation r
+            join fetch r.commonArea ca
+            join fetch r.reservedBy
+            where r.commonArea.id = :commonAreaId
+              and r.status = com.cefet_rj.projeto_final.reservations.enums.ReservationStatus.WAITLISTED
+            order by coalesce(r.waitlistPosition, 999999) asc, r.createdAt asc
+            """)
+    List<Reservation> findWaitlistedByCommonArea(
+            @Param("commonAreaId") Long commonAreaId
+    );
+
+    @Query("""
+            select count(r)
+            from Reservation r
+            where r.commonArea.id = :commonAreaId
+              and r.reservedBy.id = :userId
+              and r.status <> com.cefet_rj.projeto_final.reservations.enums.ReservationStatus.CANCELLED
+              and r.status <> com.cefet_rj.projeto_final.reservations.enums.ReservationStatus.REJECTED
+              and r.status <> com.cefet_rj.projeto_final.reservations.enums.ReservationStatus.WAITLISTED
+              and r.startAt >= :fromDate
+              and r.startAt < :toDate
+            """)
+    long countActiveBookingsByUserInRange(
+            @Param("commonAreaId") Long commonAreaId,
+            @Param("userId") Long userId,
+            @Param("fromDate") LocalDateTime fromDate,
+            @Param("toDate") LocalDateTime toDate
+    );
+
+    @Query("""
+            select count(r)
+            from Reservation r
+            where r.commonArea.id = :commonAreaId
+              and r.reservedBy.id = :userId
+              and r.status <> com.cefet_rj.projeto_final.reservations.enums.ReservationStatus.CANCELLED
+              and r.status <> com.cefet_rj.projeto_final.reservations.enums.ReservationStatus.REJECTED
+              and r.startAt < :endAt
+              and r.endAt > :startAt
+            """)
+    long countUserOverlappingReservationsOrWaitlist(
+            @Param("commonAreaId") Long commonAreaId,
+            @Param("userId") Long userId,
             @Param("startAt") LocalDateTime startAt,
             @Param("endAt") LocalDateTime endAt
     );

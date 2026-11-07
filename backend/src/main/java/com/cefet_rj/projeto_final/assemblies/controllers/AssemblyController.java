@@ -1,6 +1,7 @@
 package com.cefet_rj.projeto_final.assemblies.controllers;
 
 import com.cefet_rj.projeto_final.assemblies.dtos.AssemblyDTO;
+import com.cefet_rj.projeto_final.assemblies.dtos.AssemblyDTO.AssemblyParticipantDTO;
 import com.cefet_rj.projeto_final.assemblies.dtos.AssemblyDTO.AssemblyTopicDTO;
 import com.cefet_rj.projeto_final.assemblies.dtos.AssemblyDTO.CastVoteDTO;
 import com.cefet_rj.projeto_final.assemblies.dtos.AssemblyDTO.CreateAssemblyDTO;
@@ -14,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
@@ -43,6 +45,19 @@ public class AssemblyController {
             @PathVariable Long id,
             @Valid @RequestBody CreateTopicDTO dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(assemblyService.addTopic(id, dto));
+    }
+
+    @PostMapping("/assemblies/{id}/check-in")
+    public ResponseEntity<AssemblyParticipantDTO> checkInParticipant(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, String> body) {
+        String proxyInfo = body != null ? body.get("proxyInfo") : null;
+        return ResponseEntity.ok(assemblyService.checkInParticipant(id, proxyInfo));
+    }
+
+    @GetMapping("/assemblies/{id}/participants")
+    public ResponseEntity<List<AssemblyParticipantDTO>> listParticipants(@PathVariable Long id) {
+        return ResponseEntity.ok(assemblyService.listParticipants(id));
     }
 
     @PatchMapping("/assembly-topics/{topicId}/voting")

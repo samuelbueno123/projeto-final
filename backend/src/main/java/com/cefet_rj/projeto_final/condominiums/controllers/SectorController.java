@@ -15,6 +15,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.net.URI;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/sectors")
@@ -29,7 +30,12 @@ public class SectorController {
 
 	@GetMapping
 	@PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
-	public ResponseEntity<Page<SectorDTO>> findAll(Pageable pageable){
+	public ResponseEntity<?> findAll(
+			@RequestParam(value = "condominiumId", required = false) Long condominiumId,
+			Pageable pageable){
+		if (condominiumId != null) {
+			return ResponseEntity.ok().body(sectorService.findByCondominiumId(condominiumId));
+		}
 		Page<SectorDTO> list = sectorService.findAllPaged(pageable);
 		return ResponseEntity.ok().body(list);
 	}
@@ -55,6 +61,14 @@ public class SectorController {
 	@PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
 	public ResponseEntity<SectorDTO> update(@PathVariable Long id, @Valid @RequestBody SectorUpdateDTO dto){
 		SectorDTO newDto = sectorService.update(id, dto);
+		return ResponseEntity.ok().body(newDto);
+	}
+
+	@PatchMapping("/{id}/image")
+	@PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+	public ResponseEntity<SectorDTO> updateImage(@PathVariable Long id, @RequestBody Map<String, String> body) {
+		String imageUrl = body != null ? body.get("imageUrl") : null;
+		SectorDTO newDto = sectorService.updateImageUrl(id, imageUrl);
 		return ResponseEntity.ok().body(newDto);
 	}
 

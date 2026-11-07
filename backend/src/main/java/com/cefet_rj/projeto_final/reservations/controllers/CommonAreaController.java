@@ -119,6 +119,16 @@ public class CommonAreaController {
         );
     }
 
+    @PatchMapping("/common-areas/{id}/image")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    public ResponseEntity<CommonAreaDTO> updateImage(
+            @PathVariable Long id,
+            @RequestBody java.util.Map<String, String> body
+    ) {
+        String imageUrl = body != null ? body.get("imageUrl") : null;
+        return ResponseEntity.ok(commonAreaService.updateImageUrl(id, imageUrl));
+    }
+
     @PatchMapping(
             "/common-areas/{id}/activate"
     )

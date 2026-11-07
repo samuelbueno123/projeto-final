@@ -47,7 +47,7 @@ public class CommonAreaService {
                 FeatureCode.RESERVATIONS
         );
 
-        validateCondominiumAccess(condominiumId);
+        condominiumAccessService.validateManagerAccess(condominiumId);
 
         Condominium condominium =
                 condominiumRepository.findById(condominiumId)
@@ -72,6 +72,11 @@ public class CommonAreaService {
         commonArea.setOpeningHour(dto.openingHour() != null ? dto.openingHour() : 8);
         commonArea.setClosingHour(dto.closingHour() != null ? dto.closingHour() : 22);
         commonArea.setImageUrl(dto.imageUrl());
+        commonArea.setMinAdvanceHours(dto.minAdvanceHours() != null ? dto.minAdvanceHours() : 1);
+        commonArea.setMaxAdvanceDays(dto.maxAdvanceDays() != null ? dto.maxAdvanceDays() : 60);
+        commonArea.setMaxDurationHours(dto.maxDurationHours() != null ? dto.maxDurationHours() : 8);
+        commonArea.setMaxWeeklyBookingsPerUser(dto.maxWeeklyBookingsPerUser() != null ? dto.maxWeeklyBookingsPerUser() : 3);
+        commonArea.setAllowWaitlist(dto.allowWaitlist() != null ? dto.allowWaitlist() : true);
         commonArea.setActive(true);
         commonArea.setCondominium(condominium);
 
@@ -112,7 +117,7 @@ public class CommonAreaService {
                 FeatureCode.RESERVATIONS
         );
 
-        validateCondominiumAccess(condominiumId);
+        condominiumAccessService.validateManagerAccess(condominiumId);
 
         return commonAreaRepository
                 .findByCondominiumIdOrderByNameAsc(
@@ -199,12 +204,16 @@ public class CommonAreaService {
         featureAccessService.validateFeatureEnabled(condominiumId, FeatureCode.RESERVATIONS);
         validateCondominiumAccess(condominiumId);
 
+        boolean allowWaitlist = commonArea.getAllowWaitlist() != null ? commonArea.getAllowWaitlist() : true;
+
         if (startAt == null || endAt == null || !endAt.isAfter(startAt)) {
             return new AvailabilityCheckDTO(
                     false,
                     "O horário final deve ser posterior ao horário inicial.",
                     commonArea.getRequiresApproval() != null ? commonArea.getRequiresApproval() : true,
-                    List.of()
+                    List.of(),
+                    allowWaitlist,
+                    0
             );
         }
 
@@ -213,7 +222,9 @@ public class CommonAreaService {
                     false,
                     "Esta área comum está temporariamente desativada para reservas.",
                     commonArea.getRequiresApproval() != null ? commonArea.getRequiresApproval() : true,
-                    List.of()
+                    List.of(),
+                    false,
+                    0
             );
         }
 
@@ -230,15 +241,19 @@ public class CommonAreaService {
                 ))
                 .toList();
 
+        int waitlistCount = reservationRepository.findWaitlistedOverlapping(commonAreaId, startAt, endAt).size();
+
         boolean available = conflictDtos.isEmpty();
         boolean requiresApproval = commonArea.getRequiresApproval() != null ? commonArea.getRequiresApproval() : true;
         String message = available
                 ? (requiresApproval
                     ? "Horário disponível! Ao enviar, sua solicitação irá para aprovação do síndico."
                     : "Horário disponível para reserva imediata!")
-                : "Horário indisponível: já existe solicitação ou reserva confirmada neste intervalo.";
+                : (allowWaitlist
+                    ? "Horário indisponível: já existe reserva neste período, mas você pode entrar na lista de espera."
+                    : "Horário indisponível: já existe solicitação ou reserva confirmada neste intervalo.");
 
-        return new AvailabilityCheckDTO(available, message, requiresApproval, conflictDtos);
+        return new AvailabilityCheckDTO(available, message, requiresApproval, conflictDtos, allowWaitlist, waitlistCount);
     }
 
     private void validateCondominiumAccess(
@@ -276,7 +291,7 @@ public class CommonAreaService {
                 FeatureCode.RESERVATIONS
         );
 
-        validateCondominiumAccess(condominiumId);
+        condominiumAccessService.validateManagerAccess(condominiumId);
 
         commonArea.setName(
                 dto.name().trim()
@@ -307,10 +322,35 @@ public class CommonAreaService {
         if (dto.imageUrl() != null) {
             commonArea.setImageUrl(dto.imageUrl());
         }
+        if (dto.minAdvanceHours() != null) {
+            commonArea.setMinAdvanceHours(dto.minAdvanceHours());
+        }
+        if (dto.maxAdvanceDays() != null) {
+            commonArea.setMaxAdvanceDays(dto.maxAdvanceDays());
+        }
+        if (dto.maxDurationHours() != null) {
+            commonArea.setMaxDurationHours(dto.maxDurationHours());
+        }
+        if (dto.maxWeeklyBookingsPerUser() != null) {
+            commonArea.setMaxWeeklyBookingsPerUser(dto.maxWeeklyBookingsPerUser());
+        }
+        if (dto.allowWaitlist() != null) {
+            commonArea.setAllowWaitlist(dto.allowWaitlist());
+        }
 
         commonArea =
                 commonAreaRepository.save(commonArea);
 
+        return new CommonAreaDTO(commonArea);
+    }
+
+    @Transactional
+    public CommonAreaDTO updateImageUrl(Long id, String imageUrl) {
+        CommonArea commonArea = findCommonAreaById(id);
+        Long condominiumId = commonArea.getCondominium().getId();
+        condominiumAccessService.validateManagerAccess(condominiumId);
+        commonArea.setImageUrl(imageUrl);
+        commonArea = commonAreaRepository.save(commonArea);
         return new CommonAreaDTO(commonArea);
     }
 
@@ -328,7 +368,7 @@ public class CommonAreaService {
                 FeatureCode.RESERVATIONS
         );
 
-        validateCondominiumAccess(condominiumId);
+        condominiumAccessService.validateManagerAccess(condominiumId);
 
         commonArea.setActive(true);
 
@@ -349,7 +389,7 @@ public class CommonAreaService {
                 FeatureCode.RESERVATIONS
         );
 
-        validateCondominiumAccess(condominiumId);
+        condominiumAccessService.validateManagerAccess(condominiumId);
 
         commonArea.setActive(false);
 
@@ -398,6 +438,17 @@ public class CommonAreaService {
             Boolean available,
             String message,
             Boolean requiresApproval,
-            List<OccupiedSlotDTO> conflicts
-    ) {}
+            List<OccupiedSlotDTO> conflicts,
+            Boolean allowWaitlist,
+            Integer waitlistCount
+    ) {
+        public AvailabilityCheckDTO(
+                Boolean available,
+                String message,
+                Boolean requiresApproval,
+                List<OccupiedSlotDTO> conflicts
+        ) {
+            this(available, message, requiresApproval, conflicts, true, 0);
+        }
+    }
 }

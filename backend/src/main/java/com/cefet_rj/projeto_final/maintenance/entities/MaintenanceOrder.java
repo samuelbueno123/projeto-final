@@ -6,6 +6,8 @@ import jakarta.persistence.*;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -27,6 +29,16 @@ public class MaintenanceOrder {
     @JoinColumn(name = "condominium_id", nullable = false)
     private Condominium condominium;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "equipment_id")
+    @OnDelete(action = OnDeleteAction.SET_NULL)
+    private MaintenanceEquipment equipment;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "supplier_id")
+    @OnDelete(action = OnDeleteAction.SET_NULL)
+    private Supplier supplier;
+
     @Column(nullable = false, length = 200)
     private String title;
 
@@ -34,22 +46,28 @@ public class MaintenanceOrder {
     private String description;
 
     @Column(nullable = false, length = 50)
-    private String category; // ELETRICA, HIDRAULICA, ESTRUTURAL, SEGURANCA, ELEVADORES, LIMPEZA, AVCB_INCENDIO, OUTROS
+    private String category;
 
     @Column(nullable = false, length = 30)
-    private String type = "CORRECTIVE"; // PREVENTIVE, CORRECTIVE
+    private String type = "CORRECTIVE";
 
     @Column(nullable = false, length = 30)
-    private String priority = "MEDIUM"; // LOW, MEDIUM, HIGH, URGENT
+    private String priority = "MEDIUM";
 
     @Column(nullable = false, length = 30)
-    private String status = "OPEN"; // OPEN, IN_PROGRESS, COMPLETED, CANCELLED
+    private String status = "OPEN";
 
     @Column(name = "contractor_name", length = 150)
     private String contractorName;
 
     @Column(name = "contractor_contact", length = 100)
     private String contractorContact;
+
+    @Column(name = "responsible_name", length = 140)
+    private String responsibleName;
+
+    @Column(name = "recurrence_days")
+    private Integer recurrenceDays;
 
     @Column(name = "scheduled_date")
     private LocalDate scheduledDate;
@@ -62,6 +80,12 @@ public class MaintenanceOrder {
 
     @Column(name = "actual_cost", precision = 12, scale = 2)
     private BigDecimal actualCost;
+
+    @Column(name = "supplier_rating")
+    private Integer supplierRating;
+
+    @Column(name = "supplier_feedback", length = 600)
+    private String supplierFeedback;
 
     @Column(columnDefinition = "TEXT")
     private String notes;

@@ -18,7 +18,7 @@ public class AuthenticatedUserService {
                 .getAuthentication()
                 .getName();
 
-        return userRepository.findByEmail(email)
+        return userRepository.findByEmailIgnoreCase(email)
                 .orElseThrow(() -> new ResourceNotFoundException("Authenticated user not found"));
     }
 }

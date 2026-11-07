@@ -9,6 +9,7 @@ import lombok.Setter;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Getter
@@ -54,8 +55,20 @@ public class Pet {
     @Column(nullable = false)
     private Boolean vaccinated = true;
 
+    @Column(name = "last_vaccine_date")
+    private LocalDate lastVaccineDate;
+
+    @Column(name = "image_url", length = 500)
+    private String imageUrl;
+
     @Column(length = 500)
     private String notes;
+
+    @Column(nullable = false, length = 30)
+    private String status = "ACTIVE";
+
+    @Column(name = "manager_notes", length = 500)
+    private String managerNotes;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();

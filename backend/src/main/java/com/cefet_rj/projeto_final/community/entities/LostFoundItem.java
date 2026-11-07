@@ -38,6 +38,9 @@ public class LostFoundItem {
     @Column(nullable = false, length = 20)
     private String type = "FOUND";
 
+    @Column(nullable = false, length = 40)
+    private String category = "GENERAL";
+
     @Column(nullable = false, length = 150)
     private String title;
 
@@ -47,8 +50,17 @@ public class LostFoundItem {
     @Column(length = 150)
     private String location;
 
+    @Column(name = "image_url", length = 500)
+    private String imageUrl;
+
     @Column(name = "contact_info", length = 100)
     private String contactInfo;
+
+    @Column(name = "claim_message", length = 500)
+    private String claimMessage;
+
+    @Column(name = "resolution_notes", length = 500)
+    private String resolutionNotes;
 
     @Column(nullable = false, length = 30)
     private String status = "OPEN";

@@ -17,7 +17,7 @@ import java.util.Map;
 @RestController
 @RequiredArgsConstructor
 @PreAuthorize("isAuthenticated()")
-@Tag(name = "Condominium Community & Operations", description = "Ocorrências, visitantes, enquetes, achados e perdidos, classificados, veículos, pets, mudanças e documentos")
+@Tag(name = "Condominium Community & Operations", description = "Ocorrências, visitantes, enquetes, achados e perdidos, classificados, veículos, vagas, pets, mudanças e documentos")
 public class CondominiumCommunityController {
 
     private final CondominiumCommunityService communityService;
@@ -48,7 +48,7 @@ public class CondominiumCommunityController {
         return communityService.updateTicketStatus(id, body);
     }
 
-    // 2. VISITANTES E PRESTADORES
+    // 2. VISITANTES, CONVITES QR CODE E PORTARIA
     @GetMapping("/condominiums/{condominiumId}/visitors")
     public List<VisitorAccessDTO> listVisitors(
             @PathVariable Long condominiumId,
@@ -64,6 +64,14 @@ public class CondominiumCommunityController {
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(communityService.createVisitorAccess(condominiumId, body));
+    }
+
+    @PostMapping("/condominiums/{condominiumId}/visitors/validate-qr")
+    public VisitorAccessDTO validateVisitorQr(
+            @PathVariable Long condominiumId,
+            @RequestBody Map<String, Object> body
+    ) {
+        return communityService.validateVisitorQrCode(condominiumId, body);
     }
 
     @PatchMapping("/visitors/{id}/approve")
@@ -86,7 +94,7 @@ public class CondominiumCommunityController {
         return communityService.updateVisitorStatus(id, "CHECKED_OUT");
     }
 
-    // 3. ENQUETES E ASSEMBLEIAS VIRTUAIS
+    // 3. ENQUETES RÁPIDAS
     @GetMapping("/condominiums/{condominiumId}/polls")
     public List<PollDTO> listPolls(@PathVariable Long condominiumId) {
         return communityService.listPolls(condominiumId);
@@ -133,13 +141,38 @@ public class CondominiumCommunityController {
     }
 
     @PatchMapping("/lost-found/{id}/request-claim")
-    public LostFoundItemDTO requestClaim(@PathVariable Long id) {
-        return communityService.requestClaimLostFound(id);
+    public LostFoundItemDTO requestClaim(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, Object> body
+    ) {
+        return communityService.requestClaimLostFound(id, body);
     }
 
     @PatchMapping("/lost-found/{id}/return")
     public LostFoundItemDTO returnLostFound(@PathVariable Long id) {
         return communityService.markLostFoundReturned(id);
+    }
+
+    @PatchMapping("/lost-found/{id}/close")
+    public LostFoundItemDTO closeLostFound(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, Object> body
+    ) {
+        return communityService.closeLostFound(id, body);
+    }
+
+    @GetMapping("/lost-found/{id}/messages")
+    public List<LostFoundMessageDTO> listLostFoundMessages(@PathVariable Long id) {
+        return communityService.listLostFoundMessages(id);
+    }
+
+    @PostMapping("/lost-found/{id}/messages")
+    public ResponseEntity<LostFoundMessageDTO> addLostFoundMessage(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> body
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(communityService.addLostFoundMessage(id, body));
     }
 
     // 5. CLASSIFICADOS E MURAL DE SERVIÇOS
@@ -173,7 +206,35 @@ public class CondominiumCommunityController {
         return communityService.updateClassifiedStatus(id, body.get("status"));
     }
 
-    // 6. VEÍCULOS E CONSULTA DE PLACAS
+    // 6. VEÍCULOS, VAGAS DE GARAGEM E CONSULTA DE PLACAS
+    @GetMapping("/condominiums/{condominiumId}/parking-spots")
+    public List<ParkingSpotDTO> listParkingSpots(@PathVariable Long condominiumId) {
+        return communityService.listParkingSpots(condominiumId);
+    }
+
+    @PostMapping("/condominiums/{condominiumId}/parking-spots")
+    public ResponseEntity<ParkingSpotDTO> createParkingSpot(
+            @PathVariable Long condominiumId,
+            @RequestBody Map<String, Object> body
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(communityService.createParkingSpot(condominiumId, body));
+    }
+
+    @PutMapping("/parking-spots/{id}")
+    public ParkingSpotDTO updateParkingSpot(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> body
+    ) {
+        return communityService.updateParkingSpot(id, body);
+    }
+
+    @DeleteMapping("/parking-spots/{id}")
+    public ResponseEntity<Void> deleteParkingSpot(@PathVariable Long id) {
+        communityService.deleteParkingSpot(id);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/condominiums/{condominiumId}/vehicles")
     public List<VehicleDTO> listVehicles(
             @PathVariable Long condominiumId,
@@ -205,8 +266,11 @@ public class CondominiumCommunityController {
     }
 
     @PatchMapping("/vehicles/{id}/reject")
-    public VehicleDTO rejectVehicle(@PathVariable Long id) {
-        return communityService.updateVehicleStatus(id, "REJECTED");
+    public VehicleDTO rejectVehicle(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, String> body
+    ) {
+        return communityService.updateVehicleStatus(id, "REJECTED", body != null ? body.get("reason") : null);
     }
 
     @DeleteMapping("/vehicles/{id}")
@@ -215,7 +279,7 @@ public class CondominiumCommunityController {
         return ResponseEntity.noContent().build();
     }
 
-    // 7. CENSO DE PETS
+    // 7. GESTÃO DE ANIMAIS DE ESTIMAÇÃO (PETS)
     @GetMapping("/condominiums/{condominiumId}/pets")
     public List<PetDTO> listPets(
             @PathVariable Long condominiumId,
@@ -231,6 +295,14 @@ public class CondominiumCommunityController {
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(communityService.createPet(condominiumId, body));
+    }
+
+    @PutMapping("/pets/{id}")
+    public PetDTO updatePet(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> body
+    ) {
+        return communityService.updatePet(id, body);
     }
 
     @DeleteMapping("/pets/{id}")
@@ -361,6 +433,11 @@ public class CondominiumCommunityController {
     @PatchMapping("/guests/{id}/check-in")
     public EventGuestListDTO checkInGuest(@PathVariable Long id) {
         return communityService.checkInGuest(id);
+    }
+
+    @PatchMapping("/guests/{id}/check-out")
+    public EventGuestListDTO checkOutGuest(@PathVariable Long id) {
+        return communityService.checkOutGuest(id);
     }
 
     @DeleteMapping("/guests/{id}")
