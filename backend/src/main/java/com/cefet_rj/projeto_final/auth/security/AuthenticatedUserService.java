@@ -19,6 +19,6 @@ public class AuthenticatedUserService {
                 .getName();
 
         return userRepository.findByEmailIgnoreCase(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Authenticated user not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Authenticated user not found: " + email));
     }
 }
