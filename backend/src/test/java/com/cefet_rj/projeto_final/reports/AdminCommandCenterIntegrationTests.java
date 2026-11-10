@@ -70,13 +70,14 @@ class AdminCommandCenterIntegrationTests {
     }
 
     private Role getOrCreateRole(String authority) {
-        Role r = roleRepository.findByAuthority(authority);
-        if (r == null || r.getId() == null || !roleRepository.existsById(r.getId())) {
-            r = new Role();
-            r.setAuthority(authority);
-            r = roleRepository.save(r);
-        }
-        return r;
+        return roleRepository.findAll().stream()
+                .filter(r -> authority.equalsIgnoreCase(r.getAuthority()))
+                .findFirst()
+                .orElseGet(() -> {
+                    Role r = new Role();
+                    r.setAuthority(authority);
+                    return roleRepository.save(r);
+                });
     }
 
     private User getOrCreateUser(String firstName, String lastName, String email, Role role) {
