@@ -46,6 +46,7 @@ public class BillingPlanService {
 				);
 	}
 
+	@org.springframework.cache.annotation.Cacheable("billingPlans")
 	@Transactional(readOnly = true)
 	public List<BillingPlanDTO> findAll() {
 		return billingPlanRepository
@@ -62,6 +63,7 @@ public class BillingPlanService {
 		);
 	}
 
+	@org.springframework.cache.annotation.CacheEvict(value = "billingPlans", allEntries = true)
 	@Transactional
 	public BillingPlanDTO create(
 			BillingPlanRequestDTO dto

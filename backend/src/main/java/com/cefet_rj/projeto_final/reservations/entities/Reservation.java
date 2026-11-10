@@ -21,6 +21,9 @@ public class Reservation {
     @EqualsAndHashCode.Include
     private Long id;
 
+    @Version
+    private Long version;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "common_area_id", nullable = false)
     private CommonArea commonArea;

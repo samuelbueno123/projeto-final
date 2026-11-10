@@ -21,6 +21,9 @@ public class VisitorAccess {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Version
+    private Long version;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "condominium_id", nullable = false)
     @OnDelete(action = OnDeleteAction.CASCADE)

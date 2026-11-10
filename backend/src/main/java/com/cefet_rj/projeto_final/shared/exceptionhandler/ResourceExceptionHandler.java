@@ -448,6 +448,32 @@ public class ResourceExceptionHandler {
         return ResponseEntity.status(status).body(error);
     }
 
+    @ExceptionHandler({
+            org.springframework.orm.ObjectOptimisticLockingFailureException.class,
+            jakarta.persistence.OptimisticLockException.class
+    })
+    public ResponseEntity<StandardError> optimisticLockConflict(
+            Exception exception,
+            HttpServletRequest request
+    ) {
+        HttpStatus status = HttpStatus.CONFLICT;
+        String correlationId = getCorrelationId(request);
+
+        log.warn("Optimistic locking conflict [correlationId={}, path={}]: {}",
+                correlationId, request.getRequestURI(), exception.getMessage());
+
+        StandardError error = new StandardError(
+                Instant.now(),
+                status.value(),
+                status.getReasonPhrase(),
+                "Conflito de concorrência: o registro foi atualizado simultaneamente por outro usuário. Recarregue os dados e tente novamente.",
+                request.getRequestURI(),
+                correlationId
+        );
+
+        return ResponseEntity.status(status).body(error);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<StandardError> genericException(
             Exception exception,

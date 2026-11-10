@@ -22,6 +22,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("SELECT u FROM User u LEFT JOIN FETCH u.roles WHERE LOWER(u.email) = LOWER(:email)")
     Optional<User> findByEmailIgnoreCase(@Param("email") String email);
 
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"roles"})
+    @org.springframework.lang.NonNull
+    Page<User> findAll(@org.springframework.lang.NonNull Pageable pageable);
+
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"roles"})
     @Query("select u from User u where "
             + "lower(concat(concat(u.firstName, ' '), u.lastName)) like lower(concat('%', :query, '%')) "
             + "or lower(u.firstName) like lower(concat('%', :query, '%')) "

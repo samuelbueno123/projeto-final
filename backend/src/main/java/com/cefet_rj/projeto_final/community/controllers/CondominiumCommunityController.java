@@ -50,10 +50,16 @@ public class CondominiumCommunityController {
 
     // 2. VISITANTES, CONVITES QR CODE E PORTARIA
     @GetMapping("/condominiums/{condominiumId}/visitors")
-    public List<VisitorAccessDTO> listVisitors(
+    public Object listVisitors(
             @PathVariable Long condominiumId,
-            @RequestParam(defaultValue = "false") boolean mine
+            @RequestParam(defaultValue = "false") boolean mine,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false, defaultValue = "20") Integer size
     ) {
+        if (page != null) {
+            org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page, Math.min(size, 100));
+            return communityService.listVisitorsPaged(condominiumId, mine, pageable);
+        }
         return communityService.listVisitors(condominiumId, mine);
     }
 

@@ -29,6 +29,7 @@ public class CondominiumFeatureAccessService {
         }
     }
 
+    @org.springframework.cache.annotation.Cacheable(value = "condoFeatures", key = "#condominiumId + '-' + #featureCode.name()")
     public boolean hasFeature(
             Long condominiumId,
             FeatureCode featureCode
@@ -49,5 +50,10 @@ public class CondominiumFeatureAccessService {
                         feature.getCode()
                                 .equalsIgnoreCase(featureCode.name())
                 );
+    }
+
+    @org.springframework.cache.annotation.CacheEvict(value = "condoFeatures", allEntries = true)
+    public void evictCondoFeaturesCache() {
+        // Limpa cache ao alterar planos ou configurações de condomínios
     }
 }

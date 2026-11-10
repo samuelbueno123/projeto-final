@@ -166,10 +166,7 @@ public class CondominiumCommunityService {
         User user = validateMemberAccess(condominiumId);
         boolean isStaff = condominiumAccessService.isStaffOrAdmin(user, condominiumId);
         if (onlyMine || !isStaff) {
-            List<Long> myUnitIds = residentRepository.findUnitIdsByUserId(user.getId());
-            return visitorRepository.findByCondominiumIdOrderByCreatedAtDesc(condominiumId).stream()
-                    .filter(v -> v.getResident().getId().equals(user.getId())
-                            || (v.getUnit() != null && myUnitIds.contains(v.getUnit().getId())))
+            return visitorRepository.findByCondominiumIdAndResidentIdOrderByCreatedAtDesc(condominiumId, user.getId()).stream()
                     .map(VisitorAccessDTO::new)
                     .toList();
         }
@@ -177,6 +174,18 @@ public class CondominiumCommunityService {
                 .stream()
                 .map(VisitorAccessDTO::new)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public org.springframework.data.domain.Page<VisitorAccessDTO> listVisitorsPaged(Long condominiumId, boolean onlyMine, org.springframework.data.domain.Pageable pageable) {
+        User user = validateMemberAccess(condominiumId);
+        boolean isStaff = condominiumAccessService.isStaffOrAdmin(user, condominiumId);
+        if (onlyMine || !isStaff) {
+            return visitorRepository.findByCondominiumIdAndResidentId(condominiumId, user.getId(), pageable)
+                    .map(VisitorAccessDTO::new);
+        }
+        return visitorRepository.findByCondominiumId(condominiumId, pageable)
+                .map(VisitorAccessDTO::new);
     }
 
     @Transactional

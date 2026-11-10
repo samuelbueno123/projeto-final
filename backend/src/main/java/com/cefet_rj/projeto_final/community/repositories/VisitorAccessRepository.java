@@ -16,6 +16,13 @@ public interface VisitorAccessRepository extends JpaRepository<VisitorAccess, Lo
 
     @EntityGraph(attributePaths = {"resident", "unit", "unit.sector"})
     List<VisitorAccess> findByCondominiumIdAndVehiclePlateContainingIgnoreCaseOrderByCreatedAtDesc(Long condominiumId, String vehiclePlate);
+
+    @EntityGraph(attributePaths = {"resident", "unit", "unit.sector"})
+    org.springframework.data.domain.Page<VisitorAccess> findByCondominiumId(Long condominiumId, org.springframework.data.domain.Pageable pageable);
+
+    @EntityGraph(attributePaths = {"resident", "unit", "unit.sector"})
+    org.springframework.data.domain.Page<VisitorAccess> findByCondominiumIdAndResidentId(Long condominiumId, Long residentId, org.springframework.data.domain.Pageable pageable);
+
     Optional<VisitorAccess> findByCondominiumIdAndAccessCodeIgnoreCase(Long condominiumId, String accessCode);
     Optional<VisitorAccess> findByCondominiumIdAndQrCodePayload(Long condominiumId, String qrCodePayload);
 }
