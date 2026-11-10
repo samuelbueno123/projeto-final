@@ -6,6 +6,8 @@ import com.cefet_rj.projeto_final.maintenance.dtos.MaintenanceOrderDTO.UpdateSta
 import com.cefet_rj.projeto_final.maintenance.services.MaintenanceService;
 import com.cefet_rj.projeto_final.maintenance.services.MaintenanceService.MaintenanceEquipmentDTO;
 import com.cefet_rj.projeto_final.maintenance.services.MaintenanceService.SupplierDTO;
+import com.cefet_rj.projeto_final.maintenance.services.MaintenanceService.MaintenanceChecklistDTO;
+import com.cefet_rj.projeto_final.maintenance.services.MaintenanceService.ServiceContractDTO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -102,5 +104,47 @@ public class MaintenanceController {
     public ResponseEntity<Void> deleteSupplier(@PathVariable Long id) {
         maintenanceService.deleteSupplier(id);
         return ResponseEntity.noContent().build();
+    }
+
+    // CHECKLISTS DE INSPEÇÃO PREDIAL
+    @GetMapping("/condominiums/{condominiumId}/maintenance/checklists")
+    public ResponseEntity<List<MaintenanceChecklistDTO>> listChecklists(@PathVariable Long condominiumId) {
+        return ResponseEntity.ok(maintenanceService.listChecklists(condominiumId));
+    }
+
+    @PostMapping("/condominiums/{condominiumId}/maintenance/checklists")
+    public ResponseEntity<MaintenanceChecklistDTO> createChecklist(
+            @PathVariable Long condominiumId,
+            @RequestBody Map<String, Object> body) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(maintenanceService.createChecklist(condominiumId, body));
+    }
+
+    @PatchMapping("/maintenance/checklists/{id}/complete")
+    public ResponseEntity<MaintenanceChecklistDTO> completeChecklist(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, Object> body) {
+        return ResponseEntity.ok(maintenanceService.completeChecklist(id, body != null ? body : Map.of()));
+    }
+
+    // CONTRATOS DE PRESTAÇÃO DE SERVIÇOS E GARANTIAS
+    @GetMapping("/condominiums/{condominiumId}/contracts")
+    public ResponseEntity<List<ServiceContractDTO>> listContracts(
+            @PathVariable Long condominiumId,
+            @RequestParam(required = false) String status) {
+        return ResponseEntity.ok(maintenanceService.listContracts(condominiumId, status));
+    }
+
+    @PostMapping("/condominiums/{condominiumId}/contracts")
+    public ResponseEntity<ServiceContractDTO> createContract(
+            @PathVariable Long condominiumId,
+            @RequestBody Map<String, Object> body) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(maintenanceService.createContract(condominiumId, body));
+    }
+
+    @PatchMapping("/contracts/{id}/terminate")
+    public ResponseEntity<ServiceContractDTO> terminateContract(@PathVariable Long id) {
+        return ResponseEntity.ok(maintenanceService.terminateContract(id));
     }
 }

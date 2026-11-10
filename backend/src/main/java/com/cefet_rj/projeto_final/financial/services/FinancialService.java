@@ -9,7 +9,12 @@ import com.cefet_rj.projeto_final.condominiums.security.CondominiumAccessService
 import com.cefet_rj.projeto_final.financial.dtos.ExpenseDTO;
 import com.cefet_rj.projeto_final.financial.dtos.ExpenseDTO.CreateExpenseDTO;
 import com.cefet_rj.projeto_final.financial.dtos.ExpenseDTO.FinancialSummaryDTO;
+import com.cefet_rj.projeto_final.financial.dtos.ExpenseDTO.BudgetForecastDTO;
+import com.cefet_rj.projeto_final.financial.dtos.ExpenseDTO.CategoryBudgetComparisonDTO;
+import com.cefet_rj.projeto_final.financial.dtos.ExpenseDTO.BudgetComparisonSummaryDTO;
+import com.cefet_rj.projeto_final.financial.entities.BudgetForecast;
 import com.cefet_rj.projeto_final.financial.entities.CondominiumExpense;
+import com.cefet_rj.projeto_final.financial.repositories.BudgetForecastRepository;
 import com.cefet_rj.projeto_final.financial.repositories.CondominiumExpenseRepository;
 import com.cefet_rj.projeto_final.manager.entities.UnitPayment;
 import com.cefet_rj.projeto_final.manager.enums.UnitPaymentStatus;
@@ -25,14 +30,17 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
 public class FinancialService {
 
     private final CondominiumExpenseRepository expenseRepository;
+    private final BudgetForecastRepository budgetRepository;
     private final CondominiumRepository condominiumRepository;
     private final UnitRepository unitRepository;
     private final UnitPaymentRepository paymentRepository;
@@ -183,6 +191,145 @@ public class FinancialService {
                 unitsPaid,
                 unitsPending,
                 recentExpenses
+        );
+    }
+
+    // =========================================================================
+    // PREVISÃO ORÇAMENTÁRIA vs REALIZADO (Budget Forecasting & Category Tracking)
+    // =========================================================================
+
+    @Transactional(readOnly = true)
+    public BudgetComparisonSummaryDTO getBudgetComparison(Long condominiumId, Integer year, Integer month) {
+        condominiumAccessService.validateAccess(condominiumId);
+        int targetYear = (year != null && year > 2000) ? year : LocalDate.now().getYear();
+        int targetMonth = (month != null && month >= 1 && month <= 12) ? month : LocalDate.now().getMonthValue();
+
+        List<BudgetForecast> forecasts = budgetRepository.findByCondominiumIdAndYearAndMonth(condominiumId, targetYear, targetMonth);
+        Map<String, BigDecimal> budgetMap = new LinkedHashMap<>();
+        for (BudgetForecast b : forecasts) {
+            budgetMap.put(b.getCategory().toUpperCase(Locale.ROOT), b.getBudgetedAmount());
+        }
+
+        // Standard categories if not present
+        List<String> defaultCategories = List.of("PESSOAL", "MANUTENCAO", "LIMPEZA", "CONCESSIONARIAS", "ADMINISTRATIVO", "OUTROS");
+        for (String cat : defaultCategories) {
+            budgetMap.putIfAbsent(cat, BigDecimal.ZERO);
+        }
+
+        List<CondominiumExpense> expenses = expenseRepository.findByCondominiumIdOrderByDueDateDesc(condominiumId);
+        Map<String, BigDecimal> actualMap = new LinkedHashMap<>();
+        for (CondominiumExpense e : expenses) {
+            if ("CANCELLED".equalsIgnoreCase(e.getStatus())) continue;
+            if (e.getDueDate() != null && e.getDueDate().getYear() == targetYear && e.getDueDate().getMonthValue() == targetMonth) {
+                String cat = (e.getCategory() != null && !e.getCategory().isBlank())
+                        ? e.getCategory().trim().toUpperCase(Locale.ROOT)
+                        : "OUTROS";
+                BigDecimal current = actualMap.getOrDefault(cat, BigDecimal.ZERO);
+                actualMap.put(cat, current.add(e.getAmount() != null ? e.getAmount() : BigDecimal.ZERO));
+            }
+        }
+
+        Set<String> allCategories = new LinkedHashSet<>(budgetMap.keySet());
+        allCategories.addAll(actualMap.keySet());
+
+        List<CategoryBudgetComparisonDTO> categoryList = new ArrayList<>();
+        BigDecimal totalBudgeted = BigDecimal.ZERO;
+        BigDecimal totalActual = BigDecimal.ZERO;
+
+        for (String cat : allCategories) {
+            BigDecimal budgeted = budgetMap.getOrDefault(cat, BigDecimal.ZERO);
+            BigDecimal actual = actualMap.getOrDefault(cat, BigDecimal.ZERO);
+            BigDecimal variance = budgeted.subtract(actual);
+
+            BigDecimal percentageUsed = BigDecimal.ZERO;
+            if (budgeted.compareTo(BigDecimal.ZERO) > 0) {
+                percentageUsed = actual.multiply(BigDecimal.valueOf(100)).divide(budgeted, 1, RoundingMode.HALF_UP);
+            } else if (actual.compareTo(BigDecimal.ZERO) > 0) {
+                percentageUsed = BigDecimal.valueOf(100.0);
+            }
+
+            String status = "ON_TRACK";
+            if (actual.compareTo(budgeted) > 0) {
+                status = "OVER_BUDGET";
+            } else if (percentageUsed.compareTo(BigDecimal.valueOf(80)) < 0) {
+                status = "UNDER_BUDGET";
+            }
+
+            categoryList.add(new CategoryBudgetComparisonDTO(cat, budgeted, actual, variance, percentageUsed, status));
+            totalBudgeted = totalBudgeted.add(budgeted);
+            totalActual = totalActual.add(actual);
+        }
+
+        BigDecimal totalVariance = totalBudgeted.subtract(totalActual);
+        BigDecimal totalPercentageUsed = BigDecimal.ZERO;
+        if (totalBudgeted.compareTo(BigDecimal.ZERO) > 0) {
+            totalPercentageUsed = totalActual.multiply(BigDecimal.valueOf(100)).divide(totalBudgeted, 1, RoundingMode.HALF_UP);
+        } else if (totalActual.compareTo(BigDecimal.ZERO) > 0) {
+            totalPercentageUsed = BigDecimal.valueOf(100.0);
+        }
+
+        String overallStatus = "ON_TRACK";
+        if (totalActual.compareTo(totalBudgeted) > 0) {
+            overallStatus = "OVER_BUDGET";
+        } else if (totalPercentageUsed.compareTo(BigDecimal.valueOf(85)) < 0) {
+            overallStatus = "UNDER_BUDGET";
+        }
+
+        return new BudgetComparisonSummaryDTO(
+                targetYear,
+                targetMonth,
+                totalBudgeted,
+                totalActual,
+                totalVariance,
+                totalPercentageUsed,
+                overallStatus,
+                categoryList
+        );
+    }
+
+    @Transactional
+    public BudgetForecastDTO saveBudgetForecast(Long condominiumId, Map<String, Object> body) {
+        condominiumAccessService.validateManagerAccess(condominiumId);
+        Condominium condo = condominiumRepository.findById(condominiumId)
+                .orElseThrow(() -> new ResourceNotFoundException("Condomínio não encontrado: " + condominiumId));
+
+        int year = LocalDate.now().getYear();
+        if (body.get("year") instanceof Number n) year = n.intValue();
+        int month = LocalDate.now().getMonthValue();
+        if (body.get("month") instanceof Number n) month = n.intValue();
+
+        String category = body.get("category") != null ? body.get("category").toString().trim().toUpperCase(Locale.ROOT) : "OUTROS";
+        BigDecimal amount = BigDecimal.ZERO;
+        if (body.get("budgetedAmount") instanceof Number n) amount = BigDecimal.valueOf(n.doubleValue());
+        else if (body.get("budgetedAmount") != null) {
+            try { amount = new BigDecimal(body.get("budgetedAmount").toString().trim()); } catch (Exception ignored) {}
+        }
+
+        String notes = body.get("notes") != null ? body.get("notes").toString().trim() : null;
+        User user = authenticatedUserService.getAuthenticatedUser();
+
+        BudgetForecast forecast = budgetRepository.findByCondominiumIdAndYearAndMonthAndCategory(condominiumId, year, month, category)
+                .orElseGet(BudgetForecast::new);
+
+        forecast.setCondominium(condo);
+        forecast.setYear(year);
+        forecast.setMonth(month);
+        forecast.setCategory(category);
+        forecast.setBudgetedAmount(amount);
+        forecast.setNotes(notes);
+        forecast.setCreatedBy(user);
+        if (forecast.getId() == null) forecast.setCreatedAt(LocalDateTime.now());
+
+        forecast = budgetRepository.save(forecast);
+        return new BudgetForecastDTO(
+                forecast.getId(),
+                condominiumId,
+                forecast.getYear(),
+                forecast.getMonth(),
+                forecast.getCategory(),
+                forecast.getBudgetedAmount(),
+                forecast.getNotes(),
+                forecast.getCreatedAt()
         );
     }
 }

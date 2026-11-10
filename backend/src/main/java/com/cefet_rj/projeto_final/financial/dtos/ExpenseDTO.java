@@ -65,4 +65,35 @@ public record ExpenseDTO(
             long unitsPending,
             List<ExpenseDTO> recentExpenses
     ) {}
+
+    public record BudgetForecastDTO(
+            Long id,
+            Long condominiumId,
+            Integer year,
+            Integer month,
+            String category,
+            BigDecimal budgetedAmount,
+            String notes,
+            LocalDateTime createdAt
+    ) {}
+
+    public record CategoryBudgetComparisonDTO(
+            String category,
+            BigDecimal budgetedAmount,
+            BigDecimal actualAmount,
+            BigDecimal variance,
+            BigDecimal percentageUsed,
+            String status
+    ) {}
+
+    public record BudgetComparisonSummaryDTO(
+            Integer year,
+            Integer month,
+            BigDecimal totalBudgeted,
+            BigDecimal totalActual,
+            BigDecimal totalVariance,
+            BigDecimal totalPercentageUsed,
+            String overallStatus,
+            List<CategoryBudgetComparisonDTO> categories
+    ) {}
 }

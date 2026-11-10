@@ -478,4 +478,154 @@ public class CondominiumCommunityController {
     ) {
         return communityService.judgeInfraction(id, body.get("status"), body.get("judgment"));
     }
+
+    // 13. OBRAS E REFORMAS (NBR 16.280)
+    @GetMapping("/condominiums/{condominiumId}/renovations")
+    public List<RenovationRequestDTO> listRenovations(
+            @PathVariable Long condominiumId,
+            @RequestParam(defaultValue = "false") boolean mine
+    ) {
+        return communityService.listRenovations(condominiumId, mine);
+    }
+
+    @PostMapping("/condominiums/{condominiumId}/renovations")
+    public ResponseEntity<RenovationRequestDTO> createRenovation(
+            @PathVariable Long condominiumId,
+            @RequestBody Map<String, Object> body
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(communityService.createRenovation(condominiumId, body));
+    }
+
+    @PatchMapping("/renovations/{id}/approve")
+    public RenovationRequestDTO approveRenovation(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, Object> body
+    ) {
+        return communityService.approveRenovation(id, body != null ? body : Map.of());
+    }
+
+    @PatchMapping("/renovations/{id}/reject")
+    public RenovationRequestDTO rejectRenovation(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, Object> body
+    ) {
+        return communityService.rejectRenovation(id, body != null ? body : Map.of());
+    }
+
+    @PatchMapping("/renovations/{id}/complete")
+    public RenovationRequestDTO completeRenovation(@PathVariable Long id) {
+        return communityService.completeRenovation(id);
+    }
+
+    // 14. LIVRO DIGITAL DE PASSAGEM DE TURNO DA PORTARIA
+    @GetMapping("/condominiums/{condominiumId}/shift-logs")
+    public List<ConciergeShiftLogDTO> listShiftLogs(@PathVariable Long condominiumId) {
+        return communityService.listShiftLogs(condominiumId);
+    }
+
+    @PostMapping("/condominiums/{condominiumId}/shift-logs")
+    public ResponseEntity<ConciergeShiftLogDTO> createShiftLog(
+            @PathVariable Long condominiumId,
+            @RequestBody Map<String, Object> body
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(communityService.createShiftLog(condominiumId, body));
+    }
+
+    @PatchMapping("/shift-logs/{id}/acknowledge")
+    public ConciergeShiftLogDTO acknowledgeShiftLog(@PathVariable Long id) {
+        return communityService.acknowledgeShiftLog(id);
+    }
+
+    // 15. CONTROLE DE CHAVES E TAGS DA PORTARIA
+    @GetMapping("/condominiums/{condominiumId}/keys")
+    public List<KeyRegistryEntryDTO> listKeys(
+            @PathVariable Long condominiumId,
+            @RequestParam(required = false) String status
+    ) {
+        return communityService.listKeys(condominiumId, status);
+    }
+
+    @PostMapping("/condominiums/{condominiumId}/keys")
+    public ResponseEntity<KeyRegistryEntryDTO> createKey(
+            @PathVariable Long condominiumId,
+            @RequestBody Map<String, Object> body
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(communityService.createKey(condominiumId, body));
+    }
+
+    @PostMapping("/keys/{id}/checkout")
+    public KeyRegistryEntryDTO checkoutKey(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> body
+    ) {
+        return communityService.checkoutKey(id, body);
+    }
+
+    @PostMapping("/keys/{id}/checkin")
+    public KeyRegistryEntryDTO checkinKey(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, Object> body
+    ) {
+        return communityService.checkinKey(id, body != null ? body : Map.of());
+    }
+
+    // 16. BOTÃO DE PÂNICO & ALERTA DE EMERGÊNCIA (SOS)
+    @GetMapping("/condominiums/{condominiumId}/emergency-alerts")
+    public List<EmergencyAlertDTO> listEmergencyAlerts(
+            @PathVariable Long condominiumId,
+            @RequestParam(required = false) String status
+    ) {
+        return communityService.listEmergencyAlerts(condominiumId, status);
+    }
+
+    @PostMapping("/condominiums/{condominiumId}/emergency-alerts")
+    public ResponseEntity<EmergencyAlertDTO> triggerEmergencyAlert(
+            @PathVariable Long condominiumId,
+            @RequestBody Map<String, Object> body
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(communityService.triggerEmergencyAlert(condominiumId, body));
+    }
+
+    @PatchMapping("/emergency-alerts/{id}/attend")
+    public EmergencyAlertDTO attendEmergencyAlert(@PathVariable Long id) {
+        return communityService.attendEmergencyAlert(id);
+    }
+
+    @PatchMapping("/emergency-alerts/{id}/resolve")
+    public EmergencyAlertDTO resolveEmergencyAlert(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, Object> body
+    ) {
+        return communityService.resolveEmergencyAlert(id, body != null ? body : Map.of());
+    }
+
+    // 17. MEDIÇÃO INDIVIDUALIZADA DE ÁGUA E GÁS
+    @GetMapping("/condominiums/{condominiumId}/utility-readings")
+    public List<UtilityReadingDTO> listUtilityReadings(
+            @PathVariable Long condominiumId,
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) Integer month,
+            @RequestParam(required = false) Long unitId
+    ) {
+        return communityService.listUtilityReadings(condominiumId, year, month, unitId);
+    }
+
+    @PostMapping("/condominiums/{condominiumId}/utility-readings")
+    public ResponseEntity<UtilityReadingDTO> createUtilityReading(
+            @PathVariable Long condominiumId,
+            @RequestBody Map<String, Object> body
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(communityService.createUtilityReading(condominiumId, body));
+    }
+
+    // 18. CONVITE DIGITAL WHATSAPP
+    @GetMapping("/visitors/{id}/digital-pass")
+    public VisitorDigitalPassDTO getVisitorDigitalPass(@PathVariable Long id) {
+        return communityService.getVisitorDigitalPass(id);
+    }
 }

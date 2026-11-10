@@ -59,4 +59,25 @@ public class FinancialController {
     public ResponseEntity<ExpenseDTO> cancelExpense(@PathVariable Long id) {
         return ResponseEntity.ok(financialService.cancelExpense(id));
     }
+
+    @GetMapping("/condominiums/{condominiumId}/financial/budget-comparison")
+    @Operation(summary = "Compara despesas orçadas vs realizadas por categoria no período")
+    public ResponseEntity<ExpenseDTO.BudgetComparisonSummaryDTO> getBudgetComparison(
+            @PathVariable Long condominiumId,
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) Integer month
+    ) {
+        return ResponseEntity.ok(financialService.getBudgetComparison(condominiumId, year, month));
+    }
+
+    @PostMapping("/condominiums/{condominiumId}/financial/budgets")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @Operation(summary = "Define ou atualiza meta orçamentária por categoria para um mês/ano")
+    public ResponseEntity<ExpenseDTO.BudgetForecastDTO> saveBudgetForecast(
+            @PathVariable Long condominiumId,
+            @RequestBody java.util.Map<String, Object> body
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(financialService.saveBudgetForecast(condominiumId, body));
+    }
 }

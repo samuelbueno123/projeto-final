@@ -54,6 +54,11 @@ public class CondominiumCommunityService {
     private final GuestEntryRepository guestEntryRepository;
     private final CondominiumInfractionRepository infractionRepository;
     private final ReservationRepository reservationRepository;
+    private final RenovationRequestRepository renovationRepository;
+    private final ConciergeShiftLogRepository shiftLogRepository;
+    private final KeyRegistryEntryRepository keyRepository;
+    private final EmergencyAlertRepository emergencyAlertRepository;
+    private final UtilityReadingRepository utilityReadingRepository;
 
     private final CondominiumRepository condominiumRepository;
     private final UnitRepository unitRepository;
@@ -1738,6 +1743,378 @@ public class CondominiumCommunityService {
     }
 
     // =========================================================================
+    // 12. RENOVATION REQUESTS (Obras e Reformas - NBR 16.280)
+    // =========================================================================
+
+    @Transactional(readOnly = true)
+    public List<RenovationRequestDTO> listRenovations(Long condominiumId, boolean onlyMine) {
+        User user = validateMemberAccess(condominiumId);
+        List<RenovationRequest> list = onlyMine
+                ? renovationRepository.findByCondominiumIdAndRequesterIdOrderByCreatedAtDesc(condominiumId, user.getId())
+                : renovationRepository.findByCondominiumIdOrderByCreatedAtDesc(condominiumId);
+        return list.stream().map(RenovationRequestDTO::new).toList();
+    }
+
+    @Transactional
+    public RenovationRequestDTO createRenovation(Long condominiumId, Map<String, Object> body) {
+        User user = validateMemberAccess(condominiumId);
+        Condominium condo = getCondominium(condominiumId);
+        Unit unit = resolveUserUnit(user.getId(), condominiumId, body.get("unitId"));
+        if (unit == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Selecione a unidade correspondente à obra.");
+        }
+
+        String title = stringVal(body, "title");
+        if (title.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Título da obra ou reforma é obrigatório.");
+        }
+        LocalDate startDate = parseLocalDate(stringVal(body, "startDate"), null);
+        LocalDate expectedEndDate = parseLocalDate(stringVal(body, "expectedEndDate"), null);
+        if (startDate == null || expectedEndDate == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Datas de início e previsão de término são obrigatórias.");
+        }
+        if (expectedEndDate.isBefore(startDate)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A data de término não pode ser anterior à data de início.");
+        }
+
+        RenovationRequest req = new RenovationRequest();
+        req.setCondominium(condo);
+        req.setUnit(unit);
+        req.setRequester(user);
+        req.setTitle(title);
+        req.setDescription(blankToNull(stringVal(body, "description")));
+        req.setArtRrtNumber(blankToNull(stringVal(body, "artRrtNumber")));
+        req.setContractorName(blankToNull(stringVal(body, "contractorName")));
+        req.setContractorPhone(blankToNull(stringVal(body, "contractorPhone")));
+        req.setStartDate(startDate);
+        req.setExpectedEndDate(expectedEndDate);
+        req.setNoiseLevel(defaultIfBlank(stringVal(body, "noiseLevel"), "MEDIUM").toUpperCase(Locale.ROOT));
+        req.setStatus("REQUESTED");
+        req.setCreatedAt(LocalDateTime.now());
+
+        return new RenovationRequestDTO(renovationRepository.save(req));
+    }
+
+    @Transactional
+    public RenovationRequestDTO approveRenovation(Long id, Map<String, Object> body) {
+        RenovationRequest req = renovationRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Solicitação de reforma não encontrada: " + id));
+        User manager = validateManagerAccess(req.getCondominium().getId());
+        req.setStatus("APPROVED");
+        req.setDecisionNotes(blankToNull(stringVal(body, "decisionNotes")));
+        req.setDecidedBy(manager);
+        req.setDecidedAt(LocalDateTime.now());
+        return new RenovationRequestDTO(renovationRepository.save(req));
+    }
+
+    @Transactional
+    public RenovationRequestDTO rejectRenovation(Long id, Map<String, Object> body) {
+        RenovationRequest req = renovationRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Solicitação de reforma não encontrada: " + id));
+        User manager = validateManagerAccess(req.getCondominium().getId());
+        req.setStatus("REJECTED");
+        req.setDecisionNotes(blankToNull(stringVal(body, "decisionNotes")));
+        req.setDecidedBy(manager);
+        req.setDecidedAt(LocalDateTime.now());
+        return new RenovationRequestDTO(renovationRepository.save(req));
+    }
+
+    @Transactional
+    public RenovationRequestDTO completeRenovation(Long id) {
+        RenovationRequest req = renovationRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Solicitação de reforma não encontrada: " + id));
+        validateStaffOrOwner(req.getCondominium().getId(), req.getRequester().getId());
+        req.setStatus("COMPLETED");
+        req.setActualEndDate(LocalDate.now());
+        return new RenovationRequestDTO(renovationRepository.save(req));
+    }
+
+    // =========================================================================
+    // 13. CONCIERGE SHIFT LOGS (Passagem de Turno da Portaria)
+    // =========================================================================
+
+    @Transactional(readOnly = true)
+    public List<ConciergeShiftLogDTO> listShiftLogs(Long condominiumId) {
+        validateStaffAccess(condominiumId);
+        return shiftLogRepository.findByCondominiumIdOrderByCreatedAtDesc(condominiumId)
+                .stream().map(ConciergeShiftLogDTO::new).toList();
+    }
+
+    @Transactional
+    public ConciergeShiftLogDTO createShiftLog(Long condominiumId, Map<String, Object> body) {
+        User staff = validateStaffAccess(condominiumId);
+        Condominium condo = getCondominium(condominiumId);
+
+        String shiftType = defaultIfBlank(stringVal(body, "shiftType"), "MORNING").toUpperCase(Locale.ROOT);
+        LocalDate shiftDate = parseLocalDate(stringVal(body, "shiftDate"), LocalDate.now());
+
+        ConciergeShiftLog log = new ConciergeShiftLog();
+        log.setCondominium(condo);
+        log.setOutgoingDoorman(staff);
+        log.setShiftType(shiftType);
+        log.setShiftDate(shiftDate);
+        log.setGateStatus(defaultIfBlank(stringVal(body, "gateStatus"), "ALL_NORMAL").toUpperCase(Locale.ROOT));
+        log.setPendingKeysCount(intVal(body, "pendingKeysCount", 0));
+        log.setPendingPackagesCount(intVal(body, "pendingPackagesCount", 0));
+        log.setOccurrencesSummary(blankToNull(stringVal(body, "occurrencesSummary")));
+        log.setGeneralNotes(blankToNull(stringVal(body, "generalNotes")));
+        log.setCreatedAt(LocalDateTime.now());
+
+        return new ConciergeShiftLogDTO(shiftLogRepository.save(log));
+    }
+
+    @Transactional
+    public ConciergeShiftLogDTO acknowledgeShiftLog(Long id) {
+        ConciergeShiftLog log = shiftLogRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Registro de turno não encontrado: " + id));
+        User incoming = validateStaffAccess(log.getCondominium().getId());
+        log.setIncomingDoorman(incoming);
+        log.setAcknowledgedAt(LocalDateTime.now());
+        return new ConciergeShiftLogDTO(shiftLogRepository.save(log));
+    }
+
+    // =========================================================================
+    // 14. KEY & TAG REGISTRY (Controle de Chaves da Portaria)
+    // =========================================================================
+
+    @Transactional(readOnly = true)
+    public List<KeyRegistryEntryDTO> listKeys(Long condominiumId, String status) {
+        validateStaffAccess(condominiumId);
+        List<KeyRegistryEntry> list = (status != null && !status.isBlank())
+                ? keyRepository.findByCondominiumIdAndCurrentStatusOrderByKeyCodeAsc(condominiumId, status.trim().toUpperCase())
+                : keyRepository.findByCondominiumIdOrderByKeyCodeAsc(condominiumId);
+        return list.stream().map(KeyRegistryEntryDTO::new).toList();
+    }
+
+    @Transactional
+    public KeyRegistryEntryDTO createKey(Long condominiumId, Map<String, Object> body) {
+        validateStaffAccess(condominiumId);
+        Condominium condo = getCondominium(condominiumId);
+
+        String code = stringVal(body, "keyCode");
+        String desc = stringVal(body, "description");
+        if (code.isBlank() || desc.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Código e descrição da chave são obrigatórios.");
+        }
+
+        KeyRegistryEntry key = new KeyRegistryEntry();
+        key.setCondominium(condo);
+        key.setKeyCode(code);
+        key.setDescription(desc);
+        key.setKeyCategory(defaultIfBlank(stringVal(body, "keyCategory"), "COMMON_AREA").toUpperCase(Locale.ROOT));
+        key.setCurrentStatus("AVAILABLE");
+        key.setNotes(blankToNull(stringVal(body, "notes")));
+        key.setCreatedAt(LocalDateTime.now());
+
+        return new KeyRegistryEntryDTO(keyRepository.save(key));
+    }
+
+    @Transactional
+    public KeyRegistryEntryDTO checkoutKey(Long id, Map<String, Object> body) {
+        KeyRegistryEntry key = keyRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Chave não encontrada: " + id));
+        User staff = validateStaffAccess(key.getCondominium().getId());
+
+        String borrower = stringVal(body, "borrowerName");
+        if (borrower.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Nome do retirante é obrigatório.");
+        }
+
+        key.setCurrentStatus("BORROWED");
+        key.setBorrowerName(borrower);
+        key.setBorrowerDocument(blankToNull(stringVal(body, "borrowerDocument")));
+        key.setBorrowerPhone(blankToNull(stringVal(body, "borrowerPhone")));
+        key.setBorrowedAt(LocalDateTime.now());
+        key.setCheckedOutBy(staff);
+        key.setReturnedAt(null);
+        key.setCheckedInBy(null);
+
+        return new KeyRegistryEntryDTO(keyRepository.save(key));
+    }
+
+    @Transactional
+    public KeyRegistryEntryDTO checkinKey(Long id, Map<String, Object> body) {
+        KeyRegistryEntry key = keyRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Chave não encontrada: " + id));
+        User staff = validateStaffAccess(key.getCondominium().getId());
+
+        key.setCurrentStatus("AVAILABLE");
+        key.setReturnedAt(LocalDateTime.now());
+        key.setCheckedInBy(staff);
+        if (body != null && body.containsKey("notes")) {
+            key.setNotes(blankToNull(stringVal(body, "notes")));
+        }
+
+        return new KeyRegistryEntryDTO(keyRepository.save(key));
+    }
+
+    // =========================================================================
+    // 15. EMERGENCY ALERTS & PANIC BUTTON (Botão de Pânico SOS)
+    // =========================================================================
+
+    @Transactional(readOnly = true)
+    public List<EmergencyAlertDTO> listEmergencyAlerts(Long condominiumId, String status) {
+        validateStaffAccess(condominiumId);
+        List<EmergencyAlert> list = (status != null && !status.isBlank())
+                ? emergencyAlertRepository.findByCondominiumIdAndStatusOrderByCreatedAtDesc(condominiumId, status.trim().toUpperCase())
+                : emergencyAlertRepository.findByCondominiumIdOrderByCreatedAtDesc(condominiumId);
+        return list.stream().map(EmergencyAlertDTO::new).toList();
+    }
+
+    @Transactional
+    public EmergencyAlertDTO triggerEmergencyAlert(Long condominiumId, Map<String, Object> body) {
+        User resident = validateMemberAccess(condominiumId);
+        Condominium condo = getCondominium(condominiumId);
+        Unit unit = resolveUserUnit(resident.getId(), condominiumId, body.get("unitId"));
+
+        String type = defaultIfBlank(stringVal(body, "emergencyType"), "MEDICAL").toUpperCase(Locale.ROOT);
+
+        EmergencyAlert alert = new EmergencyAlert();
+        alert.setCondominium(condo);
+        alert.setUnit(unit);
+        alert.setResident(resident);
+        alert.setEmergencyType(type);
+        alert.setDetails(blankToNull(stringVal(body, "details")));
+        alert.setContactPhone(blankToNull(stringVal(body, "contactPhone")));
+        alert.setStatus("ACTIVE");
+        alert.setCreatedAt(LocalDateTime.now());
+
+        EmergencyAlert saved = emergencyAlertRepository.save(alert);
+        return new EmergencyAlertDTO(saved);
+    }
+
+    @Transactional
+    public EmergencyAlertDTO attendEmergencyAlert(Long id) {
+        EmergencyAlert alert = emergencyAlertRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Alerta de emergência não encontrado: " + id));
+        User staff = validateStaffAccess(alert.getCondominium().getId());
+
+        alert.setStatus("IN_ATTENDANCE");
+        alert.setAttendedBy(staff);
+        alert.setAttendedAt(LocalDateTime.now());
+        return new EmergencyAlertDTO(emergencyAlertRepository.save(alert));
+    }
+
+    @Transactional
+    public EmergencyAlertDTO resolveEmergencyAlert(Long id, Map<String, Object> body) {
+        EmergencyAlert alert = emergencyAlertRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Alerta de emergência não encontrado: " + id));
+        User staff = validateStaffAccess(alert.getCondominium().getId());
+
+        alert.setStatus("RESOLVED");
+        alert.setResolutionNotes(blankToNull(stringVal(body, "resolutionNotes")));
+        alert.setResolvedAt(LocalDateTime.now());
+        return new EmergencyAlertDTO(emergencyAlertRepository.save(alert));
+    }
+
+    // =========================================================================
+    // 16. UTILITY READINGS (Medição Individualizada de Água e Gás)
+    // =========================================================================
+
+    @Transactional(readOnly = true)
+    public List<UtilityReadingDTO> listUtilityReadings(Long condominiumId, Integer year, Integer month, Long unitId) {
+        validateMemberAccess(condominiumId);
+        List<UtilityReading> list;
+        if (unitId != null) {
+            list = utilityReadingRepository.findByUnitIdOrderByYearDescMonthDesc(unitId);
+        } else if (year != null && month != null) {
+            list = utilityReadingRepository.findByCondominiumIdAndYearAndMonthOrderByUnitIdAsc(condominiumId, year, month);
+        } else {
+            list = utilityReadingRepository.findByCondominiumIdOrderByYearDescMonthDesc(condominiumId);
+        }
+        return list.stream().map(UtilityReadingDTO::new).toList();
+    }
+
+    @Transactional
+    public UtilityReadingDTO createUtilityReading(Long condominiumId, Map<String, Object> body) {
+        User staff = validateStaffAccess(condominiumId);
+        Condominium condo = getCondominium(condominiumId);
+
+        Long unitId = numberVal(body.get("unitId"));
+        if (unitId == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unidade é obrigatória.");
+        Unit unit = unitRepository.findById(unitId)
+                .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada: " + unitId));
+
+        int year = intVal(body, "year", LocalDate.now().getYear());
+        int month = intVal(body, "month", LocalDate.now().getMonthValue());
+        String type = defaultIfBlank(stringVal(body, "utilityType"), "WATER").toUpperCase(Locale.ROOT);
+
+        BigDecimal current = toBigDecimal(body.get("currentReading"));
+        BigDecimal previous = toBigDecimal(body.get("previousReading"));
+        if (current == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Leitura atual é obrigatória.");
+        if (previous == null) {
+            int prevMonth = month == 1 ? 12 : month - 1;
+            int prevYear = month == 1 ? year - 1 : year;
+            previous = utilityReadingRepository.findByUnitIdAndYearAndMonthAndUtilityType(unitId, prevYear, prevMonth, type)
+                    .map(UtilityReading::getCurrentReading)
+                    .orElse(BigDecimal.ZERO);
+        }
+
+        BigDecimal consumption = current.subtract(previous);
+        if (consumption.compareTo(BigDecimal.ZERO) < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Leitura atual não pode ser inferior à leitura anterior.");
+        }
+
+        boolean leak = (previous.compareTo(BigDecimal.ZERO) > 0 && consumption.compareTo(new BigDecimal("30.00")) > 0)
+                || (previous.compareTo(BigDecimal.ZERO) > 0 && consumption.compareTo(previous.multiply(new BigDecimal("1.5"))) > 0);
+
+        UtilityReading reading = utilityReadingRepository.findByUnitIdAndYearAndMonthAndUtilityType(unitId, year, month, type)
+                .orElseGet(UtilityReading::new);
+
+        reading.setCondominium(condo);
+        reading.setUnit(unit);
+        reading.setUtilityType(type);
+        reading.setYear(year);
+        reading.setMonth(month);
+        reading.setReadingDate(LocalDate.now());
+        reading.setCurrentReading(current);
+        reading.setPreviousReading(previous);
+        reading.setConsumption(consumption);
+        reading.setLeakSuspicion(leak);
+        reading.setReader(staff);
+        reading.setNotes(blankToNull(stringVal(body, "notes")));
+        reading.setMeterPhotoUrl(blankToNull(stringVal(body, "meterPhotoUrl")));
+        if (reading.getId() == null) reading.setCreatedAt(LocalDateTime.now());
+
+        return new UtilityReadingDTO(utilityReadingRepository.save(reading));
+    }
+
+    // =========================================================================
+    // 17. VISITOR DIGITAL PASS (Convite Digital WhatsApp)
+    // =========================================================================
+
+    @Transactional(readOnly = true)
+    public VisitorDigitalPassDTO getVisitorDigitalPass(Long visitorId) {
+        VisitorAccess v = visitorRepository.findById(visitorId)
+                .orElseThrow(() -> new ResourceNotFoundException("Visitante não encontrado: " + visitorId));
+        validateMemberAccess(v.getCondominium().getId());
+
+        String condoName = v.getCondominium().getName();
+        String unitStr = v.getUnit() != null ? formatUnit(v.getUnit()) : "Portaria Central";
+        String host = formatUser(v.getResident());
+        String code = v.getAccessCode() != null ? v.getAccessCode() : String.valueOf(v.getId());
+
+        String message = String.format(
+                "Olá %s! Você tem um convite de acesso para o condomínio %s (%s), autorizado por %s. Seu código de liberação na portaria é: *%s*. Apresente este código ou documento ao chegar.",
+                v.getVisitorName(), condoName, unitStr, host, code
+        );
+        String whatsappUrl = "https://api.whatsapp.com/send?text=" + java.net.URLEncoder.encode(message, java.nio.charset.StandardCharsets.UTF_8);
+
+        return new VisitorDigitalPassDTO(
+                v.getId(),
+                v.getVisitorName(),
+                unitStr,
+                condoName,
+                code,
+                v.getQrCodePayload(),
+                whatsappUrl,
+                message,
+                v.getValidFrom(),
+                v.getValidUntil()
+        );
+    }
+
+    // =========================================================================
     // HELPERS & DTOs
     // =========================================================================
 
@@ -1852,6 +2229,25 @@ public class CondominiumCommunityService {
                 return Long.parseLong(raw.toString().trim());
             } catch (NumberFormatException ignored) {
             }
+        }
+        return null;
+    }
+
+    private static int intVal(Map<String, Object> body, String key, int def) {
+        if (body == null) return def;
+        Object o = body.get(key);
+        if (o instanceof Number n) return n.intValue();
+        if (o != null) {
+            try { return Integer.parseInt(o.toString().trim()); } catch (Exception ignored) {}
+        }
+        return def;
+    }
+
+    private static BigDecimal toBigDecimal(Object o) {
+        if (o instanceof BigDecimal b) return b;
+        if (o instanceof Number n) return BigDecimal.valueOf(n.doubleValue());
+        if (o != null && !o.toString().isBlank()) {
+            try { return new BigDecimal(o.toString().trim()); } catch (Exception ignored) {}
         }
         return null;
     }
@@ -2376,4 +2772,229 @@ public class CondominiumCommunityService {
             );
         }
     }
+
+    public record RenovationRequestDTO(
+            Long id,
+            Long condominiumId,
+            Long unitId,
+            String unitLabel,
+            Long requesterId,
+            String requesterName,
+            String title,
+            String description,
+            String artRrtNumber,
+            String contractorName,
+            String contractorPhone,
+            LocalDate startDate,
+            LocalDate expectedEndDate,
+            LocalDate actualEndDate,
+            String noiseLevel,
+            String status,
+            String decisionNotes,
+            Long decidedById,
+            String decidedByName,
+            LocalDateTime decidedAt,
+            LocalDateTime createdAt
+    ) {
+        public RenovationRequestDTO(RenovationRequest e) {
+            this(
+                    e.getId(),
+                    e.getCondominium().getId(),
+                    e.getUnit().getId(),
+                    formatUnit(e.getUnit()),
+                    e.getRequester().getId(),
+                    formatUser(e.getRequester()),
+                    e.getTitle(),
+                    e.getDescription(),
+                    e.getArtRrtNumber(),
+                    e.getContractorName(),
+                    e.getContractorPhone(),
+                    e.getStartDate(),
+                    e.getExpectedEndDate(),
+                    e.getActualEndDate(),
+                    e.getNoiseLevel(),
+                    e.getStatus(),
+                    e.getDecisionNotes(),
+                    e.getDecidedBy() != null ? e.getDecidedBy().getId() : null,
+                    e.getDecidedBy() != null ? formatUser(e.getDecidedBy()) : null,
+                    e.getDecidedAt(),
+                    e.getCreatedAt()
+            );
+        }
+    }
+
+    public record ConciergeShiftLogDTO(
+            Long id,
+            Long condominiumId,
+            Long outgoingDoormanId,
+            String outgoingDoormanName,
+            Long incomingDoormanId,
+            String incomingDoormanName,
+            String shiftType,
+            LocalDate shiftDate,
+            String gateStatus,
+            Integer pendingKeysCount,
+            Integer pendingPackagesCount,
+            String occurrencesSummary,
+            String generalNotes,
+            LocalDateTime acknowledgedAt,
+            LocalDateTime createdAt
+    ) {
+        public ConciergeShiftLogDTO(ConciergeShiftLog e) {
+            this(
+                    e.getId(),
+                    e.getCondominium().getId(),
+                    e.getOutgoingDoorman().getId(),
+                    formatUser(e.getOutgoingDoorman()),
+                    e.getIncomingDoorman() != null ? e.getIncomingDoorman().getId() : null,
+                    e.getIncomingDoorman() != null ? formatUser(e.getIncomingDoorman()) : null,
+                    e.getShiftType(),
+                    e.getShiftDate(),
+                    e.getGateStatus(),
+                    e.getPendingKeysCount(),
+                    e.getPendingPackagesCount(),
+                    e.getOccurrencesSummary(),
+                    e.getGeneralNotes(),
+                    e.getAcknowledgedAt(),
+                    e.getCreatedAt()
+            );
+        }
+    }
+
+    public record KeyRegistryEntryDTO(
+            Long id,
+            Long condominiumId,
+            String keyCode,
+            String description,
+            String keyCategory,
+            String currentStatus,
+            String borrowerName,
+            String borrowerDocument,
+            String borrowerPhone,
+            Long unitId,
+            String unitLabel,
+            LocalDateTime borrowedAt,
+            LocalDateTime expectedReturnAt,
+            LocalDateTime returnedAt,
+            String checkedOutByName,
+            String checkedInByName,
+            String notes,
+            LocalDateTime createdAt
+    ) {
+        public KeyRegistryEntryDTO(KeyRegistryEntry e) {
+            this(
+                    e.getId(),
+                    e.getCondominium().getId(),
+                    e.getKeyCode(),
+                    e.getDescription(),
+                    e.getKeyCategory(),
+                    e.getCurrentStatus(),
+                    e.getBorrowerName(),
+                    e.getBorrowerDocument(),
+                    e.getBorrowerPhone(),
+                    e.getUnit() != null ? e.getUnit().getId() : null,
+                    e.getUnit() != null ? formatUnit(e.getUnit()) : null,
+                    e.getBorrowedAt(),
+                    e.getExpectedReturnAt(),
+                    e.getReturnedAt(),
+                    e.getCheckedOutBy() != null ? formatUser(e.getCheckedOutBy()) : null,
+                    e.getCheckedInBy() != null ? formatUser(e.getCheckedInBy()) : null,
+                    e.getNotes(),
+                    e.getCreatedAt()
+            );
+        }
+    }
+
+    public record EmergencyAlertDTO(
+            Long id,
+            Long condominiumId,
+            Long unitId,
+            String unitLabel,
+            Long residentId,
+            String residentName,
+            String emergencyType,
+            String details,
+            String contactPhone,
+            String status,
+            Long attendedById,
+            String attendedByName,
+            String resolutionNotes,
+            LocalDateTime attendedAt,
+            LocalDateTime resolvedAt,
+            LocalDateTime createdAt
+    ) {
+        public EmergencyAlertDTO(EmergencyAlert e) {
+            this(
+                    e.getId(),
+                    e.getCondominium().getId(),
+                    e.getUnit() != null ? e.getUnit().getId() : null,
+                    e.getUnit() != null ? formatUnit(e.getUnit()) : null,
+                    e.getResident().getId(),
+                    formatUser(e.getResident()),
+                    e.getEmergencyType(),
+                    e.getDetails(),
+                    e.getContactPhone(),
+                    e.getStatus(),
+                    e.getAttendedBy() != null ? e.getAttendedBy().getId() : null,
+                    e.getAttendedBy() != null ? formatUser(e.getAttendedBy()) : null,
+                    e.getResolutionNotes(),
+                    e.getAttendedAt(),
+                    e.getResolvedAt(),
+                    e.getCreatedAt()
+            );
+        }
+    }
+
+    public record UtilityReadingDTO(
+            Long id,
+            Long condominiumId,
+            Long unitId,
+            String unitLabel,
+            String utilityType,
+            Integer year,
+            Integer month,
+            LocalDate readingDate,
+            BigDecimal currentReading,
+            BigDecimal previousReading,
+            BigDecimal consumption,
+            Boolean leakSuspicion,
+            String meterPhotoUrl,
+            String readerName,
+            String notes,
+            LocalDateTime createdAt
+    ) {
+        public UtilityReadingDTO(UtilityReading e) {
+            this(
+                    e.getId(),
+                    e.getCondominium().getId(),
+                    e.getUnit().getId(),
+                    formatUnit(e.getUnit()),
+                    e.getUtilityType(),
+                    e.getYear(),
+                    e.getMonth(),
+                    e.getReadingDate(),
+                    e.getCurrentReading(),
+                    e.getPreviousReading(),
+                    e.getConsumption(),
+                    e.getLeakSuspicion(),
+                    e.getMeterPhotoUrl(),
+                    e.getReader() != null ? formatUser(e.getReader()) : null,
+                    e.getNotes(),
+                    e.getCreatedAt()
+            );
+        }
+    }
+
+    public record VisitorDigitalPassDTO(
+            Long visitorId,
+            String visitorName,
+            String unitLabel,
+            String condominiumName,
+            String accessCode,
+            String qrCodePayload,
+            String whatsappShareUrl,
+            String whatsappMessageText,
+            LocalDateTime validFrom,
+            LocalDateTime validUntil
+    ) {}
 }

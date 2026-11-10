@@ -7,11 +7,16 @@ import com.cefet_rj.projeto_final.condominiums.security.CondominiumAccessService
 import com.cefet_rj.projeto_final.maintenance.dtos.MaintenanceOrderDTO;
 import com.cefet_rj.projeto_final.maintenance.dtos.MaintenanceOrderDTO.CreateMaintenanceOrderDTO;
 import com.cefet_rj.projeto_final.maintenance.dtos.MaintenanceOrderDTO.UpdateStatusDTO;
+import com.cefet_rj.projeto_final.maintenance.entities.MaintenanceChecklist;
+import com.cefet_rj.projeto_final.maintenance.entities.MaintenanceChecklistItem;
 import com.cefet_rj.projeto_final.maintenance.entities.MaintenanceEquipment;
 import com.cefet_rj.projeto_final.maintenance.entities.MaintenanceOrder;
+import com.cefet_rj.projeto_final.maintenance.entities.ServiceContract;
 import com.cefet_rj.projeto_final.maintenance.entities.Supplier;
+import com.cefet_rj.projeto_final.maintenance.repositories.MaintenanceChecklistRepository;
 import com.cefet_rj.projeto_final.maintenance.repositories.MaintenanceEquipmentRepository;
 import com.cefet_rj.projeto_final.maintenance.repositories.MaintenanceOrderRepository;
+import com.cefet_rj.projeto_final.maintenance.repositories.ServiceContractRepository;
 import com.cefet_rj.projeto_final.maintenance.repositories.SupplierRepository;
 import com.cefet_rj.projeto_final.realtime.dtos.RealtimeEventDTO;
 import com.cefet_rj.projeto_final.realtime.services.RealtimeEmitterService;
@@ -28,6 +33,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -39,6 +45,8 @@ public class MaintenanceService {
     private final MaintenanceOrderRepository maintenanceRepository;
     private final MaintenanceEquipmentRepository equipmentRepository;
     private final SupplierRepository supplierRepository;
+    private final MaintenanceChecklistRepository checklistRepository;
+    private final ServiceContractRepository contractRepository;
     private final CondominiumRepository condominiumRepository;
     private final AuthenticatedUserService authenticatedUserService;
     private final CondominiumAccessService condominiumAccessService;
@@ -586,6 +594,239 @@ public class MaintenanceService {
                     s.getActive(),
                     s.getCreatedAt(),
                     history
+            );
+        }
+    }
+
+    // =========================================================================
+    // INSPEÇÃO PREDIAL PERIÓDICA / CHECKLISTS DE MANUTENÇÃO PREVENTIVA
+    // =========================================================================
+
+    @Transactional(readOnly = true)
+    public List<MaintenanceChecklistDTO> listChecklists(Long condominiumId) {
+        condominiumAccessService.validateStaffAccess(condominiumId);
+        return checklistRepository.findByCondominiumIdOrderByCreatedAtDesc(condominiumId)
+                .stream().map(MaintenanceChecklistDTO::new).toList();
+    }
+
+    @Transactional
+    public MaintenanceChecklistDTO createChecklist(Long condominiumId, Map<String, Object> body) {
+        User staff = authenticatedUserService.getAuthenticatedUser();
+        condominiumAccessService.validateStaffAccess(condominiumId);
+        Condominium condo = condominiumRepository.findById(condominiumId)
+                .orElseThrow(() -> new ResourceNotFoundException("Condomínio não encontrado: " + condominiumId));
+
+        String title = body.get("title") != null ? body.get("title").toString().trim() : "Inspeção Preventiva";
+        String freq = body.get("frequency") != null ? body.get("frequency").toString().trim().toUpperCase(Locale.ROOT) : "MONTHLY";
+
+        MaintenanceChecklist cl = new MaintenanceChecklist();
+        cl.setCondominium(condo);
+        cl.setTitle(title);
+        cl.setFrequency(freq);
+        cl.setStatus("DRAFT");
+        cl.setInspector(staff);
+        cl.setGeneralNotes(body.get("generalNotes") != null ? body.get("generalNotes").toString().trim() : null);
+        cl.setCreatedAt(LocalDateTime.now());
+
+        if (body.get("items") instanceof List<?> rawList) {
+            for (Object o : rawList) {
+                if (o instanceof Map<?, ?> itemMap) {
+                    MaintenanceChecklistItem item = new MaintenanceChecklistItem();
+                    item.setChecklist(cl);
+                    item.setItemDescription(itemMap.get("itemDescription") != null ? itemMap.get("itemDescription").toString().trim() : "Item de verificação");
+                    item.setAreaOrLocation(itemMap.get("areaOrLocation") != null ? itemMap.get("areaOrLocation").toString().trim() : null);
+                    item.setStatus(itemMap.get("status") != null ? itemMap.get("status").toString().trim().toUpperCase(Locale.ROOT) : "CONFORMING");
+                    item.setObservation(itemMap.get("observation") != null ? itemMap.get("observation").toString().trim() : null);
+                    if (itemMap.get("equipmentId") instanceof Number eqId) {
+                        equipmentRepository.findById(eqId.longValue()).ifPresent(item::setEquipment);
+                    }
+                    cl.getItems().add(item);
+                }
+            }
+        }
+
+        return new MaintenanceChecklistDTO(checklistRepository.save(cl));
+    }
+
+    @Transactional
+    public MaintenanceChecklistDTO completeChecklist(Long id, Map<String, Object> body) {
+        MaintenanceChecklist cl = checklistRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Checklist não encontrado: " + id));
+        condominiumAccessService.validateStaffAccess(cl.getCondominium().getId());
+
+        cl.setStatus("COMPLETED");
+        cl.setInspectedAt(LocalDateTime.now());
+        if (body != null && body.containsKey("generalNotes")) {
+            cl.setGeneralNotes(body.get("generalNotes") != null ? body.get("generalNotes").toString().trim() : null);
+        }
+
+        // Se houver algum item não conforme, marca como REQUIRES_ACTION
+        boolean hasIrregular = cl.getItems().stream().anyMatch(i -> "NON_CONFORMING".equalsIgnoreCase(i.getStatus()));
+        if (hasIrregular) {
+            cl.setStatus("REQUIRES_ACTION");
+        }
+
+        return new MaintenanceChecklistDTO(checklistRepository.save(cl));
+    }
+
+    // =========================================================================
+    // GESTÃO DE CONTRATOS RECORRENTES E GARANTIAS
+    // =========================================================================
+
+    @Transactional(readOnly = true)
+    public List<ServiceContractDTO> listContracts(Long condominiumId, String status) {
+        condominiumAccessService.validateStaffAccess(condominiumId);
+        List<ServiceContract> list = (status != null && !status.isBlank())
+                ? contractRepository.findByCondominiumIdAndStatusOrderByEndDateAsc(condominiumId, status.trim().toUpperCase(Locale.ROOT))
+                : contractRepository.findByCondominiumIdOrderByEndDateAsc(condominiumId);
+        return list.stream().map(ServiceContractDTO::new).toList();
+    }
+
+    @Transactional
+    public ServiceContractDTO createContract(Long condominiumId, Map<String, Object> body) {
+        condominiumAccessService.validateManagerAccess(condominiumId);
+        Condominium condo = condominiumRepository.findById(condominiumId)
+                .orElseThrow(() -> new ResourceNotFoundException("Condomínio não encontrado: " + condominiumId));
+
+        String title = body.get("title") != null ? body.get("title").toString().trim() : "";
+        if (title.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Título do contrato é obrigatório.");
+        }
+
+        Supplier supplier = null;
+        if (body.get("supplierId") instanceof Number sid) {
+            supplier = supplierRepository.findById(sid.longValue()).orElse(null);
+        }
+
+        BigDecimal val = BigDecimal.ZERO;
+        if (body.get("monthlyValue") instanceof Number n) val = BigDecimal.valueOf(n.doubleValue());
+        else if (body.get("monthlyValue") != null) {
+            try { val = new BigDecimal(body.get("monthlyValue").toString().trim()); } catch (Exception ignored) {}
+        }
+
+        LocalDate start = LocalDate.now();
+        if (body.get("startDate") != null) {
+            try { start = LocalDate.parse(body.get("startDate").toString().trim().substring(0, 10)); } catch (Exception ignored) {}
+        }
+        LocalDate end = start.plusYears(1);
+        if (body.get("endDate") != null) {
+            try { end = LocalDate.parse(body.get("endDate").toString().trim().substring(0, 10)); } catch (Exception ignored) {}
+        }
+
+        ServiceContract sc = new ServiceContract();
+        sc.setCondominium(condo);
+        sc.setSupplier(supplier);
+        sc.setTitle(title);
+        sc.setContractNumber(body.get("contractNumber") != null ? body.get("contractNumber").toString().trim() : null);
+        sc.setCategory(body.get("category") != null ? body.get("category").toString().trim().toUpperCase(Locale.ROOT) : "MANUTENCAO");
+        sc.setMonthlyValue(val);
+        sc.setStartDate(start);
+        sc.setEndDate(end);
+        sc.setAutoRenew(Boolean.TRUE.equals(body.get("autoRenew")));
+        sc.setRenewalNoticeDays(body.get("renewalNoticeDays") instanceof Number n ? n.intValue() : 30);
+        sc.setStatus("ACTIVE");
+        sc.setCoverageDescription(body.get("coverageDescription") != null ? body.get("coverageDescription").toString().trim() : null);
+        sc.setDocumentUrl(body.get("documentUrl") != null ? body.get("documentUrl").toString().trim() : null);
+        sc.setCreatedAt(LocalDateTime.now());
+
+        return new ServiceContractDTO(contractRepository.save(sc));
+    }
+
+    @Transactional
+    public ServiceContractDTO terminateContract(Long id) {
+        ServiceContract sc = contractRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Contrato não encontrado: " + id));
+        condominiumAccessService.validateManagerAccess(sc.getCondominium().getId());
+        sc.setStatus("TERMINATED");
+        return new ServiceContractDTO(contractRepository.save(sc));
+    }
+
+    public record MaintenanceChecklistItemDTO(
+            Long id,
+            String itemDescription,
+            String areaOrLocation,
+            String status,
+            String observation,
+            Long equipmentId,
+            String equipmentName
+    ) {
+        public MaintenanceChecklistItemDTO(MaintenanceChecklistItem i) {
+            this(
+                    i.getId(),
+                    i.getItemDescription(),
+                    i.getAreaOrLocation(),
+                    i.getStatus(),
+                    i.getObservation(),
+                    i.getEquipment() != null ? i.getEquipment().getId() : null,
+                    i.getEquipment() != null ? i.getEquipment().getName() : null
+            );
+        }
+    }
+
+    public record MaintenanceChecklistDTO(
+            Long id,
+            Long condominiumId,
+            String title,
+            String frequency,
+            String status,
+            LocalDateTime inspectedAt,
+            String inspectorName,
+            String generalNotes,
+            LocalDateTime createdAt,
+            List<MaintenanceChecklistItemDTO> items
+    ) {
+        public MaintenanceChecklistDTO(MaintenanceChecklist c) {
+            this(
+                    c.getId(),
+                    c.getCondominium().getId(),
+                    c.getTitle(),
+                    c.getFrequency(),
+                    c.getStatus(),
+                    c.getInspectedAt(),
+                    c.getInspector() != null ? (c.getInspector().getFirstName() + " " + c.getInspector().getLastName()).trim() : null,
+                    c.getGeneralNotes(),
+                    c.getCreatedAt(),
+                    c.getItems() != null ? c.getItems().stream().map(MaintenanceChecklistItemDTO::new).toList() : List.of()
+            );
+        }
+    }
+
+    public record ServiceContractDTO(
+            Long id,
+            Long condominiumId,
+            Long supplierId,
+            String supplierName,
+            String title,
+            String contractNumber,
+            String category,
+            BigDecimal monthlyValue,
+            LocalDate startDate,
+            LocalDate endDate,
+            Boolean autoRenew,
+            Integer renewalNoticeDays,
+            String status,
+            String coverageDescription,
+            String documentUrl,
+            LocalDateTime createdAt
+    ) {
+        public ServiceContractDTO(ServiceContract c) {
+            this(
+                    c.getId(),
+                    c.getCondominium().getId(),
+                    c.getSupplier() != null ? c.getSupplier().getId() : null,
+                    c.getSupplier() != null ? c.getSupplier().getCompanyName() : null,
+                    c.getTitle(),
+                    c.getContractNumber(),
+                    c.getCategory(),
+                    c.getMonthlyValue(),
+                    c.getStartDate(),
+                    c.getEndDate(),
+                    c.getAutoRenew(),
+                    c.getRenewalNoticeDays(),
+                    c.getStatus(),
+                    c.getCoverageDescription(),
+                    c.getDocumentUrl(),
+                    c.getCreatedAt()
             );
         }
     }
