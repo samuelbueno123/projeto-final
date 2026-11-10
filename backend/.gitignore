@@ -34,3 +34,14 @@ build/
 
 # Local JWT signing keys
 .secrets/
+
+# Environment files and credentials
+.env
+.env.*
+!.env.example
+
+# Logs and runtime dumps
+*.log
+logs/
+hs_err_pid*
+

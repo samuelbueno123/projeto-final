@@ -1,0 +1,14 @@
+.git
+.gitignore
+.idea
+target/
+backend/target/
+.secrets/
+backend/.secrets/
+backend/media/
+backend/logs/
+docs/
+*.md
+.env
+.env.*
+projeto-front/

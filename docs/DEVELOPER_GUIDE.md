@@ -81,25 +81,35 @@ As configurações do sistema são injetadas via variáveis de ambiente, com val
 
 ## 4. Configuração e Execução do Ambiente Local
 
-### 4.1. Inicialização do Banco de Dados via Docker Compose
-Na pasta `samuelbueno123/projeto-final/backend`:
+### 4.1. Inicialização com Comando Único (Recomendado)
+Para provisionar todo o ambiente local (chaves RSA, variáveis `.env`, diretórios e dependências) com um único script:
 ```bash
-docker compose up -d postgres
-```
-Isso iniciará o PostgreSQL 16 na porta `5433` com volume persistente `postgres_data`. O pgAdmin opcional estará disponível na porta `5050`.
+# Na raiz de samuelbueno123/projeto-final:
+./scripts/setup-dev.sh
 
-### 4.2. Execução da API Backend
+# Para subir todo o ecossistema (PostgreSQL, Backend API e Frontend Web):
+docker compose up --build -d
+```
+O comando iniciará:
+- **PostgreSQL 16:** `localhost:5433` (com health check integrado)
+- **Backend API (Spring Boot):** `http://localhost:8080` (health check em `/actuator/health`)
+- **Frontend Web (Flutter / Nginx):** `http://localhost:5500`
+- **Swagger UI:** `http://localhost:8080/swagger-ui.html`
+- **pgAdmin (Opcional):** `http://localhost:5050`
+
+### 4.2. Execução Individual dos Serviços (Sem Docker)
+
+#### Backend API (Spring Boot)
 Na pasta `samuelbueno123/projeto-final/backend`:
 ```bash
 ./mvnw spring-boot:run
 ```
-O Spring Boot iniciará na porta `8080`.
 - As migrations do Flyway (V1 a V18) serão executadas automaticamente.
 - A conta de administrador de desenvolvimento será provisionada (`admin@ancora.com` / `ancoraAdmin`).
-- O Swagger UI estará acessível em: `http://localhost:8080/swagger-ui.html`.
-- O health check da API pode ser verificado em: `http://localhost:8080/actuator/health`.
+- Swagger UI: `http://localhost:8080/swagger-ui.html`.
+- Actuator Health: `http://localhost:8080/actuator/health`.
 
-### 4.3. Execução do Frontend Flutter
+#### Frontend (Flutter)
 Na pasta `samuelbueno123/projeto-front`:
 ```bash
 flutter pub get

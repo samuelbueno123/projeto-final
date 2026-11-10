@@ -1,0 +1,29 @@
+# Root .gitignore for projeto-final
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.DS_Store
+
+# Environments and Secrets
+.env
+.env.*
+!.env.example
+.secrets/
+backend/.secrets/
+
+# Maven targets
+target/
+backend/target/
+
+# Logs and runtime files
+*.log
+logs/
+backend/logs/
+backend/media/pictures/*
+!backend/media/pictures/.gitkeep
+backups/
+
+# Flutter subfolder (tracked in separate repository)
+projeto-front/

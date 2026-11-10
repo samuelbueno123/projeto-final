@@ -150,50 +150,52 @@ server {
 
 ---
 
-## 4. Estratégia de Backup e Restauração do Banco de Dados
+## 4. Estratégia de Backup, Restauração e Scripts Operacionais
 
-### 4.1. Rotina Diária de Backup Automatizado (Script Bash)
-Crie o script `/usr/local/bin/backup-ancora.sh` executado via cron diariamente às 02:00:
+O repositório inclui utilitários de linha de comando no diretório `scripts/` prontos para automação em produção:
 
+### 4.1. Backup Automatizado (`scripts/backup-db.sh`)
+Executa dump comprimido com carimbo de data/hora, gera checksum SHA256 e descarta backups com mais de 14 dias:
 ```bash
-#!/bin/bash
-set -euo pipefail
-
-BACKUP_DIR="/var/backups/postgres"
-TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-FILENAME="$BACKUP_DIR/ancora_backup_$TIMESTAMP.sql.gz"
-DB_NAME="ancora_prod"
-DB_USER="postgres"
-
-mkdir -p "$BACKUP_DIR"
-
-echo "Iniciando backup em: $(date)"
-pg_dump -U "$DB_USER" -d "$DB_NAME" --no-owner --no-acl --clean --if-exists | gzip > "$FILENAME"
-
-# Envia para armazenamento externo (ex.: S3 / GCS)
-aws s3 cp "$FILENAME" "s3://ancora-backups-bucket/db/$FILENAME"
-
-# Mantém apenas os últimos 30 dias localmente
-find "$BACKUP_DIR" -name "*.sql.gz" -mtime +30 -delete
-
-echo "Backup concluído com sucesso: $FILENAME"
+./scripts/backup-db.sh
+```
+Pode ser agendado via cron (ex: diariamente às 02:00):
+```cron
+0 2 * * * cd /opt/projeto-final && ./scripts/backup-db.sh >> /var/log/backup-ancora.log 2>&1
 ```
 
-### 4.2. Procedimento de Restauração (Disaster Recovery)
-Para restaurar a base em um novo servidor ou após incidente:
+### 4.2. Restauração Validada (`scripts/restore-db.sh`)
+Verifica a integridade criptográfica SHA256 antes de restaurar o banco de dados:
 ```bash
-# 1. Pare a aplicação para evitar escritas concorrentes
-docker compose stop backend
-
-# 2. Descompacte e restaure o dump SQL
-gunzip -c /var/backups/postgres/ancora_backup_YYYYMMDD_HHMMSS.sql.gz | psql -U postgres -d ancora_prod
-
-# 3. Inicie o backend para validação das migrations Flyway
-docker compose start backend
-
-# 4. Verifique a saúde do serviço
-curl -i http://localhost:8080/actuator/health
+./scripts/restore-db.sh backups/db_backup_20261110_060700.sql.gz
 ```
+
+### 4.3. Pipeline de Implantação e Rollback
+- **Deploy com Zero Downtime (`scripts/deploy.sh`):**
+  ```bash
+  # Validação pré-voo em modo dry-run
+  ./scripts/deploy.sh --dry-run
+
+  # Deploy em produção com monitoramento do Actuator Healthcheck
+  ./scripts/deploy.sh --env=prod --timeout=60
+  ```
+- **Rollback Imediato (`scripts/rollback.sh`):**
+  ```bash
+  ./scripts/rollback.sh
+  ```
+
+### 4.4. Pipelines de Integração e Entrega Contínua (CI/CD)
+Os dois repositórios possuem automação configurada no GitHub Actions:
+- **Backend CI (`.github/workflows/backend-ci.yml`):**
+  1. *Hygiene & Script Lint:* Validação de scripts shell (`bash -n`) e ausência de segredos commitados.
+  2. *Build & Test:* Execução de todos os 122 testes automatizados em JDK 17 Temurin com cache Maven.
+  3. *Security Audit:* Análise de árvore de dependências e vulnerabilidades.
+  4. *Docker Build:* Compilação de container não-root e validação de inicialização.
+- **Backend Release (`.github/workflows/deploy-production.yml`):**
+  Gera imagem Docker com tags semânticas e publica no GitHub Container Registry (ghcr.io).
+- **Frontend CI (`.github/workflows/frontend-ci.yml`):**
+  Análise estática Dart/Flutter, 38 testes de widgets e serviços, compilação Web release e imagem Nginx unprivileged.
+
 
 ---
 
