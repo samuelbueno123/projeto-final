@@ -19,10 +19,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -64,8 +66,14 @@ public class UnitService {
 
     @Transactional
     public UnitDTO insert(UnitInsertDTO dto) {
+        if (dto.identifier() == null || dto.identifier().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "O identificador da unidade é obrigatório.");
+        }
+        if (unitRepository.existsBySectorIdAndIdentifierIgnoreCase(dto.sectorId(), dto.identifier().trim())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe uma unidade com este identificador neste setor.");
+        }
         Unit entity = new Unit();
-        linkAssociations(dto.identifier(), dto.sectorId(), entity);
+        linkAssociations(dto.identifier().trim(), dto.sectorId(), entity);
         condominiumAccessService.validateManagerAccess(entity.getSector().getCondominium().getId());
         entity = unitRepository.save(entity);
         return new UnitDTO(entity);
@@ -77,6 +85,15 @@ public class UnitService {
             Unit entity = unitRepository.findById(id)
                     .orElseThrow(() -> new ResourceNotFoundException("Id " + id + " not found"));
             condominiumAccessService.validateManagerAccess(entity.getSector().getCondominium().getId());
+            if (dto.identifier() != null && !dto.identifier().isBlank()) {
+                String newIdentifier = dto.identifier().trim();
+                Long targetSectorId = dto.sectorId() != null ? dto.sectorId() : entity.getSector().getId();
+                if (!newIdentifier.equalsIgnoreCase(entity.getIdentifier()) || !targetSectorId.equals(entity.getSector().getId())) {
+                    if (unitRepository.existsBySectorIdAndIdentifierIgnoreCase(targetSectorId, newIdentifier)) {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe uma unidade com este identificador no setor de destino.");
+                    }
+                }
+            }
             linkAssociations(dto.identifier(), dto.sectorId(), entity);
             condominiumAccessService.validateManagerAccess(entity.getSector().getCondominium().getId());
             entity = unitRepository.save(entity);

@@ -189,6 +189,9 @@ public class ManagerDashboardController {
         BigDecimal amount = body != null && body.get("amount") != null
                 ? new BigDecimal(body.get("amount").toString())
                 : new BigDecimal("450.00");
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "O valor do boleto deve ser maior que zero.");
+        }
         LocalDate dueDate = body != null && body.get("dueDate") != null
                 ? LocalDate.parse(body.get("dueDate").toString())
                 : LocalDate.now().plusDays(10);
@@ -242,6 +245,10 @@ public class ManagerDashboardController {
         ensureUnitOrManagerAccess(user, condominiumId, unitId);
         UnitPayment payment = paymentRepository.findByUnitId(unitId)
                 .orElseThrow(() -> new ResourceNotFoundException("Cobrança não encontrada para esta unidade"));
+
+        if (payment.getStatus() == UnitPaymentStatus.PAID) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Esta cobrança já foi liquidada anteriormente.");
+        }
 
         payment.setStatus(UnitPaymentStatus.PAID);
         payment.setPaidAt(LocalDateTime.now());

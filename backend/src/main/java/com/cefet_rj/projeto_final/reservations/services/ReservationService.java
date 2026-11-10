@@ -79,6 +79,16 @@ public class ReservationService {
                     .orElseThrow(() -> new ResourceNotFoundException("User not found: " + dto.reservedById()));
         }
 
+        if (dto.startAt() == null || dto.endAt() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Data e horário de início e término são obrigatórios.");
+        }
+        if (!dto.endAt().isAfter(dto.startAt())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "O horário de término deve ser posterior ao horário de início.");
+        }
+        if (dto.startAt().isBefore(LocalDateTime.now().minusMinutes(5))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Não é possível criar reservas no passado.");
+        }
+
         boolean isManagerOrAdmin = condominiumAccessService.isManagerOrAdmin(authenticatedUser, condominiumId);
 
         if (!isManagerOrAdmin) {
@@ -252,6 +262,28 @@ public class ReservationService {
         condominiumAccessService.validateStaffAccess(condominiumId);
 
         User reviewer = authenticatedUserService.getAuthenticatedUser();
+
+        if (reservation.getStatus() == ReservationStatus.CONFIRMED) {
+            return new ReservationDTO(reservation);
+        }
+        if (reservation.getStatus() == ReservationStatus.CANCELLED || reservation.getStatus() == ReservationStatus.REJECTED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Não é possível aprovar uma reserva que foi cancelada ou recusada.");
+        }
+        if (reservation.getEndAt().isBefore(LocalDateTime.now())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Não é possível aprovar uma reserva cujo horário já expirou.");
+        }
+
+        List<Reservation> activeOverlapping = reservationRepository.findActiveOverlapping(
+                reservation.getCommonArea().getId(),
+                reservation.getStartAt(),
+                reservation.getEndAt()
+        );
+        boolean hasConfirmedConflict = activeOverlapping.stream()
+                .anyMatch(r -> !r.getId().equals(id) && r.getStatus() == ReservationStatus.CONFIRMED);
+        if (hasConfirmedConflict) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe uma reserva confirmada para este mesmo período.");
+        }
+
         reservation.setStatus(ReservationStatus.CONFIRMED);
         reservation.setWaitlistPosition(null);
         reservation.setRejectionReason(null);
@@ -484,6 +516,12 @@ public class ReservationService {
         ReservationStatus previousStatus = reservation.getStatus();
         if (previousStatus == ReservationStatus.CANCELLED) {
             return;
+        }
+        if (previousStatus == ReservationStatus.REJECTED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Esta reserva já foi recusada pela administração.");
+        }
+        if (reservation.getEndAt().isBefore(LocalDateTime.now())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Não é possível cancelar uma reserva cujo período já foi concluído.");
         }
 
         reservation.setStatus(

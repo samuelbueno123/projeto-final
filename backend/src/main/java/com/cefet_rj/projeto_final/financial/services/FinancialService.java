@@ -19,8 +19,10 @@ import com.cefet_rj.projeto_final.realtime.services.RealtimeEmitterService;
 import com.cefet_rj.projeto_final.shared.exceptions.ResourceNotFoundException;
 import com.cefet_rj.projeto_final.users.entities.User;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -50,6 +52,10 @@ public class FinancialService {
     public ExpenseDTO createExpense(Long condominiumId, CreateExpenseDTO dto) {
         condominiumAccessService.validateManagerAccess(condominiumId);
         User caller = authenticatedUserService.getAuthenticatedUser();
+
+        if (dto.amount() == null || dto.amount().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "O valor da despesa deve ser positivo.");
+        }
 
         Condominium condo = condominiumRepository.findById(condominiumId)
                 .orElseThrow(() -> new ResourceNotFoundException("Condomínio não encontrado: " + condominiumId));
@@ -83,6 +89,14 @@ public class FinancialService {
 
         condominiumAccessService.validateManagerAccess(expense.getCondominium().getId());
 
+        String currentStatus = expense.getStatus() != null ? expense.getStatus().toUpperCase() : "PENDING";
+        if ("PAID".equals(currentStatus)) {
+            return new ExpenseDTO(expense);
+        }
+        if ("CANCELLED".equals(currentStatus)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Não é possível liquidar uma despesa que foi cancelada.");
+        }
+
         expense.setStatus("PAID");
         expense.setPaidAt(LocalDateTime.now());
         expense = expenseRepository.save(expense);
@@ -100,6 +114,14 @@ public class FinancialService {
                 .orElseThrow(() -> new ResourceNotFoundException("Despesa não encontrada: " + expenseId));
 
         condominiumAccessService.validateManagerAccess(expense.getCondominium().getId());
+
+        String currentStatus = expense.getStatus() != null ? expense.getStatus().toUpperCase() : "PENDING";
+        if ("PAID".equals(currentStatus)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Não é possível cancelar uma despesa que já foi paga.");
+        }
+        if ("CANCELLED".equals(currentStatus)) {
+            return new ExpenseDTO(expense);
+        }
 
         expense.setStatus("CANCELLED");
         expense = expenseRepository.save(expense);

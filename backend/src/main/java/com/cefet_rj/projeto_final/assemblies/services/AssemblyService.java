@@ -31,8 +31,10 @@ import com.cefet_rj.projeto_final.shared.exceptions.ForbiddenException;
 import com.cefet_rj.projeto_final.shared.exceptions.ResourceNotFoundException;
 import com.cefet_rj.projeto_final.users.entities.User;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -94,6 +96,16 @@ public class AssemblyService {
         condominiumAccessService.validateManagerAccess(condominiumId);
         User caller = authenticatedUserService.getAuthenticatedUser();
 
+        if (dto.meetingDate() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Data e horário da assembleia são obrigatórios.");
+        }
+        if (dto.meetingDate().isBefore(LocalDateTime.now().minusMinutes(5))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Não é possível agendar uma assembleia em data passada.");
+        }
+        if (dto.secondCallDate() != null && dto.secondCallDate().isBefore(dto.meetingDate())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A data da segunda chamada não pode ser anterior à primeira chamada.");
+        }
+
         Condominium condo = condominiumRepository.findById(condominiumId)
                 .orElseThrow(() -> new ResourceNotFoundException("Condomínio não encontrado: " + condominiumId));
 
@@ -128,6 +140,10 @@ public class AssemblyService {
                 .orElseThrow(() -> new ResourceNotFoundException("Assembleia não encontrada: " + assemblyId));
         condominiumAccessService.validateManagerAccess(assembly.getCondominium().getId());
 
+        if ("CONCLUDED".equalsIgnoreCase(assembly.getStatus()) || "CANCELLED".equalsIgnoreCase(assembly.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Não é possível adicionar pautas a uma assembleia encerrada ou cancelada.");
+        }
+
         AssemblyTopic topic = new AssemblyTopic();
         topic.setAssembly(assembly);
         topic.setTitle(dto.title().trim());
@@ -152,6 +168,10 @@ public class AssemblyService {
         Long condoId = topic.getAssembly().getCondominium().getId();
         condominiumAccessService.validateManagerAccess(condoId);
 
+        if ("CONCLUDED".equalsIgnoreCase(topic.getAssembly().getStatus()) || "CANCELLED".equalsIgnoreCase(topic.getAssembly().getStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Não é possível alterar a votação de uma assembleia encerrada ou cancelada.");
+        }
+
         topic.setVotingOpen(open);
         if (!open) {
             topic.setResultStatus(computeTopicResult(topic));
@@ -173,6 +193,10 @@ public class AssemblyService {
                 .orElseThrow(() -> new ResourceNotFoundException("Assembleia não encontrada: " + assemblyId));
         Long condoId = assembly.getCondominium().getId();
         condominiumAccessService.validateAccess(condoId);
+
+        if ("CONCLUDED".equalsIgnoreCase(assembly.getStatus()) || "CANCELLED".equalsIgnoreCase(assembly.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Não é possível registrar presença em uma assembleia encerrada ou cancelada.");
+        }
 
         User caller = authenticatedUserService.getAuthenticatedUser();
         Optional<Resident> residentOpt = residentRepository.findFirstByUserIdAndUnitSectorCondominiumId(caller.getId(), condoId);
@@ -290,7 +314,19 @@ public class AssemblyService {
         Long condoId = assembly.getCondominium().getId();
         condominiumAccessService.validateManagerAccess(condoId);
 
+        String currentStatus = assembly.getStatus() != null ? assembly.getStatus().toUpperCase() : "SCHEDULED";
         String newStatus = dto.status().trim().toUpperCase();
+
+        if (!List.of("SCHEDULED", "IN_PROGRESS", "CONCLUDED", "CANCELLED").contains(newStatus)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Status de assembleia inválido: " + newStatus);
+        }
+
+        if ("CONCLUDED".equals(currentStatus) || "CANCELLED".equals(currentStatus)) {
+            if (!currentStatus.equals(newStatus)) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Uma assembleia já concluída ou cancelada não pode ser reaberta.");
+            }
+        }
+
         assembly.setStatus(newStatus);
         if (dto.minutesUrl() != null && !dto.minutesUrl().isBlank()) {
             assembly.setMinutesUrl(dto.minutesUrl().trim());

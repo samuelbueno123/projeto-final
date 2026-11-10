@@ -12,6 +12,10 @@ public interface ResidentRepository extends JpaRepository<Resident, Long> {
 
     Optional<Resident> findFirstByUnitId(Long unitId);
 
+    Optional<Resident> findByUserIdAndUnitId(Long userId, Long unitId);
+
+    boolean existsByUserIdAndUnitId(Long userId, Long unitId);
+
     Optional<Resident> findFirstByUserIdAndUnitSectorCondominiumId(Long userId, Long condominiumId);
 
     @Query("""

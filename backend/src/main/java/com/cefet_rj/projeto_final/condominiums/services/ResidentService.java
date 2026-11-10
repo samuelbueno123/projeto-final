@@ -18,9 +18,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Optional;
 
@@ -49,6 +51,9 @@ public class ResidentService {
 
     @Transactional
     public ResidentDTO insert(ResidentInsertDTO dto) {
+        if (residentRepository.existsByUserIdAndUnitId(dto.userId(), dto.unitId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Este usuário já está cadastrado como morador desta unidade.");
+        }
         Resident entity = new Resident();
         linkAssociations(dto.type(), dto.unitId(), dto.userId(), entity);
         condominiumAccessService.validateManagerAccess(entity.getUnit().getSector().getCondominium().getId());
@@ -62,6 +67,11 @@ public class ResidentService {
             Resident entity = residentRepository.findById(id)
                     .orElseThrow(() -> new ResourceNotFoundException("Id " + id + " not found"));
             condominiumAccessService.validateManagerAccess(entity.getUnit().getSector().getCondominium().getId());
+            residentRepository.findByUserIdAndUnitId(dto.userId(), dto.unitId())
+                    .filter(other -> !other.getId().equals(id))
+                    .ifPresent(other -> {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT, "Este usuário já está vinculado a esta unidade em outro registro.");
+                    });
             linkAssociations(dto.type(), dto.unitId(), dto.userId(), entity);
             condominiumAccessService.validateManagerAccess(entity.getUnit().getSector().getCondominium().getId());
             entity = residentRepository.save(entity);

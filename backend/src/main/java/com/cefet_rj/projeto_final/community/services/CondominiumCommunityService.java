@@ -14,6 +14,7 @@ import com.cefet_rj.projeto_final.condominiums.security.CondominiumAccessService
 import com.cefet_rj.projeto_final.notifications.enums.NotificationType;
 import com.cefet_rj.projeto_final.notifications.services.NotificationService;
 import com.cefet_rj.projeto_final.reservations.entities.Reservation;
+import com.cefet_rj.projeto_final.reservations.enums.ReservationStatus;
 import com.cefet_rj.projeto_final.reservations.repositories.ReservationRepository;
 import com.cefet_rj.projeto_final.shared.exceptions.ForbiddenException;
 import com.cefet_rj.projeto_final.shared.exceptions.ResourceNotFoundException;
@@ -261,11 +262,21 @@ public class CondominiumCommunityService {
         User caller = validateMemberAccess(condoId);
 
         String normalized = nextStatus.toUpperCase(Locale.ROOT);
+        if (!List.of("AUTHORIZED", "DENIED", "CANCELLED", "CHECKED_IN", "CHECKED_OUT").contains(normalized)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Status de visitante inválido: " + nextStatus);
+        }
+
         if ("CHECKED_IN".equals(normalized) || "CHECKED_OUT".equals(normalized)) {
             validateStaffAccess(condoId);
             if ("CHECKED_IN".equals(normalized)) {
                 if ("DENIED".equals(access.getStatus()) || "EXPIRED".equals(access.getStatus())) {
                     throw new ResponseStatusException(HttpStatus.CONFLICT, "Este convite foi negado ou expirou.");
+                }
+                if ("REQUESTED".equals(access.getStatus())) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "Esta visita ainda aguarda autorização do morador.");
+                }
+                if (access.getCheckedOutAt() != null || "CHECKED_OUT".equals(access.getStatus())) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "Esta visita já foi concluída.");
                 }
                 if (access.getValidUntil() != null && LocalDateTime.now().isAfter(access.getValidUntil())) {
                     access.setStatus("EXPIRED");
@@ -283,6 +294,12 @@ public class CondominiumCommunityService {
                         access.getCondominium().getName()
                 );
             } else {
+                if (access.getCheckedInAt() == null && !"CHECKED_IN".equals(access.getStatus())) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "Não é possível registrar saída de visitante que não realizou entrada.");
+                }
+                if (access.getCheckedOutAt() != null || "CHECKED_OUT".equals(access.getStatus())) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "A saída deste visitante já foi registrada.");
+                }
                 access.setCheckedOutAt(LocalDateTime.now());
                 access.setCheckedOutBy(caller);
             }
@@ -293,6 +310,9 @@ public class CondominiumCommunityService {
                     && residentRepository.findUnitIdsByUserId(caller.getId()).contains(access.getUnit().getId());
             if (!isStaff && !isOwner && !isUnitResident) {
                 throw new ForbiddenException("Apenas o morador responsável ou a portaria pode autorizar/recusar este visitante.");
+            }
+            if ("CHECKED_OUT".equals(access.getStatus())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Não é possível alterar status de visitante já com saída concluída.");
             }
         }
 
@@ -934,6 +954,12 @@ public class CondominiumCommunityService {
             if (spotEntity.getUnit() != null && unit != null && !spotEntity.getUnit().getId().equals(unit.getId()) && !isManager) {
                 throw new ForbiddenException("Esta vaga pertence a outra unidade.");
             }
+            List<Vehicle> existingVehicles = vehicleRepository.findByParkingSpotEntityId(parkingSpotId);
+            boolean isSpotInUse = existingVehicles.stream()
+                    .anyMatch(ev -> !"REJECTED".equalsIgnoreCase(ev.getStatus()) && !"CANCELLED".equalsIgnoreCase(ev.getStatus()));
+            if (isSpotInUse) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "A vaga de garagem selecionada já está ocupada ou vinculada a outro veículo.");
+            }
             spotEntity.setStatus("OCCUPIED");
             if (spotEntity.getUnit() == null && unit != null) {
                 spotEntity.setUnit(unit);
@@ -979,6 +1005,14 @@ public class CondominiumCommunityService {
         validateManagerAccess(v.getCondominium().getId());
 
         String normalized = status.toUpperCase(Locale.ROOT);
+        if (!List.of("APPROVED", "REJECTED", "PENDING", "CANCELLED").contains(normalized)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Status de veículo inválido: " + status);
+        }
+        if (("REJECTED".equals(normalized) || "CANCELLED".equals(normalized)) && v.getParkingSpotEntity() != null) {
+            ParkingSpot spot = v.getParkingSpotEntity();
+            spot.setStatus("AVAILABLE");
+            parkingSpotRepository.save(spot);
+        }
         v.setStatus(normalized);
         if (rejectionReason != null && !rejectionReason.isBlank()) {
             v.setRejectionReason(rejectionReason.trim());
@@ -1151,7 +1185,13 @@ public class CondominiumCommunityService {
         Unit unit = resolveUserUnit(user.getId(), condominiumId, body.get("unitId"));
 
         LocalDate movingDate = parseLocalDate(stringVal(body, "movingDate"), LocalDate.now().plusDays(2));
+        if (movingDate.isBefore(LocalDate.now())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Não é possível agendar mudanças para datas passadas.");
+        }
         String period = defaultIfBlank(stringVal(body, "period"), "MORNING").toUpperCase(Locale.ROOT);
+        if (!List.of("MORNING", "AFTERNOON", "FULL_DAY").contains(period)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Turno de mudança inválido: " + period);
+        }
 
         MovingAvailabilityDTO availability = checkMovingAvailability(condominiumId, movingDate);
         if (("MORNING".equals(period) && !availability.morningAvailable())
@@ -1193,17 +1233,40 @@ public class CondominiumCommunityService {
         MovingRequest req = movingRequestRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Solicitação de mudança não encontrada"));
         String normalized = status.toUpperCase(Locale.ROOT);
+        if (!List.of("APPROVED", "REJECTED", "COMPLETED", "CANCELLED", "PENDING").contains(normalized)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Status de agendamento de mudança inválido: " + status);
+        }
         if ("CANCELLED".equals(normalized)) {
             validateStaffOrOwner(req.getCondominium().getId(), req.getRequestedBy().getId());
         } else {
             validateManagerAccess(req.getCondominium().getId());
         }
 
+        if ("CANCELLED".equals(req.getStatus()) || "COMPLETED".equals(req.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Não é possível alterar o status de uma mudança já finalizada ou cancelada.");
+        }
+
+        if ("APPROVED".equals(normalized)) {
+            final Long currentId = req.getId();
+            final String currentPeriod = req.getPeriod();
+            List<MovingRequest> approvedOnDate = movingRequestRepository
+                    .findByCondominiumIdAndMovingDateOrderByCreatedAtAsc(req.getCondominium().getId(), req.getMovingDate())
+                    .stream()
+                    .filter(m -> !m.getId().equals(currentId) && "APPROVED".equals(m.getStatus()))
+                    .toList();
+            boolean conflict = approvedOnDate.stream().anyMatch(m ->
+                    "FULL_DAY".equals(m.getPeriod()) || "FULL_DAY".equals(currentPeriod) || m.getPeriod().equals(currentPeriod)
+            );
+            if (conflict) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe outra mudança aprovada para este turno nesta data.");
+            }
+        }
+
         req.setStatus(normalized);
         if (reason != null && !reason.isBlank()) {
             req.setRejectionReason(reason.trim());
         }
-        req = movingRequestRepository.save(req);
+        MovingRequest saved = movingRequestRepository.save(req);
 
         notificationService.createDirectNotification(
                 req.getRequestedBy(),
@@ -1215,7 +1278,7 @@ public class CondominiumCommunityService {
                 req.getCondominium().getName()
         );
 
-        return new MovingRequestDTO(req);
+        return new MovingRequestDTO(saved);
     }
 
     // =========================================================================
@@ -1396,7 +1459,19 @@ public class CondominiumCommunityService {
         Reservation reservation = null;
         Long reservationId = numberVal(body.get("reservationId"));
         if (reservationId != null) {
-            reservation = reservationRepository.findById(reservationId).orElse(null);
+            reservation = reservationRepository.findById(reservationId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Reserva não encontrada: " + reservationId));
+            if (!reservation.getCommonArea().getCondominium().getId().equals(condominiumId)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A reserva não pertence a este condomínio.");
+            }
+            boolean isStaff = condominiumAccessService.isStaffOrAdmin(user, condominiumId);
+            if (!isStaff && !reservation.getReservedBy().getId().equals(user.getId())) {
+                throw new ForbiddenException("A reserva informada não pertence ao usuário.");
+            }
+            if (reservation.getStatus() == ReservationStatus.CANCELLED
+                    || reservation.getStatus() == ReservationStatus.REJECTED) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Não é possível vincular lista de convidados a uma reserva cancelada ou recusada.");
+            }
         }
 
         LocalDateTime eventDate = parseDateTime(stringVal(body, "eventDate"), LocalDateTime.now().plusDays(1));
@@ -1466,6 +1541,12 @@ public class CondominiumCommunityService {
                 .orElseThrow(() -> new ResourceNotFoundException("Convidado não encontrado"));
         validateStaffAccess(g.getGuestList().getCondominium().getId());
 
+        if (g.getCheckedOutAt() != null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Este convidado já realizou saída do condomínio.");
+        }
+        if (Boolean.TRUE.equals(g.getCheckedIn())) {
+            return new EventGuestListDTO(g.getGuestList());
+        }
         g.setCheckedIn(true);
         g.setCheckedInAt(LocalDateTime.now());
         g = guestEntryRepository.save(g);
@@ -1479,6 +1560,12 @@ public class CondominiumCommunityService {
                 .orElseThrow(() -> new ResourceNotFoundException("Convidado não encontrado"));
         validateStaffAccess(g.getGuestList().getCondominium().getId());
 
+        if (!Boolean.TRUE.equals(g.getCheckedIn()) || g.getCheckedInAt() == null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Não é possível registrar saída de convidado que não realizou entrada.");
+        }
+        if (g.getCheckedOutAt() != null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "A saída deste convidado já foi registrada.");
+        }
         g.setCheckedOutAt(LocalDateTime.now());
         g = guestEntryRepository.save(g);
 
@@ -1544,6 +1631,9 @@ public class CondominiumCommunityService {
                 penalty = new BigDecimal(rawPenalty.toString().replace(",", ".").trim());
             } catch (Exception ignored) {
             }
+        }
+        if (penalty != null && penalty.compareTo(BigDecimal.ZERO) < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Valor da penalidade não pode ser negativo.");
         }
 
         CondominiumInfraction inf = new CondominiumInfraction();
@@ -1621,6 +1711,9 @@ public class CondominiumCommunityService {
         validateManagerAccess(inf.getCondominium().getId());
 
         String normalized = defaultIfBlank(status, "ACCEPTED").toUpperCase(Locale.ROOT);
+        if (!List.of("ACCEPTED", "REJECTED", "CANCELLED").contains(normalized)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Status de julgamento inválido: " + status);
+        }
         inf.setStatus(normalized);
         if (judgment != null && !judgment.isBlank()) {
             inf.setManagerJudgment(judgment.trim());

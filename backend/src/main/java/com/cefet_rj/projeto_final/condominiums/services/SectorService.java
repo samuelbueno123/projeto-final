@@ -16,9 +16,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Optional;
@@ -56,8 +58,14 @@ public class SectorService {
     @Transactional
     public SectorDTO insert(SectorInsertDTO dto) {
         condominiumAccessService.validateManagerAccess(dto.condominiumId());
+        if (dto.name() == null || dto.name().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "O nome do setor é obrigatório.");
+        }
+        if (sectorRepository.findByCondominiumIdAndNameIgnoreCase(dto.condominiumId(), dto.name().trim()).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe um setor com este nome neste condomínio.");
+        }
         Sector entity = new Sector();
-        linkAssociations(dto.name(), dto.structuralType(), dto.condominiumId(), dto.imageUrl(), entity);
+        linkAssociations(dto.name().trim(), dto.structuralType(), dto.condominiumId(), dto.imageUrl(), entity);
         entity = sectorRepository.save(entity);
         return new SectorDTO(entity);
     }
@@ -69,6 +77,14 @@ public class SectorService {
                     .orElseThrow(() -> new ResourceNotFoundException("Id " + id + " not found"));
             condominiumAccessService.validateManagerAccess(entity.getCondominium().getId());
             condominiumAccessService.validateManagerAccess(dto.condominiumId());
+            if (dto.name() != null && !dto.name().isBlank()) {
+                String newName = dto.name().trim();
+                sectorRepository.findByCondominiumIdAndNameIgnoreCase(dto.condominiumId(), newName)
+                        .filter(other -> !other.getId().equals(id))
+                        .ifPresent(other -> {
+                            throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe outro setor com este nome neste condomínio.");
+                        });
+            }
             linkAssociations(dto.name(), dto.structuralType(), dto.condominiumId(), dto.imageUrl(), entity);
             entity = sectorRepository.save(entity);
             return new SectorDTO(entity);

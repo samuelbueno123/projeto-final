@@ -72,6 +72,13 @@ public class MaintenanceService {
 
         User caller = authenticatedUserService.getAuthenticatedUser();
 
+        if (dto.title() == null || dto.title().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Título da ordem de serviço é obrigatório.");
+        }
+        if (dto.estimatedCost() != null && dto.estimatedCost().compareTo(BigDecimal.ZERO) < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Custo estimado não pode ser negativo.");
+        }
+
         MaintenanceEquipment equipment = null;
         if (dto.equipmentId() != null) {
             equipment = equipmentRepository.findById(dto.equipmentId())
@@ -135,6 +142,22 @@ public class MaintenanceService {
         condominiumAccessService.validateManagerAccess(condoId);
 
         String newStatus = dto.status().trim().toUpperCase();
+        if (!List.of("OPEN", "IN_PROGRESS", "COMPLETED", "CANCELLED").contains(newStatus)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Status de manutenção inválido: " + dto.status());
+        }
+        if ("CANCELLED".equals(order.getStatus()) && !"CANCELLED".equals(newStatus)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Não é possível alterar uma ordem de serviço já cancelada.");
+        }
+        if ("COMPLETED".equals(order.getStatus())) {
+            if ("COMPLETED".equals(newStatus)) {
+                return new MaintenanceOrderDTO(order);
+            }
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Não é possível reabrir uma ordem de serviço já concluída.");
+        }
+        if (dto.actualCost() != null && dto.actualCost().compareTo(BigDecimal.ZERO) < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Custo real não pode ser negativo.");
+        }
+
         order.setStatus(newStatus);
         if ("COMPLETED".equals(newStatus)) {
             order.setCompletedAt(LocalDateTime.now());
