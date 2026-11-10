@@ -62,10 +62,6 @@ class PackageNotificationListenerTests {
     void setUp() {
 
         notificationRepository.deleteAll();
-        condominiumRepository.deleteAll();
-        billingPlanRepository.deleteAll();
-        featureRepository.deleteAll();
-        userRepository.deleteAll();
 
         Feature packagesFeature = createFeature(
                 FeatureCode.PACKAGES,
@@ -78,13 +74,13 @@ class PackageNotificationListenerTests {
         );
 
         BillingPlan basicPlan = createPlan(
-                "BASIC",
+                "BASIC_LISTENER_TEST",
                 new BigDecimal("99.90"),
                 Set.of(packagesFeature)
         );
 
         BillingPlan premiumPlan = createPlan(
-                "PREMIUM",
+                "PREMIUM_LISTENER_TEST",
                 new BigDecimal("199.90"),
                 Set.of(
                         packagesFeature,
@@ -104,12 +100,12 @@ class PackageNotificationListenerTests {
 
         basicResident = createUser(
                 "Morador Basic",
-                "basic@test.com"
+                "basic-listener@test.com"
         );
 
         premiumResident = createUser(
                 "Morador Premium",
-                "premium@test.com"
+                "premium-listener@test.com"
         );
     }
 
@@ -163,15 +159,14 @@ class PackageNotificationListenerTests {
             FeatureCode code,
             String name
     ) {
-        Feature feature = new Feature();
-
-        feature.setCode(code.name());
-        feature.setName(name);
-        feature.setDescription(
-                "Feature de teste: " + name
-        );
-
-        return featureRepository.save(feature);
+        return featureRepository.findByCode(code.name())
+                .orElseGet(() -> {
+                    Feature feature = new Feature();
+                    feature.setCode(code.name());
+                    feature.setName(name);
+                    feature.setDescription("Feature de teste: " + name);
+                    return featureRepository.save(feature);
+                });
     }
 
     private BillingPlan createPlan(
@@ -179,7 +174,8 @@ class PackageNotificationListenerTests {
             BigDecimal monthlyFee,
             Set<Feature> features
     ) {
-        BillingPlan plan = new BillingPlan();
+        BillingPlan plan = billingPlanRepository.findByNameIgnoreCase(name)
+                .orElseGet(BillingPlan::new);
 
         plan.setName(name);
         plan.setMonthlyFee(monthlyFee);
@@ -209,13 +205,14 @@ class PackageNotificationListenerTests {
             String firstName,
             String email
     ) {
-        User user = new User();
-
-        user.setFirstName(firstName);
-        user.setLastName("Teste");
-        user.setEmail(email);
-        user.setPassword("123456");
-
-        return userRepository.save(user);
+        return userRepository.findByEmail(email)
+                .orElseGet(() -> {
+                    User user = new User();
+                    user.setFirstName(firstName);
+                    user.setLastName("Teste");
+                    user.setEmail(email);
+                    user.setPassword("123456");
+                    return userRepository.save(user);
+                });
     }
 }

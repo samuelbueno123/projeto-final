@@ -39,6 +39,9 @@ public class CondominiumService {
     private final AuthenticatedUserService authenticatedUserService;
     private final CondominiumAccessService condominiumAccessService;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.cefet_rj.projeto_final.shared.observability.AuditLogService auditLogService;
+
     @Transactional(readOnly = true)
     public Page<CondominiumDTO> findAllPaged(Pageable pageable) {
         Page<Condominium> list = condominiumRepository.findAll(pageable);
@@ -61,6 +64,18 @@ public class CondominiumService {
         Condominium entity = new Condominium();
         linkAssociations(dto.name(), dto.address(), dto.billingPlan(), dto.isActive(), dto.imageUrl(), entity);
         entity = condominiumRepository.save(entity);
+        if (auditLogService != null) {
+            auditLogService.logAdminOperation(
+                    null,
+                    "CREATE_CONDOMINIUM",
+                    "CONDOMINIUM",
+                    String.valueOf(entity.getId()),
+                    entity.getId(),
+                    entity.getName(),
+                    true,
+                    "Condomínio cadastrado: " + entity.getName() + " (Plano: " + (entity.getBillingPlan() != null ? entity.getBillingPlan().getName() : "N/A") + ")"
+            );
+        }
         return new CondominiumDTO(entity);
     }
 
@@ -70,6 +85,18 @@ public class CondominiumService {
             Condominium entity = condominiumRepository.getReferenceById(id);
             linkAssociations(dto.name(), dto.address(), dto.billingPlan(), dto.isActive(), dto.imageUrl(), entity);
             entity = condominiumRepository.save(entity);
+            if (auditLogService != null) {
+                auditLogService.logAdminOperation(
+                        null,
+                        "UPDATE_CONDOMINIUM",
+                        "CONDOMINIUM",
+                        String.valueOf(entity.getId()),
+                        entity.getId(),
+                        entity.getName(),
+                        true,
+                        "Condomínio atualizado: " + entity.getName() + " (Ativo: " + entity.getIsActive() + ", Plano: " + (entity.getBillingPlan() != null ? entity.getBillingPlan().getName() : "N/A") + ")"
+                );
+            }
             return new CondominiumDTO(entity);
         } catch (EntityNotFoundException e) {
             throw new ResourceNotFoundException("Id " + id + " not found");
@@ -93,6 +120,18 @@ public class CondominiumService {
         }
         try {
             condominiumRepository.deleteById(id);
+            if (auditLogService != null) {
+                auditLogService.logAdminOperation(
+                        null,
+                        "DELETE_CONDOMINIUM",
+                        "CONDOMINIUM",
+                        String.valueOf(id),
+                        id,
+                        null,
+                        true,
+                        "Condomínio excluído (ID=" + id + ")"
+                );
+            }
         } catch (DataIntegrityViolationException e) {
             throw new DatabaseException("Integrity violation");
         }

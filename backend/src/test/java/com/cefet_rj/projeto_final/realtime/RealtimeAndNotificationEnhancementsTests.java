@@ -57,7 +57,7 @@ public class RealtimeAndNotificationEnhancementsTests {
     @BeforeEach
     void setUp() throws Exception {
         Role foundRole = roleRepository.findByAuthority("ROLE_RESIDENT");
-        if (foundRole == null) {
+        if (foundRole == null || foundRole.getId() == null || !roleRepository.existsById(foundRole.getId())) {
             Role r = new Role();
             r.setAuthority("ROLE_RESIDENT");
             foundRole = roleRepository.save(r);

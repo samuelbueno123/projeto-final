@@ -76,21 +76,10 @@ class AnnouncementNotificationIntegrationTests {
 
         notificationRepository.deleteAll();
         announcementRepository.deleteAll();
-        membershipRepository.deleteAll();
-
-        condominiumRepository.deleteAll();
-        billingPlanRepository.deleteAll();
-        featureRepository.deleteAll();
-
-        userRepository.deleteAll();
-        roleRepository.deleteAll();
-
-        notificationRepository.deleteAll();
-        membershipRepository.deleteAll();
 
         Role adminRole = roleRepository.findByAuthority("ROLE_ADMIN");
 
-        if (adminRole == null) {
+        if (adminRole == null || adminRole.getId() == null || !roleRepository.existsById(adminRole.getId())) {
             adminRole = new Role();
             adminRole.setAuthority("ROLE_ADMIN");
             adminRole = roleRepository.save(adminRole);
@@ -98,25 +87,31 @@ class AnnouncementNotificationIntegrationTests {
 
         Role residentRole = roleRepository.findByAuthority("ROLE_RESIDENT");
 
-        if (residentRole == null) {
+        if (residentRole == null || residentRole.getId() == null || !roleRepository.existsById(residentRole.getId())) {
             residentRole = new Role();
             residentRole.setAuthority("ROLE_RESIDENT");
             residentRole = roleRepository.save(residentRole);
         }
 
-        admin = new User();
-        admin.setFirstName("Admin");
-        admin.setLastName("Announcement");
-        admin.setEmail("admin-announcement-flow@test.com");
-        admin.setPassword("123456");
+        admin = userRepository.findByEmail("admin-announcement-flow@test.com").orElse(null);
+        if (admin == null) {
+            admin = new User();
+            admin.setFirstName("Admin");
+            admin.setLastName("Announcement");
+            admin.setEmail("admin-announcement-flow@test.com");
+            admin.setPassword("123456");
+        }
         admin.addRole(adminRole);
         admin = userRepository.save(admin);
 
-        resident = new User();
-        resident.setFirstName("Resident");
-        resident.setLastName("Announcement");
-        resident.setEmail("resident-announcement-flow@test.com");
-        resident.setPassword("123456");
+        resident = userRepository.findByEmail("resident-announcement-flow@test.com").orElse(null);
+        if (resident == null) {
+            resident = new User();
+            resident.setFirstName("Resident");
+            resident.setLastName("Announcement");
+            resident.setEmail("resident-announcement-flow@test.com");
+            resident.setPassword("123456");
+        }
         resident.addRole(residentRole);
         resident = userRepository.save(resident);
 
@@ -131,19 +126,9 @@ class AnnouncementNotificationIntegrationTests {
 
     @AfterEach
     void tearDown() {
-
         SecurityContextHolder.clearContext();
-
         notificationRepository.deleteAll();
         announcementRepository.deleteAll();
-        membershipRepository.deleteAll();
-
-        condominiumRepository.deleteAll();
-        billingPlanRepository.deleteAll();
-        featureRepository.deleteAll();
-
-        userRepository.deleteAll();
-        roleRepository.deleteAll();
     }
 
     @Test
@@ -155,7 +140,8 @@ class AnnouncementNotificationIntegrationTests {
         Feature notificationsFeature =
                 getOrCreateFeature(FeatureCode.NOTIFICATIONS);
 
-        BillingPlan plan = new BillingPlan();
+        BillingPlan plan = billingPlanRepository.findByNameIgnoreCase("ANNOUNCEMENT_NOTIFICATION_PLAN")
+                .orElseGet(BillingPlan::new);
         plan.setName("ANNOUNCEMENT_NOTIFICATION_PLAN");
         plan.setMonthlyFee(new BigDecimal("199.90"));
         plan.setActive(true);

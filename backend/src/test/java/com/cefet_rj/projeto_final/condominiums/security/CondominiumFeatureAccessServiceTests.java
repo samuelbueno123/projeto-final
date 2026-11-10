@@ -48,10 +48,6 @@ class CondominiumFeatureAccessServiceTests {
     @BeforeEach
     void setUp() {
 
-        condominiumRepository.deleteAll();
-        billingPlanRepository.deleteAll();
-        featureRepository.deleteAll();
-
         packagesFeature = createFeature(
                 FeatureCode.PACKAGES,
                 "Encomendas"
@@ -68,13 +64,13 @@ class CondominiumFeatureAccessServiceTests {
         );
 
         BillingPlan basic = createPlan(
-                "BASIC",
+                "BASIC_ACCESS_TEST",
                 new BigDecimal("99.90"),
                 Set.of(packagesFeature)
         );
 
         BillingPlan premium = createPlan(
-                "PREMIUM",
+                "PREMIUM_ACCESS_TEST",
                 new BigDecimal("199.90"),
                 Set.of(
                         packagesFeature,
@@ -142,7 +138,7 @@ class CondominiumFeatureAccessServiceTests {
     void shouldCreateNewPlanWithoutChangingFeatureAccessCode() {
 
         BillingPlan standard = createPlan(
-                "STANDARD",
+                "STANDARD_ACCESS_TEST",
                 new BigDecimal("149.90"),
                 Set.of(
                         packagesFeature,
@@ -214,15 +210,14 @@ class CondominiumFeatureAccessServiceTests {
             String name
     ) {
 
-        Feature feature = new Feature();
-
-        feature.setCode(code.name());
-        feature.setName(name);
-        feature.setDescription(
-                "Feature de teste: " + name
-        );
-
-        return featureRepository.save(feature);
+        return featureRepository.findByCode(code.name())
+                .orElseGet(() -> {
+                    Feature feature = new Feature();
+                    feature.setCode(code.name());
+                    feature.setName(name);
+                    feature.setDescription("Feature de teste: " + name);
+                    return featureRepository.save(feature);
+                });
     }
 
     private BillingPlan createPlan(
@@ -231,7 +226,8 @@ class CondominiumFeatureAccessServiceTests {
             Set<Feature> features
     ) {
 
-        BillingPlan plan = new BillingPlan();
+        BillingPlan plan = billingPlanRepository.findByNameIgnoreCase(name)
+                .orElseGet(BillingPlan::new);
 
         plan.setName(name);
         plan.setMonthlyFee(monthlyFee);

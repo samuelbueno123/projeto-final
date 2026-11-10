@@ -33,6 +33,9 @@ public class UserService {
 
 	private final RoleRepository roleRepository;
 
+	@org.springframework.beans.factory.annotation.Autowired(required = false)
+	private com.cefet_rj.projeto_final.shared.observability.AuditLogService auditLogService;
+
     @Transactional(readOnly = true)
     public Page<UserDTO> findAllPaged(Pageable pageable) {
         Page<User> list = userRepository.findAll(pageable);
@@ -82,6 +85,19 @@ public class UserService {
 
 		entity = userRepository.save(entity);
 
+		if (auditLogService != null) {
+			auditLogService.logAdminOperation(
+					null,
+					"CREATE_USER",
+					"USER",
+					String.valueOf(entity.getId()),
+					null,
+					null,
+					true,
+					"Conta de usuário criada: " + entity.getEmail()
+			);
+		}
+
 		return new UserDTO(entity);
 	}
 
@@ -121,6 +137,18 @@ public class UserService {
 			}
 
 			entity = userRepository.save(entity);
+			if (auditLogService != null) {
+				auditLogService.logAdminOperation(
+						null,
+						"UPDATE_USER",
+						"USER",
+						String.valueOf(entity.getId()),
+						null,
+						null,
+						true,
+						"Dados/perfis do usuário atualizados: " + entity.getEmail()
+				);
+			}
 			return new UserDTO(entity);
 		}
 		catch (EntityNotFoundException e) {
@@ -135,6 +163,18 @@ public class UserService {
 		}
 		try {
 			userRepository.deleteById(id);
+			if (auditLogService != null) {
+				auditLogService.logAdminOperation(
+						null,
+						"DELETE_USER",
+						"USER",
+						String.valueOf(id),
+						null,
+						null,
+						true,
+						"Usuário removido (ID=" + id + ")"
+				);
+			}
 		}
 		catch (DataIntegrityViolationException e) {
 			throw new DatabaseException("Integrity violation");

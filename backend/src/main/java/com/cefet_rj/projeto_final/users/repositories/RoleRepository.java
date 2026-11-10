@@ -17,5 +17,17 @@ public interface RoleRepository extends JpaRepository<Role, Long> {
 	@Override
 	@CacheEvict(value = "roles", allEntries = true)
 	<S extends Role> S saveAndFlush(S entity);
+
+	@Override
+	@CacheEvict(value = "roles", allEntries = true)
+	void deleteAll();
+
+	@Override
+	@CacheEvict(value = "roles", allEntries = true)
+	void delete(Role entity);
+
+	@Override
+	@CacheEvict(value = "roles", allEntries = true)
+	void deleteById(Long id);
 }
 

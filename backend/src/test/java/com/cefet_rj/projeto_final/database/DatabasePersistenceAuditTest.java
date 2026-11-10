@@ -157,7 +157,7 @@ public class DatabasePersistenceAuditTest {
 
     private Role getOrCreateRole(String authority) {
         Role r = roleRepository.findByAuthority(authority);
-        if (r != null) {
+        if (r != null && r.getId() != null && roleRepository.existsById(r.getId())) {
             return r;
         }
         r = new Role();

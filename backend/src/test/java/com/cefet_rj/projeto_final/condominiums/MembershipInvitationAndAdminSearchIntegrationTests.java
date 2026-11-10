@@ -416,7 +416,7 @@ class MembershipInvitationAndAdminSearchIntegrationTests {
 
     private Role getOrCreateRole(String authority) {
         Role role = roleRepository.findByAuthority(authority);
-        if (role == null) {
+        if (role == null || role.getId() == null || !roleRepository.existsById(role.getId())) {
             role = new Role();
             role.setAuthority(authority);
             role = roleRepository.save(role);

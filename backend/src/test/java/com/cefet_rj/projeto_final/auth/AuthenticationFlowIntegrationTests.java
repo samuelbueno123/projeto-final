@@ -68,7 +68,7 @@ class AuthenticationFlowIntegrationTests {
                         "ROLE_ADMIN"
                 );
 
-        if (adminRole == null) {
+        if (adminRole == null || adminRole.getId() == null || !roleRepository.existsById(adminRole.getId())) {
 
             adminRole = new Role();
 

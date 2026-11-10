@@ -633,7 +633,7 @@ public class SecurityAndCommercialFeaturesIntegrationTests {
 
     private Role ensureRole(String authority) {
         Role found = roleRepository.findByAuthority(authority);
-        if (found != null) return found;
+        if (found != null && found.getId() != null && roleRepository.existsById(found.getId())) return found;
         Role role = new Role();
         role.setAuthority(authority);
         return roleRepository.save(role);

@@ -156,7 +156,7 @@ class RoleBasedAccessControlIntegrationTests {
 
     private Role getOrCreateRole(String authority) {
         Role r = roleRepository.findByAuthority(authority);
-        if (r == null) {
+        if (r == null || r.getId() == null || !roleRepository.existsById(r.getId())) {
             r = new Role();
             r.setAuthority(authority);
             r = roleRepository.save(r);

@@ -86,26 +86,19 @@ class PackageServiceIntegrationTests {
         notificationRepository.deleteAll();
         packageHistoryRepository.deleteAll();
         packageRepository.deleteAll();
-        unitRepository.deleteAll();
-        sectorRepository.deleteAll();
-        condominiumRepository.deleteAll();
-        billingPlanRepository.deleteAll();
-        featureRepository.deleteAll();
-        userRepository.deleteAll();
-        roleRepository.deleteAll();
 
-        Feature packagesFeature = createFeature(
+        Feature packagesFeature = getOrCreateFeature(
                 FeatureCode.PACKAGES,
                 "Encomendas"
         );
 
-        Feature notificationsFeature = createFeature(
+        Feature notificationsFeature = getOrCreateFeature(
                 FeatureCode.NOTIFICATIONS,
                 "Notificações"
         );
 
-        BillingPlan premiumPlan = createPlan(
-                "PREMIUM",
+        BillingPlan premiumPlan = getOrCreatePlan(
+                "PREMIUM_PKG_TEST",
                 new BigDecimal("199.90"),
                 Set.of(
                         packagesFeature,
@@ -122,21 +115,21 @@ class PackageServiceIntegrationTests {
 
         Unit unit = createUnit(sector);
 
-        Role adminRole = createRole("ROLE_ADMIN");
+        Role adminRole = getOrCreateRole("ROLE_ADMIN");
 
-        admin = createUser(
+        admin = getOrCreateUser(
                 "Admin",
                 "Sistema",
-                "admin@test.com"
+                "admin-pkg-integration@test.com"
         );
 
         admin.addRole(adminRole);
         admin = userRepository.save(admin);
 
-        resident = createUser(
+        resident = getOrCreateUser(
                 "Morador",
                 "Premium",
-                "resident@test.com"
+                "resident-pkg-integration@test.com"
         );
 
         packageEntity = createReceivedPackage(
@@ -211,8 +204,8 @@ class PackageServiceIntegrationTests {
                 .findByCode(FeatureCode.PACKAGES.name())
                 .orElseThrow();
 
-        BillingPlan basicPlan = createPlan(
-                "BASIC_TEST",
+        BillingPlan basicPlan = getOrCreatePlan(
+                "BASIC_PKG_TEST",
                 new BigDecimal("99.90"),
                 Set.of(packagesFeature)
         );
@@ -230,10 +223,10 @@ class PackageServiceIntegrationTests {
                 basicSector
         );
 
-        User basicResident = createUser(
+        User basicResident = getOrCreateUser(
                 "Morador",
                 "Basic",
-                "basic-resident@test.com"
+                "basic-resident-pkg@test.com"
         );
 
         Package basicPackage = createReceivedPackage(
@@ -295,27 +288,27 @@ class PackageServiceIntegrationTests {
         );
     }
 
-    private Feature createFeature(
+    private Feature getOrCreateFeature(
             FeatureCode code,
             String name
     ) {
-        Feature feature = new Feature();
-
-        feature.setCode(code.name());
-        feature.setName(name);
-        feature.setDescription(
-                "Feature de teste: " + name
-        );
-
-        return featureRepository.save(feature);
+        return featureRepository.findByCode(code.name())
+                .orElseGet(() -> {
+                    Feature feature = new Feature();
+                    feature.setCode(code.name());
+                    feature.setName(name);
+                    feature.setDescription("Feature de teste: " + name);
+                    return featureRepository.save(feature);
+                });
     }
 
-    private BillingPlan createPlan(
+    private BillingPlan getOrCreatePlan(
             String name,
             BigDecimal monthlyFee,
             Set<Feature> features
     ) {
-        BillingPlan plan = new BillingPlan();
+        BillingPlan plan = billingPlanRepository.findByNameIgnoreCase(name)
+                .orElseGet(BillingPlan::new);
 
         plan.setName(name);
         plan.setMonthlyFee(monthlyFee);
@@ -368,29 +361,32 @@ class PackageServiceIntegrationTests {
         return unitRepository.save(unit);
     }
 
-    private Role createRole(
+    private Role getOrCreateRole(
             String authority
     ) {
+        Role existing = roleRepository.findByAuthority(authority);
+        if (existing != null && existing.getId() != null && roleRepository.existsById(existing.getId())) {
+            return existing;
+        }
         Role role = new Role();
-
         role.setAuthority(authority);
-
         return roleRepository.save(role);
     }
 
-    private User createUser(
+    private User getOrCreateUser(
             String firstName,
             String lastName,
             String email
     ) {
-        User user = new User();
-
-        user.setFirstName(firstName);
-        user.setLastName(lastName);
-        user.setEmail(email);
-        user.setPassword("123456");
-
-        return userRepository.save(user);
+        return userRepository.findByEmail(email)
+                .orElseGet(() -> {
+                    User user = new User();
+                    user.setFirstName(firstName);
+                    user.setLastName(lastName);
+                    user.setEmail(email);
+                    user.setPassword("123456");
+                    return userRepository.save(user);
+                });
     }
 
     private Package createReceivedPackage(

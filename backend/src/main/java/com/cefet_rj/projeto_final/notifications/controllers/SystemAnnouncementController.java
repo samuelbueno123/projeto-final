@@ -14,9 +14,22 @@ import org.springframework.web.bind.annotation.*;
 @PreAuthorize("hasRole('ADMIN')")
 public class SystemAnnouncementController {
     private final NotificationService notificationService;
+    private final com.cefet_rj.projeto_final.shared.observability.AuditLogService auditLogService;
 
     @PostMapping
     public ResponseEntity<Integer> publish(@Valid @RequestBody SystemAnnouncementRequestDTO request) {
-        return ResponseEntity.ok(notificationService.publishSystemAnnouncement(request));
+        int recipients = notificationService.publishSystemAnnouncement(request);
+        auditLogService.logAdminOperation(
+                null,
+                "BROADCAST_SYSTEM_ANNOUNCEMENT",
+                "SYSTEM_ANNOUNCEMENT",
+                "GLOBAL",
+                null,
+                null,
+                true,
+                "Comunicado de sistema enviado para " + recipients + " destinatário(s): " + request.title()
+        );
+        return ResponseEntity.ok(recipients);
     }
 }
+

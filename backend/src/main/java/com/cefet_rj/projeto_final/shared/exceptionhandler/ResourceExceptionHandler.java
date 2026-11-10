@@ -34,6 +34,12 @@ public class ResourceExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(ResourceExceptionHandler.class);
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.cefet_rj.projeto_final.shared.observability.AuditLogService auditLogService;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.cefet_rj.projeto_final.shared.observability.OperationalMetricsService operationalMetricsService;
+
     private String getCorrelationId(HttpServletRequest request) {
         Object attr = request.getAttribute(ObservabilityConstants.CORRELATION_ID_MDC_KEY);
         if (attr instanceof String s && !s.isBlank()) {
@@ -84,6 +90,17 @@ public class ResourceExceptionHandler {
         log.warn("Forbidden access [correlationId={}, path={}]: {}",
                 correlationId, request.getRequestURI(), exception.getMessage());
 
+        if (auditLogService != null) {
+            auditLogService.logSecurityEvent(
+                    "FORBIDDEN_ACCESS",
+                    null,
+                    request.getMethod() + " " + request.getRequestURI(),
+                    request.getRequestURI(),
+                    false,
+                    exception.getMessage()
+            );
+        }
+
         StandardError error = new StandardError(
                 Instant.now(),
                 status.value(),
@@ -106,6 +123,17 @@ public class ResourceExceptionHandler {
 
         log.warn("Access denied [correlationId={}, path={}]: {}",
                 correlationId, request.getRequestURI(), exception.getMessage());
+
+        if (auditLogService != null) {
+            auditLogService.logSecurityEvent(
+                    "ACCESS_DENIED",
+                    null,
+                    request.getMethod() + " " + request.getRequestURI(),
+                    request.getRequestURI(),
+                    false,
+                    "Acesso negado ao endpoint " + request.getRequestURI()
+            );
+        }
 
         StandardError error = new StandardError(
                 Instant.now(),
@@ -130,6 +158,13 @@ public class ResourceExceptionHandler {
         log.warn("Authentication failed [correlationId={}, path={}]: {}",
                 correlationId, request.getRequestURI(), exception.getMessage());
 
+        if (operationalMetricsService != null) {
+            operationalMetricsService.recordLoginFailure("UNAUTHORIZED_REQUEST");
+        }
+        if (auditLogService != null) {
+            auditLogService.logAuthentication("ANONYMOUS", false, request.getRemoteAddr(), "Credenciais ausentes ou inválidas em " + request.getRequestURI());
+        }
+
         StandardError error = new StandardError(
                 Instant.now(),
                 status.value(),
@@ -152,6 +187,10 @@ public class ResourceExceptionHandler {
 
         log.warn("Reservation conflict [correlationId={}, path={}]: {}",
                 correlationId, request.getRequestURI(), exception.getMessage());
+
+        if (operationalMetricsService != null) {
+            operationalMetricsService.recordReservationConflict();
+        }
 
         StandardError error = new StandardError(
                 Instant.now(),
@@ -462,6 +501,18 @@ public class ResourceExceptionHandler {
         log.warn("Optimistic locking conflict [correlationId={}, path={}]: {}",
                 correlationId, request.getRequestURI(), exception.getMessage());
 
+        if (auditLogService != null) {
+            auditLogService.logErrorEvent(
+                    null,
+                    "OPTIMISTIC_LOCK_CONFLICT",
+                    request.getMethod() + " " + request.getRequestURI(),
+                    request.getRequestURI(),
+                    request.getRemoteAddr(),
+                    "WARN",
+                    "Conflito de concorrência otimista em " + request.getRequestURI()
+            );
+        }
+
         StandardError error = new StandardError(
                 Instant.now(),
                 status.value(),
@@ -484,6 +535,18 @@ public class ResourceExceptionHandler {
 
         log.error("Unhandled internal server error [correlationId={}, path={}]: {}",
                 correlationId, request.getRequestURI(), exception.getMessage(), exception);
+
+        if (auditLogService != null) {
+            auditLogService.logErrorEvent(
+                    null,
+                    "INTERNAL_SERVER_ERROR",
+                    request.getMethod() + " " + request.getRequestURI(),
+                    request.getRequestURI(),
+                    request.getRemoteAddr(),
+                    "CRITICAL",
+                    exception.getClass().getSimpleName() + ": " + exception.getMessage()
+            );
+        }
 
         StandardError error = new StandardError(
                 Instant.now(),

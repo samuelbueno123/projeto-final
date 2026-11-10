@@ -261,7 +261,7 @@ class SecurityAndHardeningIntegrationTests {
 
     private Role getOrCreateRole(String roleName) {
         Role role = roleRepository.findByAuthority(roleName);
-        if (role == null) {
+        if (role == null || role.getId() == null || !roleRepository.existsById(role.getId())) {
             role = new Role();
             role.setAuthority(roleName);
             role = roleRepository.save(role);

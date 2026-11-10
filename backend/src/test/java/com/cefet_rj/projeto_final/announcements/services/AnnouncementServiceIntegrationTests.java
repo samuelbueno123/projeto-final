@@ -58,7 +58,7 @@ class AnnouncementServiceIntegrationTests {
 
         Role adminRole = roleRepository.findByAuthority("ROLE_ADMIN");
 
-        if (adminRole == null) {
+        if (adminRole == null || adminRole.getId() == null || !roleRepository.existsById(adminRole.getId())) {
             adminRole = new Role();
             adminRole.setAuthority("ROLE_ADMIN");
             adminRole = roleRepository.save(adminRole);

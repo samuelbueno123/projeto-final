@@ -152,4 +152,18 @@ public class RealtimeEmitterService {
             });
         }
     }
+
+    public int getActiveConnectionsCount() {
+        return userEmitters.values().stream()
+                .mapToInt(List::size)
+                .sum();
+    }
+
+    public int getConnectedUsersCount() {
+        return userEmitters.size();
+    }
+
+    public int getConnectedCondominiumsCount() {
+        return condoUsers.size();
+    }
 }
