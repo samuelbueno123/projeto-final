@@ -171,4 +171,5 @@ jobs:
 
       - name: Test Container Non-Root User & Execution
         run: |
-          docker run --rm projeto-final-api:test id
+          docker run --rm --entrypoint id projeto-final-api:test
+          docker run --rm --entrypoint java projeto-final-api:test -version
