@@ -41,7 +41,7 @@ public class MembershipController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Page<MembershipDTO>> findAll(Pageable pageable) {
         Page<MembershipDTO> list = membershipService.findAllPaged(pageable);
         return ResponseEntity.ok().body(list);

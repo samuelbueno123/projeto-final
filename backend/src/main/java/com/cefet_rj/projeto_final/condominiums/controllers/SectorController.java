@@ -36,6 +36,12 @@ public class SectorController {
 		if (condominiumId != null) {
 			return ResponseEntity.ok().body(sectorService.findByCondominiumId(condominiumId));
 		}
+		org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+		boolean isAdmin = auth != null && auth.getAuthorities() != null && auth.getAuthorities().stream()
+				.anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+		if (!isAdmin) {
+			throw new org.springframework.security.access.AccessDeniedException("Informe o parâmetro condominiumId para listar os setores.");
+		}
 		Page<SectorDTO> list = sectorService.findAllPaged(pageable);
 		return ResponseEntity.ok().body(list);
 	}

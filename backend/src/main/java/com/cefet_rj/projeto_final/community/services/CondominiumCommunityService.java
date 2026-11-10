@@ -29,6 +29,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -115,17 +116,25 @@ public class CondominiumCommunityService {
         OccurrenceTicket ticket = ticketRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Ocorrência não encontrada"));
         Long condoId = ticket.getCondominium().getId();
-        validateStaffOrOwner(condoId, ticket.getAuthor().getId());
+        User caller = validateStaffOrOwner(condoId, ticket.getAuthor().getId());
+        boolean isStaff = condominiumAccessService.isStaffOrAdmin(caller, condoId);
 
         String status = defaultIfBlank(stringVal(body, "status"), "IN_PROGRESS").toUpperCase(Locale.ROOT);
         String response = blankToNull(stringVal(body, "adminResponse"));
 
-        ticket.setStatus(status);
-        if (response != null) {
-            ticket.setAdminResponse(response);
+        if (!isStaff) {
+            if (!"CANCELLED".equals(status)) {
+                throw new ForbiddenException("Apenas a administração pode alterar o status ou responder o chamado.");
+            }
+            ticket.setStatus("CANCELLED");
+        } else {
+            ticket.setStatus(status);
+            if (response != null) {
+                ticket.setAdminResponse(response);
+            }
         }
         ticket.setUpdatedAt(LocalDateTime.now());
-        if ("RESOLVED".equals(status) || "CLOSED".equals(status)) {
+        if ("RESOLVED".equals(status) || "CLOSED".equals(status) || "CANCELLED".equals(status)) {
             ticket.setResolvedAt(LocalDateTime.now());
         }
         ticket = ticketRepository.save(ticket);
@@ -368,7 +377,15 @@ public class CondominiumCommunityService {
     public List<PollDTO> listPolls(Long condominiumId) {
         User user = validateMemberAccess(condominiumId);
         List<Poll> polls = pollRepository.findByCondominiumIdOrderByCreatedAtDesc(condominiumId);
-        return polls.stream().map(poll -> toPollDTO(poll, user.getId())).toList();
+        if (polls.isEmpty()) {
+            return List.of();
+        }
+        List<PollVote> allVotes = pollVoteRepository.findAllByCondominiumIdWithDetails(condominiumId);
+        Map<Long, List<PollVote>> votesByPollId = allVotes.stream()
+                .collect(Collectors.groupingBy(v -> v.getPoll().getId()));
+        return polls.stream()
+                .map(poll -> toPollDTO(poll, user.getId(), votesByPollId.getOrDefault(poll.getId(), List.of())))
+                .toList();
     }
 
     @Transactional
@@ -461,6 +478,10 @@ public class CondominiumCommunityService {
 
     private PollDTO toPollDTO(Poll poll, Long viewerUserId) {
         List<PollVote> votes = pollVoteRepository.findByPollId(poll.getId());
+        return toPollDTO(poll, viewerUserId, votes);
+    }
+
+    private PollDTO toPollDTO(Poll poll, Long viewerUserId, List<PollVote> votes) {
         Map<Long, Long> counts = new HashMap<>();
         Long myOptionId = null;
         for (PollVote v : votes) {
@@ -1335,8 +1356,10 @@ public class CondominiumCommunityService {
         if (!isStaff && !isRecipient) {
             throw new ForbiddenException("Você não possui permissão para retirar encomendas de outra unidade.");
         }
-        if (!isStaff && pin != null && !pin.isBlank() && !pin.trim().equals(comp.getPinCode())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Código PIN incorreto.");
+        if (!isStaff && comp.getPinCode() != null && !comp.getPinCode().isBlank()) {
+            if (pin == null || pin.isBlank() || !pin.trim().equals(comp.getPinCode())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Código PIN incorreto.");
+            }
         }
 
         comp.setStatus("RETRIEVED");
@@ -1569,6 +1592,10 @@ public class CondominiumCommunityService {
 
         if (defenseText == null || defenseText.trim().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Informe a fundamentação da sua defesa/recurso.");
+        }
+
+        if (inf.getDefenseDeadline() != null && LocalDate.now().isAfter(inf.getDefenseDeadline())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "O prazo para envio de recurso expirou em " + inf.getDefenseDeadline() + ".");
         }
 
         inf.setResidentDefense(defenseText.trim());

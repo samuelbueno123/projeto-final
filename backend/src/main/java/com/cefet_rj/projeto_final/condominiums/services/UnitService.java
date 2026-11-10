@@ -47,6 +47,14 @@ public class UnitService {
     }
 
     @Transactional(readOnly = true)
+    public List<UnitDTO> findByCondominiumId(Long condominiumId) {
+        condominiumAccessService.validateAccess(condominiumId);
+        return unitRepository.findAllForCondominium(condominiumId).stream()
+                .map(UnitDTO::new)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public UnitDTO findById(Long id) {
         Optional<Unit> obj = unitRepository.findById(id);
         Unit entity = obj.orElseThrow(() -> new ResourceNotFoundException("Entity not found"));

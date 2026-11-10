@@ -28,7 +28,7 @@ public class ResidentController {
     private final ResidentService residentService;
 
 	@GetMapping
-	@PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<Page<ResidentDTO>> findAllPaged(Pageable pageable) {
 		Page<ResidentDTO> list = residentService.findAllPaged(pageable);
 		return ResponseEntity.ok().body(list);

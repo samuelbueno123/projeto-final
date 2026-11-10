@@ -32,7 +32,18 @@ public class UnitController {
 
     @GetMapping
 	@PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
-    public ResponseEntity<Page<UnitDTO>> findAll(Pageable pageable){
+    public ResponseEntity<?> findAll(
+            @RequestParam(value = "condominiumId", required = false) Long condominiumId,
+            Pageable pageable){
+        if (condominiumId != null) {
+            return ResponseEntity.ok().body(unitService.findByCondominiumId(condominiumId));
+        }
+        org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        boolean isAdmin = auth != null && auth.getAuthorities() != null && auth.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+        if (!isAdmin) {
+            throw new org.springframework.security.access.AccessDeniedException("Informe o parâmetro condominiumId para listar as unidades.");
+        }
         Page<UnitDTO> list = unitService.findAllPaged(pageable);
         return ResponseEntity.ok().body(list);
     }

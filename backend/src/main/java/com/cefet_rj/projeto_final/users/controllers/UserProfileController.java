@@ -12,6 +12,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -22,6 +23,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/users/me")
 @RequiredArgsConstructor
+@PreAuthorize("isAuthenticated()")
 public class UserProfileController {
     private final AuthenticatedUserService authenticatedUser;
     private final UserRepository users;
