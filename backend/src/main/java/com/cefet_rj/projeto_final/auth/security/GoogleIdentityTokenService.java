@@ -9,15 +9,23 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
 @Service
 public class GoogleIdentityTokenService {
     private final JwtDecoder decoder;
 
     public GoogleIdentityTokenService(@Value("${security.google.client-id}") String clientId) {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(5000);
+        requestFactory.setReadTimeout(5000);
+        RestTemplate restTemplate = new RestTemplate(requestFactory);
+
         NimbusJwtDecoder googleDecoder = NimbusJwtDecoder
                 .withJwkSetUri("https://www.googleapis.com/oauth2/v3/certs")
+                .restOperations(restTemplate)
                 .build();
         OAuth2TokenValidator<Jwt> issuer = jwt -> {
             String iss = jwt.getIssuer() != null ? jwt.getIssuer().toString() : "";

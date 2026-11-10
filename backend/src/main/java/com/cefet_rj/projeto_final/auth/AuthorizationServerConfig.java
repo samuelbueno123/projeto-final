@@ -78,7 +78,9 @@ public class AuthorizationServerConfig {
             OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator,
             UserDetailsService userDetailsService,
             PasswordEncoder passwordEncoder,
-            CorsConfigurationSource corsConfigurationSource
+            CorsConfigurationSource corsConfigurationSource,
+            com.cefet_rj.projeto_final.shared.observability.AuditLogService auditLogService,
+            com.cefet_rj.projeto_final.shared.observability.OperationalMetricsService metricsService
     ) throws Exception {
 
         OAuth2AuthorizationServerConfiguration.applyDefaultSecurity(http);
@@ -95,7 +97,9 @@ public class AuthorizationServerConfig {
                                                 authorizationService,
                                                 tokenGenerator,
                                                 userDetailsService,
-                                                passwordEncoder
+                                                passwordEncoder,
+                                                auditLogService,
+                                                metricsService
                                         )
                                 )
                 );

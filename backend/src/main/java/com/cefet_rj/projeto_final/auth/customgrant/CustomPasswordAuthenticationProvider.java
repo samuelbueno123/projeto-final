@@ -46,12 +46,24 @@ public class CustomPasswordAuthenticationProvider implements AuthenticationProvi
     private final OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator;
     private final UserDetailsService userDetailsService;
     private final PasswordEncoder passwordEncoder;
+    private final com.cefet_rj.projeto_final.shared.observability.AuditLogService auditLogService;
+    private final com.cefet_rj.projeto_final.shared.observability.OperationalMetricsService metricsService;
 
     public CustomPasswordAuthenticationProvider(
             OAuth2AuthorizationService authorizationService,
             OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator,
             UserDetailsService userDetailsService,
             PasswordEncoder passwordEncoder) {
+        this(authorizationService, tokenGenerator, userDetailsService, passwordEncoder, null, null);
+    }
+
+    public CustomPasswordAuthenticationProvider(
+            OAuth2AuthorizationService authorizationService,
+            OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator,
+            UserDetailsService userDetailsService,
+            PasswordEncoder passwordEncoder,
+            com.cefet_rj.projeto_final.shared.observability.AuditLogService auditLogService,
+            com.cefet_rj.projeto_final.shared.observability.OperationalMetricsService metricsService) {
 
         Assert.notNull(authorizationService, "authorizationService cannot be null");
         Assert.notNull(tokenGenerator, "tokenGenerator cannot be null");
@@ -62,6 +74,8 @@ public class CustomPasswordAuthenticationProvider implements AuthenticationProvi
         this.tokenGenerator = tokenGenerator;
         this.userDetailsService = userDetailsService;
         this.passwordEncoder = passwordEncoder;
+        this.auditLogService = auditLogService;
+        this.metricsService = metricsService;
     }
 
     @Override
@@ -88,11 +102,30 @@ public class CustomPasswordAuthenticationProvider implements AuthenticationProvi
         try {
             user = userDetailsService.loadUserByUsername(username);
         } catch (Exception e) {
+            if (auditLogService != null) {
+                auditLogService.logAuthentication(username, false, null, "USER_NOT_FOUND");
+            }
+            if (metricsService != null) {
+                metricsService.recordLoginFailure("USER_NOT_FOUND");
+            }
             throw invalidGrant("Invalid credentials");
         }
 
         if (!passwordEncoder.matches(password, user.getPassword())) {
+            if (auditLogService != null) {
+                auditLogService.logAuthentication(username, false, null, "BAD_CREDENTIALS");
+            }
+            if (metricsService != null) {
+                metricsService.recordLoginFailure("BAD_CREDENTIALS");
+            }
             throw invalidGrant("Invalid credentials");
+        }
+
+        if (auditLogService != null) {
+            auditLogService.logAuthentication(username, true, null, "PASSWORD_GRANT_SUCCESS");
+        }
+        if (metricsService != null) {
+            metricsService.recordLoginSuccess();
         }
 
         Set<String> requestedScopes =

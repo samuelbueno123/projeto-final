@@ -70,6 +70,8 @@ public class ResourceServerConfig {
                         authorize.requestMatchers("/h2-console/**").permitAll();
                     }
                     authorize
+                            .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
+                            .requestMatchers("/actuator/**").hasAuthority("ROLE_ADMIN")
                             .requestMatchers("/oauth2/**").permitAll()
                             .requestMatchers(HttpMethod.POST, "/auth/google").permitAll()
                             .requestMatchers(HttpMethod.GET, "/media/pictures/**").permitAll()
@@ -130,7 +132,8 @@ public class ResourceServerConfig {
         CorsConfiguration corsConfig = new CorsConfiguration();
         corsConfig.setAllowedOriginPatterns(Arrays.asList(corsOrigins.split(",")));
         corsConfig.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"));
-        corsConfig.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Accept", "Cache-Control", "Last-Event-ID", "X-Requested-With", "Origin"));
+        corsConfig.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Accept", "Cache-Control", "Last-Event-ID", "X-Requested-With", "Origin", "X-Correlation-ID", "X-Request-ID"));
+        corsConfig.setExposedHeaders(Arrays.asList("X-Correlation-ID", "X-Request-ID"));
         corsConfig.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source =

@@ -19,7 +19,6 @@ public class ValidationError extends StandardError {
             String message,
             String path
     ) {
-
         super(
                 timestamp,
                 status,
@@ -29,11 +28,28 @@ public class ValidationError extends StandardError {
         );
     }
 
+    public ValidationError(
+            Instant timestamp,
+            Integer status,
+            String error,
+            String message,
+            String path,
+            String correlationId
+    ) {
+        super(
+                timestamp,
+                status,
+                error,
+                message,
+                path,
+                correlationId
+        );
+    }
+
     public void addError(
             String fieldName,
             String message
     ) {
-
         errors.add(
                 new FieldMessage(
                         fieldName,

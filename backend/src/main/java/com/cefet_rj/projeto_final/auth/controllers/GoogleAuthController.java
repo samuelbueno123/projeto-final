@@ -35,6 +35,8 @@ public class GoogleAuthController {
     private final RoleRepository roles;
     private final PasswordEncoder passwordEncoder;
     private final JWKSource<SecurityContext> jwkSource;
+    private final com.cefet_rj.projeto_final.shared.observability.AuditLogService auditLogService;
+    private final com.cefet_rj.projeto_final.shared.observability.OperationalMetricsService metricsService;
 
     @Value("${security.jwt.duration}") private long tokenDurationSeconds;
 
@@ -44,6 +46,8 @@ public class GoogleAuthController {
         try {
             google = googleTokens.verify(request.idToken());
         } catch (RuntimeException exception) {
+            auditLogService.logAuthentication("UNKNOWN_GOOGLE", false, null, "INVALID_GOOGLE_TOKEN");
+            metricsService.recordLoginFailure("INVALID_GOOGLE_TOKEN");
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Token Google inválido ou expirado.");
         }
         String email = google.getClaimAsString("email").trim().toLowerCase();
@@ -70,6 +74,8 @@ public class GoogleAuthController {
                 .claim("authorities", user.getAuthorities().stream().map(a -> a.getAuthority()).toList())
                 .build();
         String token = new NimbusJwtEncoder(jwkSource).encode(JwtEncoderParameters.from(claims)).getTokenValue();
+        auditLogService.logAuthentication(user.getEmail(), true, null, "GOOGLE_LOGIN_SUCCESS");
+        metricsService.recordLoginSuccess();
         return ResponseEntity.ok(new GoogleLoginResponse(token, "Bearer", tokenDurationSeconds,
                 user.getEmail(), user.getFirstName() + " " + user.getLastName()));
     }
