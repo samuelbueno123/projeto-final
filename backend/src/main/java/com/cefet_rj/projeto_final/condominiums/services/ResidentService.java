@@ -81,7 +81,7 @@ public class ResidentService {
         }
     }
 
-    @Transactional(propagation = Propagation.SUPPORTS)
+    @Transactional
     public void delete(Long id) {
         Resident entity = residentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Resource not found"));

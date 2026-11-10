@@ -94,10 +94,11 @@ class ReservationServiceUnitTest {
         Role role = new Role();
         role.setAuthority("ROLE_USER");
         residentUser.addRole(role);
+
+        lenient().when(commonAreaRepository.findByIdForUpdate(anyLong())).thenReturn(Optional.of(area));
     }
 
     private void setupCommonMocks() {
-        when(commonAreaRepository.findByIdForUpdate(area.getId())).thenReturn(Optional.of(area));
         when(authenticatedUserService.getAuthenticatedUser()).thenReturn(residentUser);
     }
 

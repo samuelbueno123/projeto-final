@@ -103,7 +103,7 @@ public class UnitService {
         }
     }
 
-    @Transactional(propagation = Propagation.SUPPORTS)
+    @Transactional
     public void delete(Long id) {
         Unit entity = unitRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Resource not found"));

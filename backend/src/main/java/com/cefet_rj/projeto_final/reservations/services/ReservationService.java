@@ -257,6 +257,7 @@ public class ReservationService {
     public ReservationDTO approve(Long id) {
         Reservation reservation = reservationRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Reservation not found: " + id));
+        findCommonAreaByIdForUpdate(reservation.getCommonArea().getId());
         Long condominiumId = reservation.getCommonArea().getCondominium().getId();
         featureAccessService.validateFeatureEnabled(condominiumId, FeatureCode.RESERVATIONS);
         condominiumAccessService.validateStaffAccess(condominiumId);
@@ -377,6 +378,7 @@ public class ReservationService {
     public ReservationDTO modifyAndConfirm(Long id, ReservationDTO.ModifyAndConfirmDTO dto) {
         Reservation reservation = reservationRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Reservation not found: " + id));
+        findCommonAreaByIdForUpdate(reservation.getCommonArea().getId());
         Long condominiumId = reservation.getCommonArea().getCondominium().getId();
         featureAccessService.validateFeatureEnabled(condominiumId, FeatureCode.RESERVATIONS);
         condominiumAccessService.validateStaffAccess(condominiumId);
@@ -480,6 +482,8 @@ public class ReservationService {
                                         "Reservation not found: " + id
                                 )
                         );
+
+        findCommonAreaByIdForUpdate(reservation.getCommonArea().getId());
 
         Long condominiumId =
                 reservation.getCommonArea()

@@ -182,6 +182,11 @@ public interface MembershipRepository extends JpaRepository<Membership, Long> {
             @Param("authority") String authority
     );
 
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"user", "condominium", "role", "requestedUnit", "requestedUnit.sector"})
+    @org.springframework.lang.NonNull
+    Page<Membership> findAll(@org.springframework.lang.NonNull Pageable pageable);
+
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"user", "condominium", "role", "requestedUnit", "requestedUnit.sector"})
     @Query(
             value = """
                     select m

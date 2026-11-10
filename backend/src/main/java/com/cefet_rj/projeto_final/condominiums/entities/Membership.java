@@ -11,7 +11,12 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Data
-@Table(name = "tb_condominium_user")
+@Table(
+        name = "tb_condominium_user",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_condominium_user_role", columnNames = {"condominium_id", "user_id", "role_id"})
+        }
+)
 @Entity
 public class Membership {
 

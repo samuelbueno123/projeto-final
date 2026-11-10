@@ -103,7 +103,7 @@ public class SectorService {
         return new SectorDTO(entity);
     }
 
-    @Transactional(propagation = Propagation.SUPPORTS)
+    @Transactional
     public void delete(Long id) {
         Sector entity = sectorRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Resource not found"));

@@ -11,13 +11,23 @@ import java.util.List;
 
 public interface PackageRepository extends JpaRepository<Package, Long> {
 
-    @Query("""
-    SELECT p
-    FROM Package p
-    JOIN p.unit u
-    JOIN u.sector s
-    WHERE s.condominium.id = :condominiumId
-""")
+    @Query(
+            value = """
+        SELECT p
+        FROM Package p
+        JOIN FETCH p.recipient
+        JOIN FETCH p.unit u
+        JOIN FETCH u.sector s
+        WHERE s.condominium.id = :condominiumId
+    """,
+            countQuery = """
+        SELECT COUNT(p)
+        FROM Package p
+        JOIN p.unit u
+        JOIN u.sector s
+        WHERE s.condominium.id = :condominiumId
+    """
+    )
     Page<Package> findByCondominiumId(Long condominiumId, Pageable pageable);
 
     @Query(

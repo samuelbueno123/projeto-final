@@ -14,7 +14,12 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 @Entity
-@Table(name = "tb_key_registry")
+@Table(
+        name = "tb_key_registry",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_key_registry_condo_code", columnNames = {"condominium_id", "key_code"})
+        }
+)
 public class KeyRegistryEntry {
 
     @Id

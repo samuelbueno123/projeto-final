@@ -86,7 +86,7 @@ public class CondominiumService {
         return new CondominiumDTO(entity);
     }
 
-    @Transactional(propagation = Propagation.SUPPORTS)
+    @Transactional
     public void delete(Long id) {
         if (!condominiumRepository.existsById(id)) {
             throw new ResourceNotFoundException("Resource not found");

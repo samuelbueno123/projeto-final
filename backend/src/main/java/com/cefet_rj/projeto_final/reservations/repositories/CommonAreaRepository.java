@@ -2,6 +2,7 @@ package com.cefet_rj.projeto_final.reservations.repositories;
 
 import com.cefet_rj.projeto_final.reservations.entities.CommonArea;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -13,11 +14,13 @@ import java.util.Optional;
 public interface CommonAreaRepository
         extends JpaRepository<CommonArea, Long> {
 
+    @EntityGraph(attributePaths = {"condominium"})
     List<CommonArea>
     findByCondominiumIdAndActiveTrueOrderByNameAsc(
             Long condominiumId
     );
 
+    @EntityGraph(attributePaths = {"condominium"})
     List<CommonArea>
     findByCondominiumIdOrderByNameAsc(
             Long condominiumId

@@ -40,6 +40,8 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -94,17 +96,21 @@ public class MembershipService {
     @Transactional(readOnly = true)
     public List<AvailableUnitDTO> findAvailableUnits(Long condominiumId) {
         ensureCondominiumExists(condominiumId);
-        return unitRepository.findAllForCondominium(condominiumId).stream()
-                .map(u -> {
-                    int count = residentRepository.findAllByUnitIdWithUser(u.getId()).size();
-                    return new AvailableUnitDTO(
-                            u.getId(),
-                            u.getIdentifier(),
-                            u.getSector().getId(),
-                            u.getSector().getName(),
-                            count
-                    );
-                })
+        List<Unit> units = unitRepository.findAllForCondominium(condominiumId);
+        List<Object[]> residentCounts = residentRepository.countResidentsByUnitForCondominium(condominiumId);
+        Map<Long, Integer> countMap = residentCounts.stream()
+                .collect(Collectors.toMap(
+                        row -> (Long) row[0],
+                        row -> ((Number) row[1]).intValue()
+                ));
+        return units.stream()
+                .map(u -> new AvailableUnitDTO(
+                        u.getId(),
+                        u.getIdentifier(),
+                        u.getSector().getId(),
+                        u.getSector().getName(),
+                        countMap.getOrDefault(u.getId(), 0)
+                ))
                 .toList();
     }
 
@@ -164,7 +170,10 @@ public class MembershipService {
         }
 
         Role role = getOrCreateRole(authority);
-        Membership req = new Membership();
+        Membership req = existing.stream()
+                .filter(m -> m.getStatus() == MembershipStatus.DECLINED)
+                .findFirst()
+                .orElseGet(Membership::new);
         req.setUser(user);
         req.setCondominium(condominium);
         req.setRole(role);
@@ -173,6 +182,7 @@ public class MembershipService {
         req.setRequestedResidentType("ROLE_RESIDENT".equals(authority) ? resType : null);
         req.setRequestMessage(dto.message() == null || dto.message().isBlank() ? null : dto.message().trim());
         req.setCreatedAt(LocalDateTime.now());
+        req.setRespondedAt(null);
         req = membershipRepository.saveAndFlush(req);
 
         // Notify condominium managers
@@ -339,7 +349,14 @@ public class MembershipService {
 
     private MembershipDTO enrichWithUnitInfo(Membership m) {
         MembershipDTO base = new MembershipDTO(m);
-        if ( m.getUser() != null && m.getCondominium() != null) {
+        if (m.getRequestedUnit() != null) {
+            Unit u = m.getRequestedUnit();
+            String sectorName = u.getSector() != null ? u.getSector().getName() : "";
+            String label = sectorName + " • Unid. " + u.getIdentifier();
+            String rType = m.getRequestedResidentType() != null ? m.getRequestedResidentType().name() : null;
+            return base.withUnitInfo(u.getId(), label, rType, u.getIdentifier(), sectorName);
+        }
+        if (m.getUser() != null && m.getCondominium() != null) {
             var resOpt = residentRepository.findFirstByUserIdAndUnitSectorCondominiumId(
                     m.getUser().getId(),
                     m.getCondominium().getId()
@@ -499,7 +516,10 @@ public class MembershipService {
             }
         }
 
-        Membership invitation = new Membership();
+        Membership invitation = existing.stream()
+                .filter(m -> m.getStatus() == MembershipStatus.DECLINED)
+                .findFirst()
+                .orElseGet(Membership::new);
         invitation.setUser(recipient);
         invitation.setCondominium(condominium);
         invitation.setRole(role);
@@ -507,6 +527,7 @@ public class MembershipService {
         invitation.setRequestedUnit(requestedUnit);
         invitation.setRequestedResidentType("ROLE_RESIDENT".equals(authority) ? requestedType : null);
         invitation.setCreatedAt(LocalDateTime.now());
+        invitation.setRespondedAt(null);
         invitation = membershipRepository.saveAndFlush(invitation);
 
         String roleLabel = "ROLE_DOORMAN".equals(authority) ? "porteiro" : "morador";

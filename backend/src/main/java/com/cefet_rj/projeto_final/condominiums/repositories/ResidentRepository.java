@@ -1,14 +1,30 @@
 package com.cefet_rj.projeto_final.condominiums.repositories;
 
 import com.cefet_rj.projeto_final.condominiums.entities.Resident;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.lang.NonNull;
 
 import java.util.List;
 import java.util.Optional;
 
 public interface ResidentRepository extends JpaRepository<Resident, Long> {
+
+    @EntityGraph(attributePaths = {"user", "unit", "unit.sector", "unit.sector.condominium"})
+    @NonNull
+    Page<Resident> findAll(@NonNull Pageable pageable);
+
+    @Query("""
+            select r.unit.id, count(r)
+            from Resident r
+            where r.unit.sector.condominium.id = :condominiumId
+            group by r.unit.id
+            """)
+    List<Object[]> countResidentsByUnitForCondominium(@Param("condominiumId") Long condominiumId);
 
     Optional<Resident> findFirstByUnitId(Long unitId);
 

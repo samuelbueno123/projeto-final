@@ -6,7 +6,12 @@ import jakarta.persistence.*;
 import lombok.Data;
 
 @Data
-@Table(name = "tb_resident")
+@Table(
+        name = "tb_resident",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_resident_user_unit", columnNames = {"user_id", "unit_id"})
+        }
+)
 @Entity
 public class Resident {
 
