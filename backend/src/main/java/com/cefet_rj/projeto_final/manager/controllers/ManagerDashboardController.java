@@ -60,6 +60,12 @@ public class ManagerDashboardController {
     private final NotificationService notificationService;
     private final BillingPlanRepository billingPlanRepository;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.cefet_rj.projeto_final.condominiums.security.CondominiumFeatureAccessService featureAccessService;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.cefet_rj.projeto_final.realtime.services.RealtimeEmitterService realtimeEmitterService;
+
     @GetMapping("/manager/dashboard")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
     @Transactional(readOnly = true)
@@ -139,6 +145,9 @@ public class ManagerDashboardController {
         condo.setBillingPlan(plan);
         condo.setPlanSelected(true);
         condo = condominiumRepository.save(condo);
+        if (featureAccessService != null) {
+            featureAccessService.evictCondoFeaturesCache();
+        }
         return ResponseEntity.ok(new CondominiumDTO(condo));
     }
 
@@ -162,12 +171,26 @@ public class ManagerDashboardController {
         payment.setDueDate(dto.dueDate());
         payment.setAmount(dto.amount());
         payment.setPaymentNote(dto.paymentNote());
-        if (payment.getStatus() == UnitPaymentStatus.PAID && payment.getPaidAt() == null) {
-            payment.setPaidAt(LocalDateTime.now());
+        if (payment.getStatus() == UnitPaymentStatus.PAID) {
+            if (payment.getPaidAt() == null) {
+                payment.setPaidAt(LocalDateTime.now());
+            }
+        } else {
+            payment.setPaidAt(null);
         }
         payment.setUpdatedAt(LocalDateTime.now());
         payment.setUpdatedBy(viewer);
-        paymentRepository.save(payment);
+        payment = paymentRepository.save(payment);
+        if (realtimeEmitterService != null) {
+            realtimeEmitterService.sendToCondominium(
+                    condominiumId,
+                    com.cefet_rj.projeto_final.realtime.dtos.RealtimeEventDTO.of(
+                            "INVOICE_UPDATED",
+                            condominiumId,
+                            toUnitInfo(unit, payment)
+                    )
+            );
+        }
         return ResponseEntity.noContent().build();
     }
 
@@ -213,20 +236,18 @@ public class ManagerDashboardController {
         payment.setUpdatedAt(LocalDateTime.now());
         payment.setUpdatedBy(viewer);
         payment = paymentRepository.save(payment);
-
-        return ResponseEntity.ok(new ManagerDashboardDTO.UnitInfo(
-                unit.getId(),
-                unit.getIdentifier(),
-                unit.getSector().getName(),
-                payment.getStatus().name(),
-                payment.getDueDate(),
-                payment.getAmount(),
-                payment.getPaymentNote(),
-                payment.getRequestedAt(),
-                payment.getInvoiceTitle(),
-                payment.getDigitableLine(),
-                payment.getPaidAt()
-        ));
+        ManagerDashboardDTO.UnitInfo unitInfo = toUnitInfo(unit, payment);
+        if (realtimeEmitterService != null) {
+            realtimeEmitterService.sendToCondominium(
+                    condominiumId,
+                    com.cefet_rj.projeto_final.realtime.dtos.RealtimeEventDTO.of(
+                            "INVOICE_UPDATED",
+                            condominiumId,
+                            unitInfo
+                    )
+            );
+        }
+        return ResponseEntity.ok(unitInfo);
     }
 
     @PostMapping("/condominiums/{condominiumId}/units/{unitId}/pay-boleto")
@@ -256,20 +277,18 @@ public class ManagerDashboardController {
         payment.setUpdatedAt(LocalDateTime.now());
         payment.setUpdatedBy(user);
         payment = paymentRepository.save(payment);
-
-        return ResponseEntity.ok(new ManagerDashboardDTO.UnitInfo(
-                unit.getId(),
-                unit.getIdentifier(),
-                unit.getSector().getName(),
-                payment.getStatus().name(),
-                payment.getDueDate(),
-                payment.getAmount(),
-                payment.getPaymentNote(),
-                payment.getRequestedAt(),
-                payment.getInvoiceTitle(),
-                payment.getDigitableLine(),
-                payment.getPaidAt()
-        ));
+        ManagerDashboardDTO.UnitInfo unitInfo = toUnitInfo(unit, payment);
+        if (realtimeEmitterService != null) {
+            realtimeEmitterService.sendToCondominium(
+                    condominiumId,
+                    com.cefet_rj.projeto_final.realtime.dtos.RealtimeEventDTO.of(
+                            "INVOICE_UPDATED",
+                            condominiumId,
+                            unitInfo
+                    )
+            );
+        }
+        return ResponseEntity.ok(unitInfo);
     }
 
     @GetMapping("/condominiums/{condominiumId}/units/{unitId}/payment-status")
@@ -390,19 +409,19 @@ public class ManagerDashboardController {
             );
         }
 
-        return ResponseEntity.ok(new ManagerDashboardDTO.UnitInfo(
-                unit.getId(),
-                unit.getIdentifier(),
-                unit.getSector().getName(),
-                payment.getStatus().name(),
-                payment.getDueDate(),
-                payment.getAmount(),
-                payment.getPaymentNote(),
-                payment.getRequestedAt(),
-                payment.getInvoiceTitle(),
-                payment.getDigitableLine(),
-                payment.getPaidAt()
-        ));
+        ManagerDashboardDTO.UnitInfo unitInfo = toUnitInfo(unit, payment);
+        if (realtimeEmitterService != null) {
+            realtimeEmitterService.sendToCondominium(
+                    condominiumId,
+                    com.cefet_rj.projeto_final.realtime.dtos.RealtimeEventDTO.of(
+                            "INVOICE_UPDATED",
+                            condominiumId,
+                            unitInfo
+                    )
+            );
+        }
+
+        return ResponseEntity.ok(unitInfo);
     }
 
     @GetMapping("/manager/condominiums/{condominiumId}/sectors")
@@ -431,6 +450,9 @@ public class ManagerDashboardController {
         String name = body.getOrDefault("name", "").trim();
         if (name.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Informe o nome do setor/bloco.");
+        }
+        if (sectorRepository.findByCondominiumIdAndNameIgnoreCase(condominiumId, name).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe um setor/bloco com esse nome neste condomínio.");
         }
         SectorStructuralType type = SectorStructuralType.BLOCK;
         String rawType = body.get("structuralType");
@@ -467,11 +489,30 @@ public class ManagerDashboardController {
         if (!sector.getCondominium().getId().equals(condominiumId)) {
             throw new AccessDeniedException("Setor fora deste condomínio");
         }
+        if (unitRepository.existsBySectorIdAndIdentifierIgnoreCase(sector.getId(), identifier)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe uma unidade com este identificador neste setor.");
+        }
         Unit unit = new Unit();
         unit.setIdentifier(identifier);
         unit.setSector(sector);
         unit = unitRepository.save(unit);
         return ResponseEntity.status(HttpStatus.CREATED).body(new UnitDTO(unit));
+    }
+
+    private static ManagerDashboardDTO.UnitInfo toUnitInfo(Unit unit, UnitPayment payment) {
+        return new ManagerDashboardDTO.UnitInfo(
+                unit.getId(),
+                unit.getIdentifier(),
+                unit.getSector().getName(),
+                payment.getStatus().name(),
+                payment.getDueDate(),
+                payment.getAmount(),
+                payment.getPaymentNote(),
+                payment.getRequestedAt(),
+                payment.getInvoiceTitle(),
+                payment.getDigitableLine(),
+                payment.getPaidAt()
+        );
     }
 
     private void ensureAccess(User viewer, Long condominiumId) {

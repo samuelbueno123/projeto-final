@@ -71,7 +71,7 @@ services:
 
   frontend:
     build:
-      context: ../../projeto-front
+      context: ../projeto-front
       dockerfile: Dockerfile
       args:
         API_BASE_URL: ${API_BASE_URL:-http://localhost:8080}

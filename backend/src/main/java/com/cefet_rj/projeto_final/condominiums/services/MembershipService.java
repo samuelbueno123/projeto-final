@@ -517,7 +517,7 @@ public class MembershipService {
         }
 
         Membership invitation = existing.stream()
-                .filter(m -> m.getStatus() == MembershipStatus.DECLINED)
+                .filter(m -> m.getStatus() != MembershipStatus.ACTIVE)
                 .findFirst()
                 .orElseGet(Membership::new);
         invitation.setUser(recipient);
@@ -679,7 +679,10 @@ public class MembershipService {
 
         Role managerRole = getOrCreateRole("ROLE_MANAGER");
 
-        Membership membership = new Membership();
+        Membership membership = existing.stream()
+                .filter(m -> m.getStatus() != MembershipStatus.ACTIVE)
+                .findFirst()
+                .orElseGet(Membership::new);
         membership.setUser(targetUser);
         membership.setCondominium(condominium);
         membership.setRole(managerRole);

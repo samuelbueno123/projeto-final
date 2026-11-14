@@ -29,8 +29,11 @@ LABEL org.opencontainers.image.title="Gestao Condominial Backend API" \
       org.opencontainers.image.version="1.0.0" \
       org.opencontainers.image.licenses="MIT"
 
-# Security: Create non-root system group and user (UID/GID 10001)
-RUN groupadd -g 10001 -r appgroup && \
+# Security: Install healthcheck tools and create non-root system group and user (UID/GID 10001)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl wget && \
+    rm -rf /var/lib/apt/lists/* && \
+    groupadd -g 10001 -r appgroup && \
     useradd -u 10001 -r -g appgroup -s /usr/sbin/nologin -d /app -c "Application Runner" appuser
 
 WORKDIR /app

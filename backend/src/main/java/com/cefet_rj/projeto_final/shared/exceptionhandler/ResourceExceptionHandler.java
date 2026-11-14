@@ -1,13 +1,15 @@
 package com.cefet_rj.projeto_final.shared.exceptionhandler;
 
-import com.cefet_rj.projeto_final.packages.exceptions.InvalidPackageStateTransitionException;
-import com.cefet_rj.projeto_final.packages.exceptions.InvalidStatusException;
 import com.cefet_rj.projeto_final.reservations.exceptions.ReservationConflictException;
 import com.cefet_rj.projeto_final.shared.exceptions.DatabaseException;
 import com.cefet_rj.projeto_final.shared.exceptions.ForbiddenException;
+import com.cefet_rj.projeto_final.shared.exceptions.InvalidPackageStateTransitionException;
+import com.cefet_rj.projeto_final.shared.exceptions.InvalidStatusException;
 import com.cefet_rj.projeto_final.shared.exceptions.ResourceNotFoundException;
 import com.cefet_rj.projeto_final.shared.observability.ObservabilityConstants;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -318,6 +320,34 @@ public class ResourceExceptionHandler {
 
         for (FieldError fieldError : exception.getBindingResult().getFieldErrors()) {
             error.addError(fieldError.getField(), fieldError.getDefaultMessage());
+        }
+
+        return ResponseEntity.status(status).body(error);
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<StandardError> constraintViolation(
+            ConstraintViolationException exception,
+            HttpServletRequest request
+    ) {
+        HttpStatus status = HttpStatus.BAD_REQUEST;
+        String correlationId = getCorrelationId(request);
+
+        log.warn("Constraint violation [correlationId={}, path={}]: {} violations",
+                correlationId, request.getRequestURI(), exception.getConstraintViolations().size());
+
+        ValidationError error = new ValidationError(
+                Instant.now(),
+                status.value(),
+                "Validation error",
+                "Um ou mais parâmetros contêm valores inválidos",
+                request.getRequestURI(),
+                correlationId
+        );
+
+        for (ConstraintViolation<?> violation : exception.getConstraintViolations()) {
+            String field = violation.getPropertyPath() != null ? violation.getPropertyPath().toString() : "parameter";
+            error.addError(field, violation.getMessage());
         }
 
         return ResponseEntity.status(status).body(error);

@@ -14,4 +14,6 @@ public interface KeyRegistryEntryRepository extends JpaRepository<KeyRegistryEnt
 
     @EntityGraph(attributePaths = {"unit", "checkedOutBy", "checkedInBy"})
     List<KeyRegistryEntry> findByCondominiumIdAndCurrentStatusOrderByKeyCodeAsc(Long condominiumId, String currentStatus);
+
+    boolean existsByCondominiumIdAndKeyCodeIgnoreCase(Long condominiumId, String keyCode);
 }

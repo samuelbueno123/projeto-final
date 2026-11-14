@@ -29,7 +29,7 @@ CREATE INDEX IF NOT EXISTS idx_visitor_condo_plate
     ON tb_visitor_access(condominium_id, vehicle_plate);
 
 CREATE INDEX IF NOT EXISTS idx_package_history_package_desc 
-    ON tb_package_history(package_id, changed_at DESC);
+    ON tb_package_history(package_id, performed_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_unit_sector_ident 
     ON tb_unit(sector_id, identifier);

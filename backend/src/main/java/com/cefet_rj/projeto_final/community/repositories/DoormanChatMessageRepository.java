@@ -70,4 +70,25 @@ public interface DoormanChatMessageRepository extends JpaRepository<DoormanChatM
           AND m.isRead = false
     """)
     void markAsReadForUser(@Param("condoId") Long condoId, @Param("userId") Long userId);
+
+    @Modifying
+    @Query("""
+        UPDATE DoormanChatMessage m
+        SET m.isRead = true
+        WHERE m.condominium.id = :condoId
+          AND (m.recipient.id = :userId OR (m.recipient IS NULL AND m.senderRole = 'RESIDENT'))
+          AND m.isRead = false
+    """)
+    int markAllAsReadForStaff(@Param("condoId") Long condoId, @Param("userId") Long userId);
+
+    @Modifying
+    @Query("""
+        UPDATE DoormanChatMessage m
+        SET m.isRead = true
+        WHERE m.condominium.id = :condoId
+          AND m.sender.id = :senderId
+          AND m.senderRole = 'RESIDENT'
+          AND m.isRead = false
+    """)
+    int markConversationAsReadForStaff(@Param("condoId") Long condoId, @Param("senderId") Long senderId);
 }

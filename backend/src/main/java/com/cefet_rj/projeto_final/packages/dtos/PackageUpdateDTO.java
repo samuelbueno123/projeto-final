@@ -1,8 +1,10 @@
 package com.cefet_rj.projeto_final.packages.dtos;
 
 import com.cefet_rj.projeto_final.packages.entities.Package;
+import jakarta.validation.constraints.NotBlank;
 
 public record PackageUpdateDTO(
+        @NotBlank(message = "Descrição é obrigatória")
         String description,
         Long recipientId,
         Long unitId

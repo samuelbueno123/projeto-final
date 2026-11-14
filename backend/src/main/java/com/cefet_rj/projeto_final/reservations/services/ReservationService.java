@@ -6,6 +6,8 @@ import com.cefet_rj.projeto_final.condominiums.security.CondominiumAccessService
 import com.cefet_rj.projeto_final.condominiums.security.CondominiumFeatureAccessService;
 import com.cefet_rj.projeto_final.notifications.enums.NotificationType;
 import com.cefet_rj.projeto_final.notifications.services.NotificationService;
+import com.cefet_rj.projeto_final.realtime.dtos.RealtimeEventDTO;
+import com.cefet_rj.projeto_final.realtime.services.RealtimeEmitterService;
 import com.cefet_rj.projeto_final.reservations.dtos.ReservationDTO;
 import com.cefet_rj.projeto_final.reservations.dtos.ReservationRequestDTO;
 import com.cefet_rj.projeto_final.reservations.entities.CommonArea;
@@ -19,6 +21,7 @@ import com.cefet_rj.projeto_final.shared.exceptions.ResourceNotFoundException;
 import com.cefet_rj.projeto_final.users.entities.User;
 import com.cefet_rj.projeto_final.users.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +34,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.temporal.TemporalAdjusters;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -44,6 +48,9 @@ public class ReservationService {
     private final CondominiumAccessService condominiumAccessService;
     private final CondominiumFeatureAccessService featureAccessService;
     private final NotificationService notificationService;
+
+    @Autowired(required = false)
+    private RealtimeEmitterService realtimeEmitterService;
 
     @Transactional
     public ReservationDTO create(
@@ -77,6 +84,9 @@ public class ReservationService {
         if (condominiumAccessService.isManagerOrAdmin(authenticatedUser, condominiumId) && dto.reservedById() != null) {
             user = userRepository.findById(dto.reservedById())
                     .orElseThrow(() -> new ResourceNotFoundException("User not found: " + dto.reservedById()));
+            if (!user.hasRole("ROLE_ADMIN")) {
+                condominiumAccessService.validateUserBelongsToCondominium(user.getId(), condominiumId);
+            }
         }
 
         if (dto.startAt() == null || dto.endAt() == null) {
@@ -158,6 +168,7 @@ public class ReservationService {
         }
 
         reservation = reservationRepository.save(reservation);
+        emitReservationUpdated(condominiumId, reservation);
 
         if (reservation.getStatus() != ReservationStatus.WAITLISTED) {
             eventPublisher.publishEvent(
@@ -211,7 +222,7 @@ public class ReservationService {
         LocalDateTime now = LocalDateTime.now();
 
         int minAdvanceHours = commonArea.getMinAdvanceHours() != null ? commonArea.getMinAdvanceHours() : 1;
-        if (minAdvanceHours > 1 && startAt.isBefore(now.plusHours(minAdvanceHours).minusMinutes(5))) {
+        if (minAdvanceHours > 0 && startAt.isBefore(now.plusHours(minAdvanceHours).minusMinutes(5))) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "A reserva exige antecedência mínima de " + minAdvanceHours + "h."
@@ -291,6 +302,7 @@ public class ReservationService {
         reservation.setReviewedBy(reviewer);
         reservation.setReviewedAt(LocalDateTime.now());
         reservation = reservationRepository.save(reservation);
+        emitReservationUpdated(condominiumId, reservation);
 
         notificationService.createDirectNotification(
                 reservation.getReservedBy(),
@@ -324,6 +336,7 @@ public class ReservationService {
         reservation.setReviewedBy(reviewer);
         reservation.setReviewedAt(LocalDateTime.now());
         reservation = reservationRepository.save(reservation);
+        emitReservationUpdated(condominiumId, reservation);
 
         notificationService.createDirectNotification(
                 reservation.getReservedBy(),
@@ -352,6 +365,17 @@ public class ReservationService {
         featureAccessService.validateFeatureEnabled(condominiumId, FeatureCode.RESERVATIONS);
         condominiumAccessService.validateStaffAccess(condominiumId);
 
+        if (reservation.getStatus() == ReservationStatus.CANCELLED
+                || reservation.getStatus() == ReservationStatus.REJECTED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Não é possível enviar contraproposta para uma reserva cancelada ou recusada.");
+        }
+        if (dto.proposedStartAt() == null || dto.proposedEndAt() == null
+                || !dto.proposedEndAt().isAfter(dto.proposedStartAt())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "O horário proposto de término deve ser posterior ao horário de início.");
+        }
+
         User reviewer = authenticatedUserService.getAuthenticatedUser();
         reservation.setStatus(ReservationStatus.COUNTER_PROPOSED);
         reservation.setProposedStartAt(dto.proposedStartAt());
@@ -360,6 +384,7 @@ public class ReservationService {
         reservation.setReviewedBy(reviewer);
         reservation.setReviewedAt(LocalDateTime.now());
         reservation = reservationRepository.save(reservation);
+        emitReservationUpdated(condominiumId, reservation);
 
         notificationService.createDirectNotification(
                 reservation.getReservedBy(),
@@ -383,9 +408,34 @@ public class ReservationService {
         featureAccessService.validateFeatureEnabled(condominiumId, FeatureCode.RESERVATIONS);
         condominiumAccessService.validateStaffAccess(condominiumId);
 
+        if (reservation.getStatus() == ReservationStatus.CANCELLED
+                || reservation.getStatus() == ReservationStatus.REJECTED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Não é possível confirmar uma reserva cancelada ou recusada.");
+        }
+
+        LocalDateTime effectiveStart = dto.startAt() != null ? dto.startAt() : reservation.getStartAt();
+        LocalDateTime effectiveEnd = dto.endAt() != null ? dto.endAt() : reservation.getEndAt();
+        if (effectiveStart == null || effectiveEnd == null || !effectiveEnd.isAfter(effectiveStart)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "O horário de término deve ser posterior ao horário de início.");
+        }
+
+        List<Reservation> activeOverlapping = reservationRepository.findActiveOverlapping(
+                reservation.getCommonArea().getId(),
+                effectiveStart,
+                effectiveEnd
+        );
+        boolean hasConflict = activeOverlapping.stream()
+                .anyMatch(r -> !r.getId().equals(id)
+                        && (r.getStatus() == ReservationStatus.CONFIRMED || r.getStatus() == ReservationStatus.PENDING));
+        if (hasConflict) {
+            throw new ReservationConflictException("Já existe outra reserva ativa para este mesmo período.");
+        }
+
         User reviewer = authenticatedUserService.getAuthenticatedUser();
-        if (dto.startAt() != null) reservation.setStartAt(dto.startAt());
-        if (dto.endAt() != null) reservation.setEndAt(dto.endAt());
+        reservation.setStartAt(effectiveStart);
+        reservation.setEndAt(effectiveEnd);
         if (dto.notes() != null && !dto.notes().isBlank()) {
             reservation.setNotes(dto.notes().trim());
         }
@@ -395,6 +445,7 @@ public class ReservationService {
         reservation.setReviewedBy(reviewer);
         reservation.setReviewedAt(LocalDateTime.now());
         reservation = reservationRepository.save(reservation);
+        emitReservationUpdated(condominiumId, reservation);
 
         notificationService.createDirectNotification(
                 reservation.getReservedBy(),
@@ -413,6 +464,7 @@ public class ReservationService {
     public ReservationDTO acceptCounterProposal(Long id) {
         Reservation reservation = reservationRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Reservation not found: " + id));
+        findCommonAreaByIdForUpdate(reservation.getCommonArea().getId());
         User user = authenticatedUserService.getAuthenticatedUser();
         if (!reservation.getReservedBy().getId().equals(user.getId()) && !user.hasRole("ROLE_ADMIN")) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Não autorizado.");
@@ -420,14 +472,35 @@ public class ReservationService {
         if (reservation.getStatus() != ReservationStatus.COUNTER_PROPOSED) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Esta reserva não possui uma contraproposta ativa.");
         }
-        if (reservation.getProposedStartAt() != null) {
-            reservation.setStartAt(reservation.getProposedStartAt());
+
+        LocalDateTime effectiveStart = reservation.getProposedStartAt() != null
+                ? reservation.getProposedStartAt()
+                : reservation.getStartAt();
+        LocalDateTime effectiveEnd = reservation.getProposedEndAt() != null
+                ? reservation.getProposedEndAt()
+                : reservation.getEndAt();
+        if (effectiveStart == null || effectiveEnd == null || !effectiveEnd.isAfter(effectiveStart)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "A contraproposta possui intervalo de horários inválido.");
         }
-        if (reservation.getProposedEndAt() != null) {
-            reservation.setEndAt(reservation.getProposedEndAt());
+
+        List<Reservation> activeOverlapping = reservationRepository.findActiveOverlapping(
+                reservation.getCommonArea().getId(),
+                effectiveStart,
+                effectiveEnd
+        );
+        boolean hasConfirmedConflict = activeOverlapping.stream()
+                .anyMatch(r -> !r.getId().equals(id) && r.getStatus() == ReservationStatus.CONFIRMED);
+        if (hasConfirmedConflict) {
+            throw new ReservationConflictException("O horário da contraproposta não está mais disponível.");
         }
+
+        reservation.setStartAt(effectiveStart);
+        reservation.setEndAt(effectiveEnd);
+        reservation.setWaitlistPosition(null);
         reservation.setStatus(ReservationStatus.CONFIRMED);
         reservation = reservationRepository.save(reservation);
+        emitReservationUpdated(reservation.getCommonArea().getCondominium().getId(), reservation);
         return new ReservationDTO(reservation);
     }
 
@@ -439,10 +512,14 @@ public class ReservationService {
         if (!reservation.getReservedBy().getId().equals(user.getId()) && !user.hasRole("ROLE_ADMIN")) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Não autorizado.");
         }
+        if (reservation.getStatus() != ReservationStatus.COUNTER_PROPOSED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Esta reserva não possui uma contraproposta ativa.");
+        }
         reservation.setStatus(ReservationStatus.CANCELLED);
         reservation.setWaitlistPosition(null);
         reservation.setCancelledAt(LocalDateTime.now());
         reservation = reservationRepository.save(reservation);
+        emitReservationUpdated(reservation.getCommonArea().getCondominium().getId(), reservation);
         promoteNextFromWaitlist(reservation);
         return new ReservationDTO(reservation);
     }
@@ -537,6 +614,7 @@ public class ReservationService {
         );
 
         reservationRepository.save(reservation);
+        emitReservationUpdated(condominiumId, reservation);
 
         if (previousStatus == ReservationStatus.PENDING
                 || previousStatus == ReservationStatus.CONFIRMED
@@ -603,6 +681,19 @@ public class ReservationService {
             entry.setWaitlistPosition(position++);
             reservationRepository.save(entry);
         }
+    }
+
+    private void emitReservationUpdated(Long condominiumId, Reservation reservation) {
+        if (realtimeEmitterService == null || condominiumId == null || reservation == null) {
+            return;
+        }
+        realtimeEmitterService.sendToCondominium(
+                condominiumId,
+                RealtimeEventDTO.of("RESERVATION_UPDATED", condominiumId, Map.of(
+                        "reservationId", reservation.getId() != null ? reservation.getId() : 0L,
+                        "status", reservation.getStatus() != null ? reservation.getStatus().name() : ""
+                ))
+        );
     }
 
     private CommonArea findCommonAreaByIdForUpdate(

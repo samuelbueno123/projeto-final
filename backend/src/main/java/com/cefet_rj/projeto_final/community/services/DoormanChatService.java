@@ -8,14 +8,14 @@ import com.cefet_rj.projeto_final.community.repositories.DoormanChatMessageRepos
 import com.cefet_rj.projeto_final.condominiums.entities.Condominium;
 import com.cefet_rj.projeto_final.condominiums.entities.Resident;
 import com.cefet_rj.projeto_final.condominiums.entities.Unit;
+import com.cefet_rj.projeto_final.condominiums.enums.MembershipStatus;
 import com.cefet_rj.projeto_final.condominiums.repositories.CondominiumRepository;
 import com.cefet_rj.projeto_final.condominiums.repositories.MembershipRepository;
 import com.cefet_rj.projeto_final.condominiums.repositories.ResidentRepository;
 import com.cefet_rj.projeto_final.condominiums.repositories.UnitRepository;
 import com.cefet_rj.projeto_final.condominiums.security.CondominiumAccessService;
-import com.cefet_rj.projeto_final.notifications.entities.Notification;
 import com.cefet_rj.projeto_final.notifications.enums.NotificationType;
-import com.cefet_rj.projeto_final.notifications.repositories.NotificationRepository;
+import com.cefet_rj.projeto_final.notifications.services.NotificationService;
 import com.cefet_rj.projeto_final.realtime.dtos.RealtimeEventDTO;
 import com.cefet_rj.projeto_final.realtime.services.RealtimeEmitterService;
 import com.cefet_rj.projeto_final.shared.exceptions.ResourceNotFoundException;
@@ -43,17 +43,20 @@ public class DoormanChatService {
     private final MembershipRepository membershipRepository;
     private final CondominiumAccessService condominiumAccessService;
     private final UserRepository userRepository;
-    private final NotificationRepository notificationRepository;
+    private final NotificationService notificationService;
     private final AuthenticatedUserService authenticatedUserService;
     private final RealtimeEmitterService realtimeEmitterService;
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<ChatMessageDTO> findMessages(Long condominiumId, Long targetUserId) {
         condominiumAccessService.validateAccess(condominiumId);
         User currentUser = authenticatedUserService.getAuthenticatedUser();
         boolean isStaff = condominiumAccessService.isStaffOrAdmin(currentUser, condominiumId);
 
         if (isStaff) {
+            if (targetUserId != null) {
+                chatMessageRepository.markConversationAsReadForStaff(condominiumId, targetUserId);
+            }
             return chatMessageRepository.findDoormanConversation(condominiumId, targetUserId).stream()
                     .map(ChatMessageDTO::new)
                     .toList();
@@ -148,21 +151,22 @@ public class DoormanChatService {
             if (dto.recipientId() != null) {
                 recipientUser = userRepository.findById(dto.recipientId())
                         .orElseThrow(() -> new ResourceNotFoundException("Destinatário não encontrado: " + dto.recipientId()));
+                if (!recipientUser.hasRole("ROLE_ADMIN")) {
+                    condominiumAccessService.validateUserBelongsToCondominium(recipientUser.getId(), condominiumId);
+                }
                 msg.setRecipient(recipientUser);
 
-                Notification notice = new Notification();
-                notice.setRecipient(recipientUser);
-                notice.setType(NotificationType.DOORMAN_CHAT);
-                notice.setTitle("Nova mensagem da Portaria");
                 String preview = dto.message().length() > 100
                         ? dto.message().substring(0, 97) + "..."
                         : dto.message();
-                notice.setMessage(preview);
-                notice.setRead(false);
-                notice.setCreatedAt(LocalDateTime.now());
-                notice.setCondominiumId(condominiumId);
-                notice.setCondominiumName(condominium.getName());
-                notificationRepository.save(notice);
+                notificationService.createDirectNotification(
+                        recipientUser,
+                        NotificationType.DOORMAN_CHAT,
+                        "Nova mensagem da Portaria",
+                        preview,
+                        condominiumId,
+                        condominium.getName()
+                );
             }
             if (dto.unitId() != null) {
                 unitRepository.findById(dto.unitId())
@@ -192,7 +196,8 @@ public class DoormanChatService {
         }
         realtimeEmitterService.sendToUser(currentUser.getId(), realtimeEvent);
         membershipRepository.findActiveAndPendingByCondominiumId(condominiumId).stream()
-                .filter(m -> m.getUser() != null && m.getRole() != null
+                .filter(m -> m.getStatus() == MembershipStatus.ACTIVE
+                        && m.getUser() != null && m.getRole() != null
                         && ("ROLE_MANAGER".equals(m.getRole().getAuthority()) || "ROLE_DOORMAN".equals(m.getRole().getAuthority())))
                 .forEach(m -> realtimeEmitterService.sendToUser(m.getUser().getId(), realtimeEvent));
 
@@ -203,7 +208,11 @@ public class DoormanChatService {
     public void markMessagesAsRead(Long condominiumId) {
         condominiumAccessService.validateAccess(condominiumId);
         User currentUser = authenticatedUserService.getAuthenticatedUser();
-        chatMessageRepository.markAsReadForUser(condominiumId, currentUser.getId());
+        if (condominiumAccessService.isStaffOrAdmin(currentUser, condominiumId)) {
+            chatMessageRepository.markAllAsReadForStaff(condominiumId, currentUser.getId());
+        } else {
+            chatMessageRepository.markAsReadForUser(condominiumId, currentUser.getId());
+        }
     }
 
     private Long findResidentUnitId(Long condominiumId, Long userId) {

@@ -1,6 +1,7 @@
 package com.cefet_rj.projeto_final.realtime.controllers;
 
 import com.cefet_rj.projeto_final.auth.security.AuthenticatedUserService;
+import com.cefet_rj.projeto_final.condominiums.enums.MembershipStatus;
 import com.cefet_rj.projeto_final.condominiums.repositories.MembershipRepository;
 import com.cefet_rj.projeto_final.realtime.services.RealtimeEmitterService;
 import com.cefet_rj.projeto_final.users.entities.User;
@@ -32,6 +33,9 @@ public class RealtimeController {
     public SseEmitter subscribeToRealtimeEvents() {
         User user = authenticatedUserService.getAuthenticatedUser();
         List<Long> condoIds = membershipRepository.findAllByUserId(user.getId()).stream()
+                .filter(m -> m.getStatus() == MembershipStatus.ACTIVE
+                        && m.getCondominium() != null
+                        && Boolean.TRUE.equals(m.getCondominium().getIsActive()))
                 .map(m -> m.getCondominium().getId())
                 .toList();
 

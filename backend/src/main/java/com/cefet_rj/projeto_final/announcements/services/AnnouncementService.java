@@ -49,6 +49,9 @@ public class AnnouncementService {
     private final UnitRepository unitRepository;
     private final ResidentRepository residentRepository;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.cefet_rj.projeto_final.realtime.services.RealtimeEmitterService realtimeEmitterService;
+
     @Transactional
     public AnnouncementDTO create(
             Long condominiumId,
@@ -109,7 +112,18 @@ public class AnnouncementService {
                 )
         );
 
-        return new AnnouncementDTO(announcement, 0L, false);
+        AnnouncementDTO dtoResult = new AnnouncementDTO(announcement, 0L, false);
+        if (realtimeEmitterService != null) {
+            realtimeEmitterService.sendToCondominium(
+                    condominiumId,
+                    com.cefet_rj.projeto_final.realtime.dtos.RealtimeEventDTO.of(
+                            "ANNOUNCEMENT_CREATED",
+                            condominiumId,
+                            dtoResult
+                    )
+            );
+        }
+        return dtoResult;
     }
 
     @Transactional(readOnly = true)

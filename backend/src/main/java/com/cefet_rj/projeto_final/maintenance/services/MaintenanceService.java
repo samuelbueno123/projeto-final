@@ -638,7 +638,9 @@ public class MaintenanceService {
                     item.setStatus(itemMap.get("status") != null ? itemMap.get("status").toString().trim().toUpperCase(Locale.ROOT) : "CONFORMING");
                     item.setObservation(itemMap.get("observation") != null ? itemMap.get("observation").toString().trim() : null);
                     if (itemMap.get("equipmentId") instanceof Number eqId) {
-                        equipmentRepository.findById(eqId.longValue()).ifPresent(item::setEquipment);
+                        equipmentRepository.findById(eqId.longValue())
+                                .filter(eq -> eq.getCondominium().getId().equals(condominiumId))
+                                .ifPresent(item::setEquipment);
                     }
                     cl.getItems().add(item);
                 }
@@ -694,8 +696,18 @@ public class MaintenanceService {
         }
 
         Supplier supplier = null;
-        if (body.get("supplierId") instanceof Number sid) {
-            supplier = supplierRepository.findById(sid.longValue()).orElse(null);
+        Object rawSupplierId = body.get("supplierId");
+        Long sid = null;
+        if (rawSupplierId instanceof Number n) {
+            sid = n.longValue();
+        } else if (rawSupplierId != null && !rawSupplierId.toString().isBlank()) {
+            try { sid = Long.parseLong(rawSupplierId.toString().trim()); } catch (NumberFormatException ignored) {}
+        }
+        if (sid != null) {
+            supplier = supplierRepository.findById(sid).orElse(null);
+            if (supplier == null || !supplier.getCondominium().getId().equals(condominiumId)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Fornecedor não encontrado neste condomínio.");
+            }
         }
 
         BigDecimal val = BigDecimal.ZERO;
@@ -711,6 +723,9 @@ public class MaintenanceService {
         LocalDate end = start.plusYears(1);
         if (body.get("endDate") != null) {
             try { end = LocalDate.parse(body.get("endDate").toString().trim().substring(0, 10)); } catch (Exception ignored) {}
+        }
+        if (end.isBefore(start)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Data de término não pode ser anterior à data de início.");
         }
 
         ServiceContract sc = new ServiceContract();

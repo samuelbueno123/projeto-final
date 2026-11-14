@@ -94,7 +94,7 @@ CREATE TABLE IF NOT EXISTS tb_budget_forecast (
     category VARCHAR(60) NOT NULL,
     budgeted_amount NUMERIC(12,2) NOT NULL,
     notes VARCHAR(500),
-    created_by_id BIGINT NOT REFERENCES tb_user(id) ON DELETE SET NULL,
+    created_by_id BIGINT REFERENCES tb_user(id) ON DELETE SET NULL,
     created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uk_budget_condo_year_month_cat UNIQUE (condominium_id, year, month, category)
 );

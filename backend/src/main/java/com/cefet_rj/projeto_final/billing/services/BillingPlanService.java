@@ -63,7 +63,7 @@ public class BillingPlanService {
 		);
 	}
 
-	@org.springframework.cache.annotation.CacheEvict(value = "billingPlans", allEntries = true)
+	@org.springframework.cache.annotation.CacheEvict(value = {"billingPlans", "condoFeatures"}, allEntries = true)
 	@Transactional
 	public BillingPlanDTO create(
 			BillingPlanRequestDTO dto
@@ -100,6 +100,7 @@ public class BillingPlanService {
 		return new BillingPlanDTO(plan);
 	}
 
+	@org.springframework.cache.annotation.CacheEvict(value = {"billingPlans", "condoFeatures"}, allEntries = true)
 	@Transactional
 	public BillingPlanDTO update(
 			Long id,
@@ -137,6 +138,7 @@ public class BillingPlanService {
 		return new BillingPlanDTO(plan);
 	}
 
+	@org.springframework.cache.annotation.CacheEvict(value = {"billingPlans", "condoFeatures"}, allEntries = true)
 	@Transactional
 	public void deactivate(Long id) {
 
@@ -147,6 +149,7 @@ public class BillingPlanService {
 		billingPlanRepository.save(plan);
 	}
 
+	@org.springframework.cache.annotation.CacheEvict(value = {"billingPlans", "condoFeatures"}, allEntries = true)
 	@Transactional
 	public void activate(Long id) {
 

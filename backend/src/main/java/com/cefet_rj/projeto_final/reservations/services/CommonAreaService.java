@@ -15,9 +15,11 @@ import com.cefet_rj.projeto_final.reservations.repositories.ReservationRepositor
 import com.cefet_rj.projeto_final.shared.exceptions.ResourceNotFoundException;
 import com.cefet_rj.projeto_final.users.entities.User;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.cefet_rj.projeto_final.reservations.dtos.CommonAreaUpdateDTO;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -69,8 +71,12 @@ public class CommonAreaService {
         commonArea.setCapacity(dto.capacity());
         commonArea.setRequiresApproval(dto.requiresApproval() != null ? dto.requiresApproval() : true);
         commonArea.setRules(dto.rules() == null || dto.rules().isBlank() ? null : dto.rules().trim());
-        commonArea.setOpeningHour(dto.openingHour() != null ? dto.openingHour() : 8);
-        commonArea.setClosingHour(dto.closingHour() != null ? dto.closingHour() : 22);
+        int openHour = dto.openingHour() != null ? dto.openingHour() : 8;
+        int closeHour = dto.closingHour() != null ? dto.closingHour() : 22;
+        validateOperatingHours(openHour, closeHour);
+
+        commonArea.setOpeningHour(openHour);
+        commonArea.setClosingHour(closeHour);
         commonArea.setImageUrl(dto.imageUrl());
         commonArea.setMinAdvanceHours(dto.minAdvanceHours() != null ? dto.minAdvanceHours() : 1);
         commonArea.setMaxAdvanceDays(dto.maxAdvanceDays() != null ? dto.maxAdvanceDays() : 60);
@@ -319,6 +325,7 @@ public class CommonAreaService {
         if (dto.closingHour() != null) {
             commonArea.setClosingHour(dto.closingHour());
         }
+        validateOperatingHours(commonArea.getOpeningHour(), commonArea.getClosingHour());
         if (dto.imageUrl() != null) {
             commonArea.setImageUrl(dto.imageUrl());
         }
@@ -394,6 +401,18 @@ public class CommonAreaService {
         commonArea.setActive(false);
 
         commonAreaRepository.save(commonArea);
+    }
+
+    private void validateOperatingHours(Integer openingHour, Integer closingHour) {
+        if (openingHour != null && (openingHour < 0 || openingHour > 23)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Horário de abertura deve estar entre 0 e 23.");
+        }
+        if (closingHour != null && (closingHour < 1 || closingHour > 24)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Horário de encerramento deve estar entre 1 e 24.");
+        }
+        if (openingHour != null && closingHour != null && closingHour <= openingHour) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "O horário de encerramento deve ser posterior ao horário de abertura.");
+        }
     }
 
     private CommonArea findCommonAreaById(

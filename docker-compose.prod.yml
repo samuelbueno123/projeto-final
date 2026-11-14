@@ -12,6 +12,9 @@ networks:
 services:
   postgres:
     restart: always
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-${POSTGRES_USER:-postgres}}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-${POSTGRES_PASSWORD:-postgres_strong_password}}
     deploy:
       resources:
         limits:
@@ -31,8 +34,8 @@ services:
     environment:
       APP_PROFILE: prod
       DB_URL: ${DB_URL:-jdbc:postgresql://postgres:5432/gestao_condominial_db}
-      DB_USERNAME: ${DB_USERNAME:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:-postgres_strong_password}
+      DB_USERNAME: ${DB_USERNAME:-${POSTGRES_USER:-postgres}}
+      DB_PASSWORD: ${DB_PASSWORD:-${POSTGRES_PASSWORD:-postgres_strong_password}}
       CLIENT_ID: ${CLIENT_ID:-ancora-app}
       CLIENT_SECRET: ${CLIENT_SECRET:-myclientsecret}
       CORS_ORIGINS: ${CORS_ORIGINS:-https://app.ancora.com}

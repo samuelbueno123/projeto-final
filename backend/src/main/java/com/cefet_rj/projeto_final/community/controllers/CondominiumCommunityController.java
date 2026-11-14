@@ -276,7 +276,11 @@ public class CondominiumCommunityController {
             @PathVariable Long id,
             @RequestBody(required = false) Map<String, String> body
     ) {
-        return communityService.updateVehicleStatus(id, "REJECTED", body != null ? body.get("reason") : null);
+        String reason = null;
+        if (body != null) {
+            reason = body.get("reason") != null ? body.get("reason") : body.get("notes");
+        }
+        return communityService.updateVehicleStatus(id, "REJECTED", reason);
     }
 
     @DeleteMapping("/vehicles/{id}")

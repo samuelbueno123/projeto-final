@@ -6,6 +6,7 @@ import com.cefet_rj.projeto_final.community.repositories.*;
 import com.cefet_rj.projeto_final.condominiums.entities.Condominium;
 import com.cefet_rj.projeto_final.condominiums.entities.Resident;
 import com.cefet_rj.projeto_final.condominiums.entities.Unit;
+import com.cefet_rj.projeto_final.condominiums.enums.MembershipStatus;
 import com.cefet_rj.projeto_final.condominiums.repositories.CondominiumRepository;
 import com.cefet_rj.projeto_final.condominiums.repositories.MembershipRepository;
 import com.cefet_rj.projeto_final.condominiums.repositories.ResidentRepository;
@@ -13,14 +14,19 @@ import com.cefet_rj.projeto_final.condominiums.repositories.UnitRepository;
 import com.cefet_rj.projeto_final.condominiums.security.CondominiumAccessService;
 import com.cefet_rj.projeto_final.notifications.enums.NotificationType;
 import com.cefet_rj.projeto_final.notifications.services.NotificationService;
+import com.cefet_rj.projeto_final.realtime.dtos.RealtimeEventDTO;
+import com.cefet_rj.projeto_final.realtime.services.RealtimeEmitterService;
 import com.cefet_rj.projeto_final.reservations.entities.Reservation;
 import com.cefet_rj.projeto_final.reservations.enums.ReservationStatus;
 import com.cefet_rj.projeto_final.reservations.repositories.ReservationRepository;
 import com.cefet_rj.projeto_final.shared.exceptions.ForbiddenException;
 import com.cefet_rj.projeto_final.shared.exceptions.ResourceNotFoundException;
+import com.cefet_rj.projeto_final.shared.observability.AuditLogService;
+import com.cefet_rj.projeto_final.shared.observability.OperationalMetricsService;
 import com.cefet_rj.projeto_final.users.entities.User;
 import com.cefet_rj.projeto_final.users.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -69,6 +75,15 @@ public class CondominiumCommunityService {
     private final CondominiumAccessService condominiumAccessService;
     private final NotificationService notificationService;
 
+    @Autowired(required = false)
+    private RealtimeEmitterService realtimeEmitterService;
+
+    @Autowired(required = false)
+    private AuditLogService auditLogService;
+
+    @Autowired(required = false)
+    private OperationalMetricsService operationalMetricsService;
+
     // =========================================================================
     // 1. OCCURRENCE TICKETS (Livro de Ocorrências e Chamados de Manutenção)
     // =========================================================================
@@ -76,7 +91,8 @@ public class CondominiumCommunityService {
     @Transactional(readOnly = true)
     public List<OccurrenceTicketDTO> listTickets(Long condominiumId, boolean onlyMine) {
         User user = validateMemberAccess(condominiumId);
-        List<OccurrenceTicket> list = onlyMine
+        boolean effectiveOnlyMine = onlyMine || !condominiumAccessService.isStaffOrAdmin(user, condominiumId);
+        List<OccurrenceTicket> list = effectiveOnlyMine
                 ? ticketRepository.findByCondominiumIdAndAuthorIdOrderByCreatedAtDesc(condominiumId, user.getId())
                 : ticketRepository.findByCondominiumIdOrderByCreatedAtDesc(condominiumId);
         return list.stream().map(OccurrenceTicketDTO::new).toList();
@@ -220,7 +236,11 @@ public class CondominiumCommunityService {
         }
 
         LocalDateTime now = LocalDateTime.now();
-        LocalDateTime expectedAt = parseDateTime(stringVal(body, "expectedAt"), now);
+        String rawExpected = stringVal(body, "expectedAt");
+        if (rawExpected == null) {
+            rawExpected = stringVal(body, "expectedDate");
+        }
+        LocalDateTime expectedAt = parseDateTime(rawExpected, now);
         LocalDateTime validFrom = parseDateTime(stringVal(body, "validFrom"), expectedAt.minusMinutes(15));
         Long validityHours = numberVal(body.get("validityHours"));
         LocalDateTime defaultValidUntil = validityHours != null && validityHours > 0
@@ -839,7 +859,11 @@ public class CondominiumCommunityService {
         spot.setUnit(unit);
         spot.setCode(code);
         spot.setSpotType(defaultIfBlank(stringVal(body, "spotType"), "CAR").toUpperCase(Locale.ROOT));
-        spot.setLocationDescription(blankToNull(stringVal(body, "locationDescription")));
+        String locationDesc = blankToNull(stringVal(body, "locationDescription"));
+        if (locationDesc == null) {
+            locationDesc = blankToNull(stringVal(body, "description"));
+        }
+        spot.setLocationDescription(locationDesc);
         spot.setStatus(defaultIfBlank(stringVal(body, "status"), unit != null ? "OCCUPIED" : "AVAILABLE").toUpperCase(Locale.ROOT));
         spot.setCreatedAt(LocalDateTime.now());
         spot = parkingSpotRepository.save(spot);
@@ -863,8 +887,12 @@ public class CondominiumCommunityService {
         if (body.containsKey("spotType") && !stringVal(body, "spotType").isBlank()) {
             spot.setSpotType(stringVal(body, "spotType").toUpperCase(Locale.ROOT));
         }
-        if (body.containsKey("locationDescription")) {
-            spot.setLocationDescription(blankToNull(stringVal(body, "locationDescription")));
+        if (body.containsKey("locationDescription") || body.containsKey("description")) {
+            String locationDesc = blankToNull(stringVal(body, "locationDescription"));
+            if (locationDesc == null) {
+                locationDesc = blankToNull(stringVal(body, "description"));
+            }
+            spot.setLocationDescription(locationDesc);
         }
         if (body.containsKey("unitId")) {
             Long unitId = numberVal(body.get("unitId"));
@@ -901,7 +929,8 @@ public class CondominiumCommunityService {
     @Transactional(readOnly = true)
     public List<VehicleDTO> listVehicles(Long condominiumId, boolean onlyMine) {
         User user = validateMemberAccess(condominiumId);
-        List<Vehicle> list = onlyMine
+        boolean effectiveOnlyMine = onlyMine || !condominiumAccessService.isStaffOrAdmin(user, condominiumId);
+        List<Vehicle> list = effectiveOnlyMine
                 ? vehicleRepository.findByCondominiumIdAndOwnerIdOrderByCreatedAtDesc(condominiumId, user.getId())
                 : vehicleRepository.findByCondominiumIdOrderByCreatedAtDesc(condominiumId);
         return list.stream().map(VehicleDTO::new).toList();
@@ -1092,7 +1121,11 @@ public class CondominiumCommunityService {
         pet.setSize(defaultIfBlank(stringVal(body, "size"), "MEDIUM").toUpperCase(Locale.ROOT));
         pet.setColor(blankToNull(stringVal(body, "color")));
         pet.setVaccinated(body.get("vaccinated") == null || Boolean.TRUE.equals(body.get("vaccinated")));
-        pet.setLastVaccineDate(parseLocalDate(stringVal(body, "lastVaccineDate"), null));
+        String rawVaccineDate = stringVal(body, "lastVaccineDate");
+        if (rawVaccineDate.isBlank()) {
+            rawVaccineDate = stringVal(body, "lastVaccinationDate");
+        }
+        pet.setLastVaccineDate(parseLocalDate(rawVaccineDate, null));
         pet.setImageUrl(blankToNull(stringVal(body, "imageUrl")));
         pet.setNotes(blankToNull(stringVal(body, "notes")));
         pet.setStatus("ACTIVE");
@@ -1127,8 +1160,12 @@ public class CondominiumCommunityService {
         if (body.containsKey("vaccinated") && body.get("vaccinated") != null) {
             pet.setVaccinated(Boolean.TRUE.equals(body.get("vaccinated")));
         }
-        if (body.containsKey("lastVaccineDate")) {
-            pet.setLastVaccineDate(parseLocalDate(stringVal(body, "lastVaccineDate"), pet.getLastVaccineDate()));
+        if (body.containsKey("lastVaccineDate") || body.containsKey("lastVaccinationDate")) {
+            String rawVaccineDate = stringVal(body, "lastVaccineDate");
+            if (rawVaccineDate.isBlank()) {
+                rawVaccineDate = stringVal(body, "lastVaccinationDate");
+            }
+            pet.setLastVaccineDate(parseLocalDate(rawVaccineDate, pet.getLastVaccineDate()));
         }
         if (body.containsKey("imageUrl")) {
             pet.setImageUrl(blankToNull(stringVal(body, "imageUrl")));
@@ -1186,7 +1223,8 @@ public class CondominiumCommunityService {
     @Transactional(readOnly = true)
     public List<MovingRequestDTO> listMovingRequests(Long condominiumId, boolean onlyMine) {
         User user = validateMemberAccess(condominiumId);
-        List<MovingRequest> list = onlyMine
+        boolean effectiveOnlyMine = onlyMine || !condominiumAccessService.isStaffOrAdmin(user, condominiumId);
+        List<MovingRequest> list = effectiveOnlyMine
                 ? movingRequestRepository.findByCondominiumIdAndRequestedByIdOrderByMovingDateDescCreatedAtDesc(condominiumId, user.getId())
                 : movingRequestRepository.findByCondominiumIdOrderByMovingDateDescCreatedAtDesc(condominiumId);
         return list.stream().map(MovingRequestDTO::new).toList();
@@ -1391,7 +1429,21 @@ public class CondominiumCommunityService {
         }
 
         String compNum = defaultIfBlank(stringVal(body, "compartmentNumber"), String.valueOf((int) (Math.random() * 50 + 1)));
-        String pin = defaultIfBlank(stringVal(body, "pinCode"), String.format("%04d", (int) (Math.random() * 9000 + 1000)));
+        String rawPin = stringVal(body, "pinCode");
+        if (rawPin.isBlank()) {
+            rawPin = stringVal(body, "pickupPin");
+        }
+        String pin = defaultIfBlank(rawPin, String.format("%04d", (int) (Math.random() * 9000 + 1000)));
+        String desc = blankToNull(stringVal(body, "description"));
+        if (desc == null) {
+            String courier = blankToNull(stringVal(body, "courierName"));
+            String tracking = blankToNull(stringVal(body, "trackingCode"));
+            if (courier != null && tracking != null) {
+                desc = courier + " • " + tracking;
+            } else {
+                desc = courier != null ? courier : tracking;
+            }
+        }
 
         SmartLockerCompartment comp = new SmartLockerCompartment();
         comp.setCondominium(condo);
@@ -1401,7 +1453,7 @@ public class CondominiumCommunityService {
         comp.setLockerName(defaultIfBlank(stringVal(body, "lockerName"), "Armário Inteligente Bloco Central"));
         comp.setCompartmentNumber(compNum);
         comp.setPinCode(pin);
-        comp.setDescription(blankToNull(stringVal(body, "description")));
+        comp.setDescription(desc);
         comp.setStatus("OCCUPIED");
         comp.setDepositedAt(LocalDateTime.now());
         comp = lockerRepository.save(comp);
@@ -1640,6 +1692,9 @@ public class CondominiumCommunityService {
 
         BigDecimal penalty = null;
         Object rawPenalty = body.get("penaltyAmount");
+        if (rawPenalty == null || rawPenalty.toString().isBlank()) {
+            rawPenalty = body.get("fineAmount");
+        }
         if (rawPenalty != null && !rawPenalty.toString().isBlank()) {
             try {
                 penalty = new BigDecimal(rawPenalty.toString().replace(",", ".").trim());
@@ -1758,7 +1813,8 @@ public class CondominiumCommunityService {
     @Transactional(readOnly = true)
     public List<RenovationRequestDTO> listRenovations(Long condominiumId, boolean onlyMine) {
         User user = validateMemberAccess(condominiumId);
-        List<RenovationRequest> list = onlyMine
+        boolean effectiveOnlyMine = onlyMine || !condominiumAccessService.isStaffOrAdmin(user, condominiumId);
+        List<RenovationRequest> list = effectiveOnlyMine
                 ? renovationRepository.findByCondominiumIdAndRequesterIdOrderByCreatedAtDesc(condominiumId, user.getId())
                 : renovationRepository.findByCondominiumIdOrderByCreatedAtDesc(condominiumId);
         return list.stream().map(RenovationRequestDTO::new).toList();
@@ -1905,9 +1961,23 @@ public class CondominiumCommunityService {
         if (code.isBlank() || desc.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Código e descrição da chave são obrigatórios.");
         }
+        if (keyRepository.existsByCondominiumIdAndKeyCodeIgnoreCase(condominiumId, code)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe uma chave cadastrada com o código " + code + ".");
+        }
+
+        Unit unit = null;
+        Long unitId = numberVal(body.get("unitId"));
+        if (unitId != null) {
+            unit = unitRepository.findById(unitId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada: " + unitId));
+            if (!unit.getSector().getCondominium().getId().equals(condominiumId)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unidade não pertence a este condomínio.");
+            }
+        }
 
         KeyRegistryEntry key = new KeyRegistryEntry();
         key.setCondominium(condo);
+        key.setUnit(unit);
         key.setKeyCode(code);
         key.setDescription(desc);
         key.setKeyCategory(defaultIfBlank(stringVal(body, "keyCategory"), "COMMON_AREA").toUpperCase(Locale.ROOT));
@@ -1922,11 +1992,32 @@ public class CondominiumCommunityService {
     public KeyRegistryEntryDTO checkoutKey(Long id, Map<String, Object> body) {
         KeyRegistryEntry key = keyRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Chave não encontrada: " + id));
-        User staff = validateStaffAccess(key.getCondominium().getId());
+        Long condominiumId = key.getCondominium().getId();
+        User staff = validateStaffAccess(condominiumId);
+
+        if ("BORROWED".equalsIgnoreCase(key.getCurrentStatus())) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Esta chave já está emprestada para " + defaultIfBlank(key.getBorrowerName(), "outro responsável") + "."
+            );
+        }
 
         String borrower = stringVal(body, "borrowerName");
         if (borrower.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Nome do retirante é obrigatório.");
+        }
+
+        Long unitId = numberVal(body != null ? body.get("unitId") : null);
+        if (unitId != null) {
+            Unit unit = unitRepository.findById(unitId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada: " + unitId));
+            if (!unit.getSector().getCondominium().getId().equals(condominiumId)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unidade não pertence a este condomínio.");
+            }
+            key.setUnit(unit);
+        }
+        if (body != null && body.containsKey("expectedReturnAt")) {
+            key.setExpectedReturnAt(parseDateTime(stringVal(body, "expectedReturnAt"), null));
         }
 
         key.setCurrentStatus("BORROWED");
@@ -1989,31 +2080,87 @@ public class CondominiumCommunityService {
         alert.setCreatedAt(LocalDateTime.now());
 
         EmergencyAlert saved = emergencyAlertRepository.save(alert);
-        return new EmergencyAlertDTO(saved);
+
+        if (operationalMetricsService != null) {
+            operationalMetricsService.recordEmergencyTriggered(type);
+        }
+        if (auditLogService != null) {
+            auditLogService.logEmergencyAlert(resident.getEmail(), saved.getId(), type, condominiumId);
+        }
+
+        EmergencyAlertDTO dto = new EmergencyAlertDTO(saved);
+        if (realtimeEmitterService != null) {
+            realtimeEmitterService.sendToCondominium(
+                    condominiumId,
+                    RealtimeEventDTO.of("EMERGENCY_ALERT", condominiumId, dto)
+            );
+        }
+
+        Map<Long, User> recipients = new LinkedHashMap<>();
+        for (var m : membershipRepository.findActiveAndPendingByCondominiumId(condominiumId)) {
+            if (m.getStatus() == MembershipStatus.ACTIVE && m.getRole() != null && m.getUser() != null) {
+                String auth = m.getRole().getAuthority();
+                if ("ROLE_MANAGER".equals(auth) || "ROLE_DOORMAN".equals(auth) || "ROLE_ADMIN".equals(auth)) {
+                    recipients.putIfAbsent(m.getUser().getId(), m.getUser());
+                }
+            }
+        }
+        String unitLabel = unit != null ? formatUnit(unit) : "Portaria Central";
+        for (User staffRecipient : recipients.values()) {
+            notificationService.createDirectNotification(
+                    staffRecipient,
+                    NotificationType.SYSTEM_ANNOUNCEMENT,
+                    "Alerta SOS: " + type,
+                    "Emergência acionada por " + formatUser(resident) + " (" + unitLabel + ")",
+                    condominiumId,
+                    condo.getName()
+            );
+        }
+
+        return dto;
     }
 
     @Transactional
     public EmergencyAlertDTO attendEmergencyAlert(Long id) {
         EmergencyAlert alert = emergencyAlertRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Alerta de emergência não encontrado: " + id));
-        User staff = validateStaffAccess(alert.getCondominium().getId());
+        Long condominiumId = alert.getCondominium().getId();
+        User staff = validateStaffAccess(condominiumId);
 
         alert.setStatus("IN_ATTENDANCE");
         alert.setAttendedBy(staff);
         alert.setAttendedAt(LocalDateTime.now());
-        return new EmergencyAlertDTO(emergencyAlertRepository.save(alert));
+        EmergencyAlertDTO dto = new EmergencyAlertDTO(emergencyAlertRepository.save(alert));
+        if (realtimeEmitterService != null) {
+            realtimeEmitterService.sendToCondominium(
+                    condominiumId,
+                    RealtimeEventDTO.of("EMERGENCY_ALERT", condominiumId, dto)
+            );
+        }
+        return dto;
     }
 
     @Transactional
     public EmergencyAlertDTO resolveEmergencyAlert(Long id, Map<String, Object> body) {
         EmergencyAlert alert = emergencyAlertRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Alerta de emergência não encontrado: " + id));
-        User staff = validateStaffAccess(alert.getCondominium().getId());
+        Long condominiumId = alert.getCondominium().getId();
+        validateStaffAccess(condominiumId);
 
         alert.setStatus("RESOLVED");
         alert.setResolutionNotes(blankToNull(stringVal(body, "resolutionNotes")));
         alert.setResolvedAt(LocalDateTime.now());
-        return new EmergencyAlertDTO(emergencyAlertRepository.save(alert));
+        EmergencyAlertDTO dto = new EmergencyAlertDTO(emergencyAlertRepository.save(alert));
+        if (operationalMetricsService != null) {
+            operationalMetricsService.recordEmergencyResolved();
+        }
+        if (realtimeEmitterService != null) {
+            realtimeEmitterService.sendToCondominium(
+                    condominiumId,
+                    RealtimeEventDTO.of("EMERGENCY_ALERT", condominiumId, dto)
+            );
+        }
+        return dto;
     }
 
     // =========================================================================
@@ -2022,14 +2169,30 @@ public class CondominiumCommunityService {
 
     @Transactional(readOnly = true)
     public List<UtilityReadingDTO> listUtilityReadings(Long condominiumId, Integer year, Integer month, Long unitId) {
-        validateMemberAccess(condominiumId);
-        List<UtilityReading> list;
+        User user = validateMemberAccess(condominiumId);
+        boolean isStaff = condominiumAccessService.isStaffOrAdmin(user, condominiumId);
         if (unitId != null) {
-            list = utilityReadingRepository.findByUnitIdOrderByYearDescMonthDesc(unitId);
-        } else if (year != null && month != null) {
-            list = utilityReadingRepository.findByCondominiumIdAndYearAndMonthOrderByUnitIdAsc(condominiumId, year, month);
-        } else {
-            list = utilityReadingRepository.findByCondominiumIdOrderByYearDescMonthDesc(condominiumId);
+            Unit unit = unitRepository.findById(unitId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada: " + unitId));
+            if (!unit.getSector().getCondominium().getId().equals(condominiumId)) {
+                throw new ForbiddenException("Unidade não pertence a este condomínio.");
+            }
+            if (!isStaff && !residentRepository.findUnitIdsByUserId(user.getId()).contains(unitId)) {
+                throw new ForbiddenException("Você só pode consultar leituras das suas próprias unidades.");
+            }
+            return utilityReadingRepository.findByUnitIdOrderByYearDescMonthDesc(unitId).stream()
+                    .map(UtilityReadingDTO::new)
+                    .toList();
+        }
+
+        List<UtilityReading> list = (year != null && month != null)
+                ? utilityReadingRepository.findByCondominiumIdAndYearAndMonthOrderByUnitIdAsc(condominiumId, year, month)
+                : utilityReadingRepository.findByCondominiumIdOrderByYearDescMonthDesc(condominiumId);
+        if (!isStaff) {
+            List<Long> myUnitIds = residentRepository.findUnitIdsByUserId(user.getId());
+            list = list.stream()
+                    .filter(r -> r.getUnit() != null && myUnitIds.contains(r.getUnit().getId()))
+                    .toList();
         }
         return list.stream().map(UtilityReadingDTO::new).toList();
     }
@@ -2043,9 +2206,18 @@ public class CondominiumCommunityService {
         if (unitId == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unidade é obrigatória.");
         Unit unit = unitRepository.findById(unitId)
                 .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada: " + unitId));
+        if (!unit.getSector().getCondominium().getId().equals(condominiumId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unidade não pertence a este condomínio.");
+        }
 
         int year = intVal(body, "year", LocalDate.now().getYear());
         int month = intVal(body, "month", LocalDate.now().getMonthValue());
+        if (month < 1 || month > 12) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Mês deve estar entre 1 e 12.");
+        }
+        if (year < 2000 || year > 2100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ano inválido (esperado entre 2000 e 2100).");
+        }
         String type = defaultIfBlank(stringVal(body, "utilityType"), "WATER").toUpperCase(Locale.ROOT);
 
         BigDecimal current = toBigDecimal(body.get("currentReading"));
@@ -2096,7 +2268,14 @@ public class CondominiumCommunityService {
     public VisitorDigitalPassDTO getVisitorDigitalPass(Long visitorId) {
         VisitorAccess v = visitorRepository.findById(visitorId)
                 .orElseThrow(() -> new ResourceNotFoundException("Visitante não encontrado: " + visitorId));
-        validateMemberAccess(v.getCondominium().getId());
+        User user = validateMemberAccess(v.getCondominium().getId());
+        boolean isStaff = condominiumAccessService.isStaffOrAdmin(user, v.getCondominium().getId());
+        boolean isHost = v.getResident() != null && v.getResident().getId().equals(user.getId());
+        boolean isUnitResident = v.getUnit() != null
+                && residentRepository.findByUserIdAndUnitId(user.getId(), v.getUnit().getId()).isPresent();
+        if (!isStaff && !isHost && !isUnitResident) {
+            throw new ForbiddenException("Sem permissão para acessar o passe digital deste visitante.");
+        }
 
         String condoName = v.getCondominium().getName();
         String unitStr = v.getUnit() != null ? formatUnit(v.getUnit()) : "Portaria Central";

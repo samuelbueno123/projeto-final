@@ -15,15 +15,18 @@ import com.cefet_rj.projeto_final.packages.dtos.PackageUpdateDTO;
 import com.cefet_rj.projeto_final.packages.entities.Package;
 import com.cefet_rj.projeto_final.packages.enums.PackageStatus;
 import com.cefet_rj.projeto_final.packages.events.PackageStatusChangedEvent;
+import com.cefet_rj.projeto_final.packages.history.repositories.PackageHistoryRepository;
 import com.cefet_rj.projeto_final.packages.history.services.PackageHistoryService;
 import com.cefet_rj.projeto_final.packages.repositories.PackageRepository;
 import com.cefet_rj.projeto_final.shared.exceptions.DatabaseException;
 import com.cefet_rj.projeto_final.shared.exceptions.ForbiddenException;
 import com.cefet_rj.projeto_final.shared.exceptions.InvalidPackageStateTransitionException;
 import com.cefet_rj.projeto_final.shared.exceptions.ResourceNotFoundException;
+import com.cefet_rj.projeto_final.shared.observability.OperationalMetricsService;
 import com.cefet_rj.projeto_final.users.entities.User;
 import com.cefet_rj.projeto_final.users.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -48,8 +51,12 @@ public class PackageService {
     private final AuthenticatedUserService authenticatedUserService;
     private final CondominiumAccessService condominiumAccessService;
     private final PackageHistoryService packageHistoryService;
+    private final PackageHistoryRepository packageHistoryRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final CondominiumFeatureAccessService featureAccessService;
+
+    @Autowired(required = false)
+    private OperationalMetricsService operationalMetricsService;
 
     @Transactional(readOnly = true)
     public PackageDTO findById(Long id) {
@@ -110,6 +117,16 @@ public class PackageService {
         entity.setReceivedAt(LocalDateTime.now());
 
         entity = packageRepository.save(entity);
+        packageHistoryService.registerUserAction(
+                entity,
+                null,
+                PackageStatus.RECEIVED,
+                "Encomenda recebida na portaria"
+        );
+        publishStatusChangedEvent(entity, null, PackageStatus.RECEIVED);
+        if (operationalMetricsService != null) {
+            operationalMetricsService.recordPackageReceived();
+        }
         return new PackageDTO(entity);
     }
 
@@ -146,6 +163,13 @@ public class PackageService {
         entity.setStatus(PackageStatus.EXPECTED);
 
         entity = packageRepository.save(entity);
+        packageHistoryService.registerUserAction(
+                entity,
+                null,
+                PackageStatus.EXPECTED,
+                "Encomenda esperada cadastrada"
+        );
+        publishStatusChangedEvent(entity, null, PackageStatus.EXPECTED);
         return new PackageDTO(entity);
     }
 
@@ -179,6 +203,9 @@ public class PackageService {
                 "Package received at condominium"
         );
         entity.setReceivedAt(LocalDateTime.now());
+        if (operationalMetricsService != null) {
+            operationalMetricsService.recordPackageReceived();
+        }
 
         return new PackageDTO(entity);
     }
@@ -213,6 +240,9 @@ public class PackageService {
                 "Package picked up"
         );
         entity.setPickedUpAt(LocalDateTime.now());
+        if (operationalMetricsService != null) {
+            operationalMetricsService.recordPackageDelivered();
+        }
 
         return new PackageDTO(entity);
     }
@@ -266,11 +296,18 @@ public class PackageService {
 
         condominiumAccessService.validateStaffAccess(getCondominiumId(entity.getUnit()));
 
+        Long effectiveRecipientId = dto.recipientId() != null
+                ? dto.recipientId()
+                : (entity.getRecipient() != null ? entity.getRecipient().getId() : null);
+        Long effectiveUnitId = dto.unitId() != null
+                ? dto.unitId()
+                : entity.getUnit().getId();
+
         linkAssociations(
                 null,
                 dto.description(),
-                dto.recipientId(),
-                dto.unitId(),
+                effectiveRecipientId,
+                effectiveUnitId,
                 entity
         );
         condominiumAccessService.validateStaffAccess(getCondominiumId(entity.getUnit()));
@@ -287,6 +324,7 @@ public class PackageService {
 
             condominiumAccessService.validateStaffAccess(getCondominiumId(entity.getUnit()));
 
+            packageHistoryRepository.deleteByPackageEntityId(id);
             packageRepository.delete(entity);
         } catch (DataIntegrityViolationException e) {
             throw new DatabaseException("Integrity violation");
@@ -438,6 +476,11 @@ public class PackageService {
         if (recipientId != null) {
             recipient = userRepository.findById(recipientId)
                     .orElseThrow(() -> new ResourceNotFoundException("User not found: " + recipientId));
+            if (!recipient.hasRole("ROLE_ADMIN")
+                    && !condominiumAccessService.userBelongsToCondominium(recipient.getId(), resolvedCondoId)
+                    && residentRepository.findFirstByUserIdAndUnitSectorCondominiumId(recipient.getId(), resolvedCondoId).isEmpty()) {
+                throw new ForbiddenException("O destinatário informado não pertence a este condomínio.");
+            }
         } else {
             recipient = residentRepository.findFirstByUnitId(unit.getId())
                     .map(Resident::getUser)

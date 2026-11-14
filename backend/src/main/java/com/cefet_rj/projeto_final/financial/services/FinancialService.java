@@ -297,12 +297,21 @@ public class FinancialService {
         if (body.get("year") instanceof Number n) year = n.intValue();
         int month = LocalDate.now().getMonthValue();
         if (body.get("month") instanceof Number n) month = n.intValue();
+        if (month < 1 || month > 12) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Mês deve estar entre 1 e 12.");
+        }
+        if (year < 2000 || year > 2100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ano inválido (esperado entre 2000 e 2100).");
+        }
 
         String category = body.get("category") != null ? body.get("category").toString().trim().toUpperCase(Locale.ROOT) : "OUTROS";
         BigDecimal amount = BigDecimal.ZERO;
         if (body.get("budgetedAmount") instanceof Number n) amount = BigDecimal.valueOf(n.doubleValue());
         else if (body.get("budgetedAmount") != null) {
             try { amount = new BigDecimal(body.get("budgetedAmount").toString().trim()); } catch (Exception ignored) {}
+        }
+        if (amount.compareTo(BigDecimal.ZERO) < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Valor orçado não pode ser negativo.");
         }
 
         String notes = body.get("notes") != null ? body.get("notes").toString().trim() : null;

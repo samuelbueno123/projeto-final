@@ -147,17 +147,17 @@ public class AdminDashboardController {
         long inactiveCondos = allCondos.size() - activeCondos;
 
         List<User> allUsers = users.findAll();
-        Map<String, Long> usersByRole = new LinkedHashMap<>();
-        usersByRole.put("ROLE_ADMIN", 0L);
-        usersByRole.put("ROLE_MANAGER", 0L);
-        usersByRole.put("ROLE_DOORMAN", 0L);
-        usersByRole.put("ROLE_RESIDENT", 0L);
+        Map<String, java.util.Set<Long>> usersByRoleSet = new LinkedHashMap<>();
+        usersByRoleSet.put("ROLE_ADMIN", new java.util.LinkedHashSet<>());
+        usersByRoleSet.put("ROLE_MANAGER", new java.util.LinkedHashSet<>());
+        usersByRoleSet.put("ROLE_DOORMAN", new java.util.LinkedHashSet<>());
+        usersByRoleSet.put("ROLE_RESIDENT", new java.util.LinkedHashSet<>());
 
         for (User u : allUsers) {
             if (u.getRoles() != null) {
                 for (Role r : u.getRoles()) {
                     if (r.getAuthority() != null) {
-                        usersByRole.merge(r.getAuthority(), 1L, Long::sum);
+                        usersByRoleSet.computeIfAbsent(r.getAuthority(), k -> new java.util.LinkedHashSet<>()).add(u.getId());
                     }
                 }
             }
@@ -172,11 +172,15 @@ public class AdminDashboardController {
             if (m.getStatus() != null) {
                 membershipsByStatus.merge(m.getStatus().name(), 1L, Long::sum);
             }
-            if (m.getRole() != null && m.getRole().getAuthority() != null && m.getStatus() == MembershipStatus.ACTIVE) {
-                // Also ensure users whose role comes via condominium membership are represented
-                usersByRole.putIfAbsent(m.getRole().getAuthority(), 0L);
+            if (m.getRole() != null && m.getRole().getAuthority() != null
+                    && m.getStatus() == MembershipStatus.ACTIVE && m.getUser() != null) {
+                usersByRoleSet.computeIfAbsent(m.getRole().getAuthority(), k -> new java.util.LinkedHashSet<>())
+                        .add(m.getUser().getId());
             }
         }
+
+        Map<String, Long> usersByRole = new LinkedHashMap<>();
+        usersByRoleSet.forEach((role, ids) -> usersByRole.put(role, (long) ids.size()));
 
         Map<String, Long> moduleVolumes = new LinkedHashMap<>();
         moduleVolumes.put("users", (long) allUsers.size());
@@ -565,6 +569,7 @@ public class AdminDashboardController {
             case "assemblies" -> queryPage(assemblies, AssemblyDTO::new, query, pageable);
             case "maintenance-orders" -> queryPage(maintenanceOrders, MaintenanceOrderDTO::new, query, pageable);
             case "expenses" -> queryPage(expenses, ExpenseDTO::new, query, pageable);
+            case "unit-payments", "unitPayments" -> queryPage(unitPayments, AdminUnitPaymentDTO::new, query, pageable);
             case "emergency-alerts" -> queryPage(emergencyAlerts, EmergencyAlertDTO::new, query, pageable);
             case "shift-logs" -> queryPage(shiftLogs, ConciergeShiftLogDTO::new, query, pageable);
             case "renovation-requests" -> queryPage(renovationRequests, RenovationRequestDTO::new, query, pageable);
@@ -706,4 +711,44 @@ public class AdminDashboardController {
     public record AdminSearchResponse(List<AdminSearchResult> users,
                                       List<AdminSearchResult> condominiums,
                                       List<AdminSearchResult> sectors) {}
+
+    public record AdminUnitPaymentDTO(
+            Long id,
+            Long unitId,
+            String unitIdentifier,
+            String sectorName,
+            Long condominiumId,
+            String condominiumName,
+            String invoiceTitle,
+            String status,
+            java.math.BigDecimal amount,
+            LocalDate dueDate,
+            LocalDateTime paidAt,
+            String digitableLine,
+            String paymentNote,
+            LocalDateTime requestedAt,
+            LocalDateTime updatedAt
+    ) {
+        public AdminUnitPaymentDTO(com.cefet_rj.projeto_final.manager.entities.UnitPayment p) {
+            this(
+                    p.getId(),
+                    p.getUnit() != null ? p.getUnit().getId() : null,
+                    p.getUnit() != null ? p.getUnit().getIdentifier() : null,
+                    p.getUnit() != null && p.getUnit().getSector() != null ? p.getUnit().getSector().getName() : null,
+                    p.getUnit() != null && p.getUnit().getSector() != null && p.getUnit().getSector().getCondominium() != null
+                            ? p.getUnit().getSector().getCondominium().getId() : null,
+                    p.getUnit() != null && p.getUnit().getSector() != null && p.getUnit().getSector().getCondominium() != null
+                            ? p.getUnit().getSector().getCondominium().getName() : null,
+                    p.getInvoiceTitle(),
+                    p.getStatus() != null ? p.getStatus().name() : null,
+                    p.getAmount(),
+                    p.getDueDate(),
+                    p.getPaidAt(),
+                    p.getDigitableLine(),
+                    p.getPaymentNote(),
+                    p.getRequestedAt(),
+                    p.getUpdatedAt()
+            );
+        }
+    }
 }

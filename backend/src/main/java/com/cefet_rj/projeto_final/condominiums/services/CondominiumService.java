@@ -42,6 +42,9 @@ public class CondominiumService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.cefet_rj.projeto_final.shared.observability.AuditLogService auditLogService;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.cefet_rj.projeto_final.condominiums.security.CondominiumFeatureAccessService featureAccessService;
+
     @Transactional(readOnly = true)
     public Page<CondominiumDTO> findAllPaged(Pageable pageable) {
         Page<Condominium> list = condominiumRepository.findAll(pageable);
@@ -64,6 +67,9 @@ public class CondominiumService {
         Condominium entity = new Condominium();
         linkAssociations(dto.name(), dto.address(), dto.billingPlan(), dto.isActive(), dto.imageUrl(), entity);
         entity = condominiumRepository.save(entity);
+        if (featureAccessService != null) {
+            featureAccessService.evictCondoFeaturesCache();
+        }
         if (auditLogService != null) {
             auditLogService.logAdminOperation(
                     null,
@@ -85,6 +91,9 @@ public class CondominiumService {
             Condominium entity = condominiumRepository.getReferenceById(id);
             linkAssociations(dto.name(), dto.address(), dto.billingPlan(), dto.isActive(), dto.imageUrl(), entity);
             entity = condominiumRepository.save(entity);
+            if (featureAccessService != null) {
+                featureAccessService.evictCondoFeaturesCache();
+            }
             if (auditLogService != null) {
                 auditLogService.logAdminOperation(
                         null,
@@ -120,6 +129,9 @@ public class CondominiumService {
         }
         try {
             condominiumRepository.deleteById(id);
+            if (featureAccessService != null) {
+                featureAccessService.evictCondoFeaturesCache();
+            }
             if (auditLogService != null) {
                 auditLogService.logAdminOperation(
                         null,
