@@ -178,6 +178,12 @@ public class PackageService {
         Package entity = packageRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Package not found"));
         validatePackageOwnerOrStaffAccess(entity);
+        if (entity.getStatus() != PackageStatus.RECEIVED && entity.getStatus() != PackageStatus.NOTIFIED) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Somente encomendas recebidas na portaria podem ter retirada solicitada."
+            );
+        }
         String cleanNote = note == null || note.isBlank()
                 ? "Morador solicitou separação da encomenda para retirada na portaria."
                 : "Solicitação de retirada: " + note.trim();
@@ -454,13 +460,7 @@ public class PackageService {
         } else if (recipientId != null && condominiumId != null) {
             unit = residentRepository.findFirstByUserIdAndUnitSectorCondominiumId(recipientId, condominiumId)
                     .map(Resident::getUnit)
-                    .orElseGet(() -> unitRepository.findAllForCondominium(condominiumId).stream()
-                            .findFirst()
-                            .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Informe uma unidade válida.")));
-        } else if (condominiumId != null) {
-            unit = unitRepository.findAllForCondominium(condominiumId).stream()
-                    .findFirst()
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Informe uma unidade válida."));
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "O destinatário não possui unidade vinculada neste condomínio. Informe a unidade da encomenda."));
         } else {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Informe a unidade da encomenda.");
         }
@@ -484,13 +484,7 @@ public class PackageService {
         } else {
             recipient = residentRepository.findFirstByUnitId(unit.getId())
                     .map(Resident::getUser)
-                    .orElseGet(() -> {
-                        var residentUserIds = membershipRepository.findResidentUserIdsByCondominiumId(resolvedCondoId);
-                        if (!residentUserIds.isEmpty()) {
-                            return userRepository.findById(residentUserIds.get(0)).orElseGet(authenticatedUserService::getAuthenticatedUser);
-                        }
-                        return authenticatedUserService.getAuthenticatedUser();
-                    });
+                    .orElseGet(authenticatedUserService::getAuthenticatedUser);
         }
 
         featureAccessService.validateFeatureEnabled(

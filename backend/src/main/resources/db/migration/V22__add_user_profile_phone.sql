@@ -1,0 +1,2 @@
+ALTER TABLE tb_user
+    ADD COLUMN IF NOT EXISTS phone VARCHAR(32);

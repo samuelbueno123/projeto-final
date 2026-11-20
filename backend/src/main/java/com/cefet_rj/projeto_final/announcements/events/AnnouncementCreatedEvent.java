@@ -7,7 +7,19 @@ public record AnnouncementCreatedEvent(
         Long condominiumId,
         String condominiumName,
         Long unitId,
+        Long sectorId,
+        String targetRole,
         String title,
         LocalDateTime occurredAt
 ) {
+    public AnnouncementCreatedEvent(
+            Long announcementId,
+            Long condominiumId,
+            String condominiumName,
+            Long unitId,
+            String title,
+            LocalDateTime occurredAt
+    ) {
+        this(announcementId, condominiumId, condominiumName, unitId, null, null, title, occurredAt);
+    }
 }

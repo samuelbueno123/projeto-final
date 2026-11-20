@@ -31,4 +31,17 @@ public interface CondominiumExpenseRepository extends JpaRepository<CondominiumE
             @Param("condoId") Long condoId,
             @Param("status") String status
     );
+
+    @Query("""
+        SELECT e FROM CondominiumExpense e
+        WHERE e.condominium.id = :condoId
+          AND e.dueDate >= :startDate
+          AND e.dueDate <= :endDate
+          AND UPPER(COALESCE(e.status, '')) <> 'CANCELLED'
+    """)
+    List<CondominiumExpense> findActiveForPeriod(
+            @Param("condoId") Long condoId,
+            @Param("startDate") java.time.LocalDate startDate,
+            @Param("endDate") java.time.LocalDate endDate
+    );
 }

@@ -216,17 +216,16 @@ public class FinancialService {
             budgetMap.putIfAbsent(cat, BigDecimal.ZERO);
         }
 
-        List<CondominiumExpense> expenses = expenseRepository.findByCondominiumIdOrderByDueDateDesc(condominiumId);
+        LocalDate periodStart = LocalDate.of(targetYear, targetMonth, 1);
+        LocalDate periodEnd = periodStart.withDayOfMonth(periodStart.lengthOfMonth());
+        List<CondominiumExpense> expenses = expenseRepository.findActiveForPeriod(condominiumId, periodStart, periodEnd);
         Map<String, BigDecimal> actualMap = new LinkedHashMap<>();
         for (CondominiumExpense e : expenses) {
-            if ("CANCELLED".equalsIgnoreCase(e.getStatus())) continue;
-            if (e.getDueDate() != null && e.getDueDate().getYear() == targetYear && e.getDueDate().getMonthValue() == targetMonth) {
-                String cat = (e.getCategory() != null && !e.getCategory().isBlank())
-                        ? e.getCategory().trim().toUpperCase(Locale.ROOT)
-                        : "OUTROS";
-                BigDecimal current = actualMap.getOrDefault(cat, BigDecimal.ZERO);
-                actualMap.put(cat, current.add(e.getAmount() != null ? e.getAmount() : BigDecimal.ZERO));
-            }
+            String cat = (e.getCategory() != null && !e.getCategory().isBlank())
+                    ? e.getCategory().trim().toUpperCase(Locale.ROOT)
+                    : "OUTROS";
+            BigDecimal current = actualMap.getOrDefault(cat, BigDecimal.ZERO);
+            actualMap.put(cat, current.add(e.getAmount() != null ? e.getAmount() : BigDecimal.ZERO));
         }
 
         Set<String> allCategories = new LinkedHashSet<>(budgetMap.keySet());

@@ -69,12 +69,15 @@ public class UnitService {
         if (dto.identifier() == null || dto.identifier().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "O identificador da unidade é obrigatório.");
         }
+        Sector sector = sectorRepository.findById(dto.sectorId())
+                .orElseThrow(() -> new ResourceNotFoundException("Sector not found: " + dto.sectorId()));
+        condominiumAccessService.validateManagerAccess(sector.getCondominium().getId());
         if (unitRepository.existsBySectorIdAndIdentifierIgnoreCase(dto.sectorId(), dto.identifier().trim())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe uma unidade com este identificador neste setor.");
         }
         Unit entity = new Unit();
-        linkAssociations(dto.identifier().trim(), dto.sectorId(), entity);
-        condominiumAccessService.validateManagerAccess(entity.getSector().getCondominium().getId());
+        entity.setIdentifier(dto.identifier().trim());
+        entity.setSector(sector);
         entity = unitRepository.save(entity);
         return new UnitDTO(entity);
     }

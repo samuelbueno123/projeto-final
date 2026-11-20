@@ -51,12 +51,12 @@ public class ResidentService {
 
     @Transactional
     public ResidentDTO insert(ResidentInsertDTO dto) {
-        if (residentRepository.existsByUserIdAndUnitId(dto.userId(), dto.unitId())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Este usuário já está cadastrado como morador desta unidade.");
-        }
         Resident entity = new Resident();
         linkAssociations(dto.type(), dto.unitId(), dto.userId(), entity);
         condominiumAccessService.validateManagerAccess(entity.getUnit().getSector().getCondominium().getId());
+        if (residentRepository.existsByUserIdAndUnitId(dto.userId(), dto.unitId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Este usuário já está cadastrado como morador desta unidade.");
+        }
         entity = residentRepository.save(entity);
         return new ResidentDTO(entity);
     }

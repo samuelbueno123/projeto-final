@@ -202,7 +202,7 @@ class AssemblyServiceUnitTest {
         topic.setAgainstCount(5);
         topic.setAbstainCount(2);
 
-        when(topicRepository.findByIdWithAssembly(10L)).thenReturn(Optional.of(topic));
+        when(topicRepository.findByIdWithAssemblyForUpdate(10L)).thenReturn(Optional.of(topic));
         when(topicRepository.save(any(AssemblyTopic.class))).thenAnswer(inv -> inv.getArgument(0));
 
         AssemblyTopicDTO dto = assemblyService.toggleTopicVoting(10L, false);
@@ -226,7 +226,7 @@ class AssemblyServiceUnitTest {
         topic.setVotingOpen(false);
 
         when(authenticatedUserService.getAuthenticatedUser()).thenReturn(residentUser);
-        when(topicRepository.findByIdWithAssembly(10L)).thenReturn(Optional.of(topic));
+        when(topicRepository.findByIdWithAssemblyForUpdate(10L)).thenReturn(Optional.of(topic));
 
         CastVoteDTO dto = new CastVoteDTO("IN_FAVOR");
         ForbiddenException ex = assertThrows(ForbiddenException.class, () -> assemblyService.castVote(10L, dto));
@@ -247,7 +247,7 @@ class AssemblyServiceUnitTest {
         topic.setVotingOpen(true);
 
         when(authenticatedUserService.getAuthenticatedUser()).thenReturn(residentUser);
-        when(topicRepository.findByIdWithAssembly(10L)).thenReturn(Optional.of(topic));
+        when(topicRepository.findByIdWithAssemblyForUpdate(10L)).thenReturn(Optional.of(topic));
         when(residentRepository.findFirstByUserIdAndUnitSectorCondominiumId(residentUser.getId(), condo.getId()))
                 .thenReturn(Optional.of(testResident));
         when(voteRepository.findByTopicIdAndUserId(10L, residentUser.getId()))
@@ -273,7 +273,7 @@ class AssemblyServiceUnitTest {
         topic.setVotingOpen(true);
 
         when(authenticatedUserService.getAuthenticatedUser()).thenReturn(residentUser);
-        when(topicRepository.findByIdWithAssembly(10L)).thenReturn(Optional.of(topic));
+        when(topicRepository.findByIdWithAssemblyForUpdate(10L)).thenReturn(Optional.of(topic));
         when(residentRepository.findFirstByUserIdAndUnitSectorCondominiumId(residentUser.getId(), condo.getId()))
                 .thenReturn(Optional.of(testResident));
         when(voteRepository.findByTopicIdAndUserId(10L, residentUser.getId()))
@@ -302,7 +302,7 @@ class AssemblyServiceUnitTest {
         topic.setVotingOpen(true);
 
         when(authenticatedUserService.getAuthenticatedUser()).thenReturn(residentUser);
-        when(topicRepository.findByIdWithAssembly(10L)).thenReturn(Optional.of(topic));
+        when(topicRepository.findByIdWithAssemblyForUpdate(10L)).thenReturn(Optional.of(topic));
         when(residentRepository.findFirstByUserIdAndUnitSectorCondominiumId(residentUser.getId(), condo.getId()))
                 .thenReturn(Optional.of(testResident));
         when(voteRepository.findByTopicIdAndUserId(10L, residentUser.getId()))
@@ -337,7 +337,7 @@ class AssemblyServiceUnitTest {
         topic.setAbstainCount(0);
 
         when(authenticatedUserService.getAuthenticatedUser()).thenReturn(residentUser);
-        when(topicRepository.findByIdWithAssembly(10L)).thenReturn(Optional.of(topic));
+        when(topicRepository.findByIdWithAssemblyForUpdate(10L)).thenReturn(Optional.of(topic));
         when(residentRepository.findFirstByUserIdAndUnitSectorCondominiumId(residentUser.getId(), condo.getId()))
                 .thenReturn(Optional.of(testResident));
         when(voteRepository.findByTopicIdAndUserId(10L, residentUser.getId()))

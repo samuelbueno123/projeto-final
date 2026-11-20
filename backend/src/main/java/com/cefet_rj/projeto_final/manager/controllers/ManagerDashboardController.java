@@ -136,12 +136,15 @@ public class ManagerDashboardController {
         ensureAccess(viewer, condominiumId);
         Condominium condo = condominiumRepository.findById(condominiumId)
                 .orElseThrow(() -> new ResourceNotFoundException("Condomínio não encontrado"));
-        Long planId = body.get("planId") instanceof Number n ? n.longValue() : null;
+        Long planId = body != null && body.get("planId") instanceof Number n ? n.longValue() : null;
         if (planId == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Informe o plano desejado.");
         }
         BillingPlan plan = billingPlanRepository.findById(planId)
                 .orElseThrow(() -> new ResourceNotFoundException("Plano não encontrado: " + planId));
+        if (!Boolean.TRUE.equals(plan.getActive())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "O plano selecionado não está ativo.");
+        }
         condo.setBillingPlan(plan);
         condo.setPlanSelected(true);
         condo = condominiumRepository.save(condo);
@@ -161,7 +164,8 @@ public class ManagerDashboardController {
     ) {
         User viewer = authenticatedUserService.getAuthenticatedUser();
         ensureAccess(viewer, condominiumId);
-        Unit unit = unitRepository.findById(unitId).orElseThrow();
+        Unit unit = unitRepository.findById(unitId)
+                .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada: " + unitId));
         if (!unit.getSector().getCondominium().getId().equals(condominiumId)) {
             throw new AccessDeniedException("Unidade fora deste condomínio");
         }
@@ -170,7 +174,9 @@ public class ManagerDashboardController {
         payment.setStatus(dto.status());
         payment.setDueDate(dto.dueDate());
         payment.setAmount(dto.amount());
-        payment.setPaymentNote(dto.paymentNote());
+        if (dto.paymentNote() != null) {
+            payment.setPaymentNote(dto.paymentNote());
+        }
         if (payment.getStatus() == UnitPaymentStatus.PAID) {
             if (payment.getPaidAt() == null) {
                 payment.setPaidAt(LocalDateTime.now());
@@ -181,16 +187,7 @@ public class ManagerDashboardController {
         payment.setUpdatedAt(LocalDateTime.now());
         payment.setUpdatedBy(viewer);
         payment = paymentRepository.save(payment);
-        if (realtimeEmitterService != null) {
-            realtimeEmitterService.sendToCondominium(
-                    condominiumId,
-                    com.cefet_rj.projeto_final.realtime.dtos.RealtimeEventDTO.of(
-                            "INVOICE_UPDATED",
-                            condominiumId,
-                            toUnitInfo(unit, payment)
-                    )
-            );
-        }
+        emitInvoiceUpdated(condominiumId, unitId, toUnitInfo(unit, payment));
         return ResponseEntity.noContent().build();
     }
 
@@ -209,15 +206,25 @@ public class ManagerDashboardController {
         if (!unit.getSector().getCondominium().getId().equals(condominiumId)) {
             throw new AccessDeniedException("Unidade fora deste condomínio");
         }
-        BigDecimal amount = body != null && body.get("amount") != null
-                ? new BigDecimal(body.get("amount").toString())
-                : new BigDecimal("450.00");
+        BigDecimal amount;
+        try {
+            amount = body != null && body.get("amount") != null
+                    ? new BigDecimal(body.get("amount").toString().trim().replace(",", "."))
+                    : new BigDecimal("450.00");
+        } catch (NumberFormatException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Valor inválido para o boleto.");
+        }
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "O valor do boleto deve ser maior que zero.");
         }
-        LocalDate dueDate = body != null && body.get("dueDate") != null
-                ? LocalDate.parse(body.get("dueDate").toString())
-                : LocalDate.now().plusDays(10);
+        LocalDate dueDate;
+        try {
+            dueDate = body != null && body.get("dueDate") != null && !body.get("dueDate").toString().isBlank()
+                    ? LocalDate.parse(body.get("dueDate").toString().trim().substring(0, Math.min(10, body.get("dueDate").toString().trim().length())))
+                    : LocalDate.now().plusDays(10);
+        } catch (java.time.format.DateTimeParseException | IndexOutOfBoundsException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Data de vencimento inválida (esperado YYYY-MM-DD).");
+        }
         String title = body != null && body.get("title") != null && !body.get("title").toString().isBlank()
                 ? body.get("title").toString().trim()
                 : "Taxa de Condomínio - " + LocalDate.now().getMonth().name().substring(0, 3) + "/" + LocalDate.now().getYear();
@@ -237,16 +244,7 @@ public class ManagerDashboardController {
         payment.setUpdatedBy(viewer);
         payment = paymentRepository.save(payment);
         ManagerDashboardDTO.UnitInfo unitInfo = toUnitInfo(unit, payment);
-        if (realtimeEmitterService != null) {
-            realtimeEmitterService.sendToCondominium(
-                    condominiumId,
-                    com.cefet_rj.projeto_final.realtime.dtos.RealtimeEventDTO.of(
-                            "INVOICE_UPDATED",
-                            condominiumId,
-                            unitInfo
-                    )
-            );
-        }
+        emitInvoiceUpdated(condominiumId, unitId, unitInfo);
         return ResponseEntity.ok(unitInfo);
     }
 
@@ -258,6 +256,9 @@ public class ManagerDashboardController {
             @PathVariable Long unitId
     ) {
         User user = authenticatedUserService.getAuthenticatedUser();
+        if (!user.hasRole("ROLE_ADMIN")) {
+            condominiumAccessService.validateUserBelongsToCondominium(user.getId(), condominiumId);
+        }
         Unit unit = unitRepository.findById(unitId)
                 .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada: " + unitId));
         if (!unit.getSector().getCondominium().getId().equals(condominiumId)) {
@@ -278,16 +279,7 @@ public class ManagerDashboardController {
         payment.setUpdatedBy(user);
         payment = paymentRepository.save(payment);
         ManagerDashboardDTO.UnitInfo unitInfo = toUnitInfo(unit, payment);
-        if (realtimeEmitterService != null) {
-            realtimeEmitterService.sendToCondominium(
-                    condominiumId,
-                    com.cefet_rj.projeto_final.realtime.dtos.RealtimeEventDTO.of(
-                            "INVOICE_UPDATED",
-                            condominiumId,
-                            unitInfo
-                    )
-            );
-        }
+        emitInvoiceUpdated(condominiumId, unitId, unitInfo);
         return ResponseEntity.ok(unitInfo);
     }
 
@@ -299,6 +291,9 @@ public class ManagerDashboardController {
             @PathVariable Long unitId
     ) {
         User user = authenticatedUserService.getAuthenticatedUser();
+        if (!user.hasRole("ROLE_ADMIN")) {
+            condominiumAccessService.validateUserBelongsToCondominium(user.getId(), condominiumId);
+        }
         Unit unit = unitRepository.findById(unitId)
                 .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada: " + unitId));
         if (!unit.getSector().getCondominium().getId().equals(condominiumId)) {
@@ -334,6 +329,9 @@ public class ManagerDashboardController {
             @PathVariable Long condominiumId
     ) {
         User user = authenticatedUserService.getAuthenticatedUser();
+        if (!user.hasRole("ROLE_ADMIN")) {
+            condominiumAccessService.validateUserBelongsToCondominium(user.getId(), condominiumId);
+        }
         var residents = residentRepository.findByUserIdAndCondominiumId(user.getId(), condominiumId);
         List<Long> unitIds = residents.stream().map(r -> r.getUnit().getId()).toList();
         Map<Long, UnitPayment> paymentMap = unitIds.isEmpty()
@@ -386,6 +384,9 @@ public class ManagerDashboardController {
                 : "Pagamento informado pelo morador " + user.getFirstName();
 
         UnitPayment payment = paymentRepository.findByUnitId(unitId).orElseGet(UnitPayment::new);
+        if (payment.getStatus() == UnitPaymentStatus.PAID) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Esta cobrança já está quitada.");
+        }
         payment.setUnit(unit);
         payment.setStatus(UnitPaymentStatus.CONFIRMATION_REQUESTED);
         payment.setPaymentNote(note);
@@ -410,16 +411,7 @@ public class ManagerDashboardController {
         }
 
         ManagerDashboardDTO.UnitInfo unitInfo = toUnitInfo(unit, payment);
-        if (realtimeEmitterService != null) {
-            realtimeEmitterService.sendToCondominium(
-                    condominiumId,
-                    com.cefet_rj.projeto_final.realtime.dtos.RealtimeEventDTO.of(
-                            "INVOICE_UPDATED",
-                            condominiumId,
-                            unitInfo
-                    )
-            );
-        }
+        emitInvoiceUpdated(condominiumId, unitId, unitInfo);
 
         return ResponseEntity.ok(unitInfo);
     }
@@ -528,5 +520,22 @@ public class ManagerDashboardController {
         if (!myUnitIds.contains(unitId)) {
             throw new AccessDeniedException("Você não possui vínculo com esta unidade");
         }
+    }
+
+    private void emitInvoiceUpdated(Long condominiumId, Long unitId, ManagerDashboardDTO.UnitInfo unitInfo) {
+        if (realtimeEmitterService == null) {
+            return;
+        }
+        java.util.Set<Long> targets = new java.util.LinkedHashSet<>(residentRepository.findUserIdsByUnitId(unitId));
+        membershipRepository.findActiveManagersByCondominiumId(condominiumId)
+                .forEach(m -> targets.add(m.getUser().getId()));
+        realtimeEmitterService.sendToUsers(
+                targets,
+                com.cefet_rj.projeto_final.realtime.dtos.RealtimeEventDTO.of(
+                        "INVOICE_UPDATED",
+                        condominiumId,
+                        unitInfo
+                )
+        );
     }
 }

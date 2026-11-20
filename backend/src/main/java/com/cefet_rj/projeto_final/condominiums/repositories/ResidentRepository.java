@@ -51,6 +51,13 @@ public interface ResidentRepository extends JpaRepository<Resident, Long> {
     List<Long> findUserIdsByUnitId(@Param("unitId") Long unitId);
 
     @Query("""
+            select distinct r.user.id
+            from Resident r
+            where r.unit.sector.id = :sectorId
+            """)
+    List<Long> findUserIdsBySectorId(@Param("sectorId") Long sectorId);
+
+    @Query("""
             select distinct r.unit.id
             from Resident r
             where r.user.id = :userId

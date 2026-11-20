@@ -321,11 +321,15 @@ public class ReservationService {
     public ReservationDTO reject(Long id, String reason) {
         Reservation reservation = reservationRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Reservation not found: " + id));
+        findCommonAreaByIdForUpdate(reservation.getCommonArea().getId());
         Long condominiumId = reservation.getCommonArea().getCondominium().getId();
         featureAccessService.validateFeatureEnabled(condominiumId, FeatureCode.RESERVATIONS);
         condominiumAccessService.validateStaffAccess(condominiumId);
 
         ReservationStatus previousStatus = reservation.getStatus();
+        if (previousStatus == ReservationStatus.CANCELLED || previousStatus == ReservationStatus.REJECTED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Esta reserva já foi cancelada ou recusada.");
+        }
         User reviewer = authenticatedUserService.getAuthenticatedUser();
         String cleanReason = reason == null || reason.isBlank()
                 ? "Solicitação não aprovada pela administração."
@@ -361,6 +365,7 @@ public class ReservationService {
     public ReservationDTO counterPropose(Long id, ReservationDTO.CounterProposalDTO dto) {
         Reservation reservation = reservationRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Reservation not found: " + id));
+        findCommonAreaByIdForUpdate(reservation.getCommonArea().getId());
         Long condominiumId = reservation.getCommonArea().getCondominium().getId();
         featureAccessService.validateFeatureEnabled(condominiumId, FeatureCode.RESERVATIONS);
         condominiumAccessService.validateStaffAccess(condominiumId);
@@ -465,6 +470,9 @@ public class ReservationService {
         Reservation reservation = reservationRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Reservation not found: " + id));
         findCommonAreaByIdForUpdate(reservation.getCommonArea().getId());
+        Long condominiumId = reservation.getCommonArea().getCondominium().getId();
+        featureAccessService.validateFeatureEnabled(condominiumId, FeatureCode.RESERVATIONS);
+        validateCondominiumAccess(condominiumId);
         User user = authenticatedUserService.getAuthenticatedUser();
         if (!reservation.getReservedBy().getId().equals(user.getId()) && !user.hasRole("ROLE_ADMIN")) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Não autorizado.");
@@ -508,6 +516,10 @@ public class ReservationService {
     public ReservationDTO declineCounterProposal(Long id) {
         Reservation reservation = reservationRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Reservation not found: " + id));
+        findCommonAreaByIdForUpdate(reservation.getCommonArea().getId());
+        Long condominiumId = reservation.getCommonArea().getCondominium().getId();
+        featureAccessService.validateFeatureEnabled(condominiumId, FeatureCode.RESERVATIONS);
+        validateCondominiumAccess(condominiumId);
         User user = authenticatedUserService.getAuthenticatedUser();
         if (!reservation.getReservedBy().getId().equals(user.getId()) && !user.hasRole("ROLE_ADMIN")) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Não autorizado.");

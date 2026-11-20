@@ -34,14 +34,20 @@ public class GoogleIdentityTokenService {
             }
             return OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token", "Invalid Google token issuer: " + iss, null));
         };
-        OAuth2TokenValidator<Jwt> audience = jwt -> jwt.getAudience().contains(clientId)
-                ? OAuth2TokenValidatorResult.success()
-                : OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token", "Invalid Google token audience", null));
-        googleDecoder.setJwtValidator(jwt -> {
-            OAuth2TokenValidatorResult issuerResult = issuer.validate(jwt);
-            if (issuerResult.hasErrors()) return issuerResult;
-            return audience.validate(jwt);
-        });
+        OAuth2TokenValidator<Jwt> withTimestamps = JwtValidators.createDefault();
+        OAuth2TokenValidator<Jwt> audience = jwt -> {
+            java.util.List<String> audiences = jwt.getAudience();
+            return audiences != null && audiences.contains(clientId)
+                    ? OAuth2TokenValidatorResult.success()
+                    : OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token", "Invalid Google token audience", null));
+        };
+        googleDecoder.setJwtValidator(
+                new org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator<>(
+                        withTimestamps,
+                        issuer,
+                        audience
+                )
+        );
         this.decoder = googleDecoder;
     }
 

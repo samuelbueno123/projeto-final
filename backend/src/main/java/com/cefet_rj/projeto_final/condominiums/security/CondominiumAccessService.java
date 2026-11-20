@@ -25,7 +25,7 @@ public class CondominiumAccessService {
 
     public User validateManagerAccess(Long condominiumId) {
         if (SecurityContextHolder.getContext().getAuthentication() == null) {
-            return null;
+            throw new ForbiddenException("Autenticação obrigatória para acessar este condomínio.");
         }
         User user = authenticatedUserService.getAuthenticatedUser();
         if (user.hasRole("ROLE_ADMIN")) {
@@ -39,7 +39,7 @@ public class CondominiumAccessService {
 
     public User validateStaffAccess(Long condominiumId) {
         if (SecurityContextHolder.getContext().getAuthentication() == null) {
-            return null;
+            throw new ForbiddenException("Autenticação obrigatória para acessar este condomínio.");
         }
         User user = authenticatedUserService.getAuthenticatedUser();
         if (user.hasRole("ROLE_ADMIN")) {

@@ -79,7 +79,11 @@ public class ResourceServerConfig {
                                     "/v3/api-docs/**",
                                     "/swagger-ui/**",
                                     "/swagger-ui.html"
-                            ).permitAll()
+                            ).access((authentication, context) -> isDevOrTest
+                                    ? new org.springframework.security.authorization.AuthorizationDecision(true)
+                                    : org.springframework.security.authorization.AuthorityAuthorizationManager
+                                            .<org.springframework.security.web.access.intercept.RequestAuthorizationContext>hasAuthority("ROLE_ADMIN")
+                                            .check(authentication, context))
                             .requestMatchers(
                                     HttpMethod.POST,
                                     "/users"
@@ -119,6 +123,7 @@ public class ResourceServerConfig {
                             .toList();
                     return dbAuthorities;
                 }
+                return java.util.Collections.emptyList();
             }
             return authoritiesConverter.convert(jwt);
         });
@@ -130,7 +135,10 @@ public class ResourceServerConfig {
     CorsConfigurationSource corsConfigurationSource() {
 
         CorsConfiguration corsConfig = new CorsConfiguration();
-        corsConfig.setAllowedOriginPatterns(Arrays.asList(corsOrigins.split(",")));
+        corsConfig.setAllowedOriginPatterns(Arrays.stream(corsOrigins.split(","))
+                .map(String::trim)
+                .filter(origin -> !origin.isEmpty())
+                .toList());
         corsConfig.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"));
         corsConfig.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Accept", "Cache-Control", "Last-Event-ID", "X-Requested-With", "Origin", "X-Correlation-ID", "X-Request-ID"));
         corsConfig.setExposedHeaders(Arrays.asList("X-Correlation-ID", "X-Request-ID"));

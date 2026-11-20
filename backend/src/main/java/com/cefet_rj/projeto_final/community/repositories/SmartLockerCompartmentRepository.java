@@ -12,4 +12,11 @@ public interface SmartLockerCompartmentRepository extends JpaRepository<SmartLoc
 
     @EntityGraph(attributePaths = {"recipient", "unit", "unit.sector", "depositedBy"})
     List<SmartLockerCompartment> findByCondominiumIdAndRecipientIdOrderByDepositedAtDesc(Long condominiumId, Long recipientId);
+
+    boolean existsByCondominiumIdAndLockerNameAndCompartmentNumberAndStatus(
+            Long condominiumId,
+            String lockerName,
+            String compartmentNumber,
+            String status
+    );
 }

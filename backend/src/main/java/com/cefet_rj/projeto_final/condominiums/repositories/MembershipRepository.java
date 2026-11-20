@@ -109,6 +109,35 @@ public interface MembershipRepository extends JpaRepository<Membership, Long> {
     );
 
     @Query("""
+            select distinct m.user.id
+            from Membership m
+            where m.condominium.id = :condominiumId
+              and m.status = com.cefet_rj.projeto_final.condominiums.enums.MembershipStatus.ACTIVE
+            """)
+    List<Long> findActiveUserIdsByCondominiumId(@Param("condominiumId") Long condominiumId);
+
+    @Query("""
+            select distinct m.user.id
+            from Membership m
+            where m.condominium.id = :condominiumId
+              and m.role.authority in ('ROLE_MANAGER', 'ROLE_DOORMAN')
+              and m.status = com.cefet_rj.projeto_final.condominiums.enums.MembershipStatus.ACTIVE
+            """)
+    List<Long> findActiveStaffUserIdsByCondominiumId(@Param("condominiumId") Long condominiumId);
+
+    @Query("""
+            select distinct m.user.id
+            from Membership m
+            where m.condominium.id = :condominiumId
+              and m.role.authority = :authority
+              and m.status = com.cefet_rj.projeto_final.condominiums.enums.MembershipStatus.ACTIVE
+            """)
+    List<Long> findActiveUserIdsByCondominiumIdAndAuthority(
+            @Param("condominiumId") Long condominiumId,
+            @Param("authority") String authority
+    );
+
+    @Query("""
             select m
             from Membership m
             join fetch m.user

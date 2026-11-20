@@ -214,12 +214,22 @@ public class MaintenanceService {
     @Transactional(readOnly = true)
     public List<MaintenanceEquipmentDTO> listEquipment(Long condominiumId) {
         condominiumAccessService.validateAccess(condominiumId);
-        return equipmentRepository.findByCondominiumIdOrderByNextMaintenanceDateAsc(condominiumId).stream()
+        List<MaintenanceEquipment> equipment = equipmentRepository.findByCondominiumIdOrderByNextMaintenanceDateAsc(condominiumId);
+        if (equipment.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, List<MaintenanceOrderDTO>> ordersByEquipmentId = maintenanceRepository
+                .findAllByCondominiumIdWithDetails(condominiumId)
+                .stream()
+                .filter(o -> o.getEquipment() != null)
+                .collect(java.util.stream.Collectors.groupingBy(
+                        o -> o.getEquipment().getId(),
+                        java.util.stream.Collectors.mapping(MaintenanceOrderDTO::new, java.util.stream.Collectors.toList())
+                ));
+        return equipment.stream()
                 .map(eq -> new MaintenanceEquipmentDTO(
                         eq,
-                        maintenanceRepository.findByEquipmentIdOrderByCreatedAtDesc(eq.getId()).stream()
-                                .map(MaintenanceOrderDTO::new)
-                                .toList()
+                        ordersByEquipmentId.getOrDefault(eq.getId(), List.of())
                 ))
                 .toList();
     }
@@ -346,12 +356,22 @@ public class MaintenanceService {
     @Transactional(readOnly = true)
     public List<SupplierDTO> listSuppliers(Long condominiumId) {
         condominiumAccessService.validateAccess(condominiumId);
-        return supplierRepository.findByCondominiumIdOrderByCompanyNameAsc(condominiumId).stream()
+        List<Supplier> suppliers = supplierRepository.findByCondominiumIdOrderByCompanyNameAsc(condominiumId);
+        if (suppliers.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, List<MaintenanceOrderDTO>> ordersBySupplierId = maintenanceRepository
+                .findAllByCondominiumIdWithDetails(condominiumId)
+                .stream()
+                .filter(o -> o.getSupplier() != null)
+                .collect(java.util.stream.Collectors.groupingBy(
+                        o -> o.getSupplier().getId(),
+                        java.util.stream.Collectors.mapping(MaintenanceOrderDTO::new, java.util.stream.Collectors.toList())
+                ));
+        return suppliers.stream()
                 .map(s -> new SupplierDTO(
                         s,
-                        maintenanceRepository.findBySupplierIdOrderByCreatedAtDesc(s.getId()).stream()
-                                .map(MaintenanceOrderDTO::new)
-                                .toList()
+                        ordersBySupplierId.getOrDefault(s.getId(), List.of())
                 ))
                 .toList();
     }

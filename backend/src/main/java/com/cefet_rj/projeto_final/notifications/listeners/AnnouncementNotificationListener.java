@@ -34,27 +34,40 @@ public class AnnouncementNotificationListener {
             return;
         }
 
-        List<Long> residentIds =
-                membershipRepository
-                        .findResidentUserIdsByCondominiumId(
-                                event.condominiumId()
-                        );
+        List<Long> recipientIds;
+        if (event.targetRole() != null && !event.targetRole().isBlank()) {
+            recipientIds = membershipRepository
+                    .findActiveUserIdsByCondominiumIdAndAuthority(
+                            event.condominiumId(),
+                            event.targetRole()
+                    );
+        } else {
+            recipientIds = membershipRepository
+                    .findResidentUserIdsByCondominiumId(
+                            event.condominiumId()
+                    );
+        }
 
         if (event.unitId() != null) {
-            List<Long> unitResidentIds =
-                    residentRepository.findUserIdsByUnitId(event.unitId());
-
-            residentIds = residentIds.stream()
+            java.util.Set<Long> unitResidentIds = new java.util.HashSet<>(
+                    residentRepository.findUserIdsByUnitId(event.unitId()));
+            recipientIds = recipientIds.stream()
                     .filter(unitResidentIds::contains)
+                    .toList();
+        } else if (event.sectorId() != null) {
+            java.util.Set<Long> sectorResidentIds = new java.util.HashSet<>(
+                    residentRepository.findUserIdsBySectorId(event.sectorId()));
+            recipientIds = recipientIds.stream()
+                    .filter(sectorResidentIds::contains)
                     .toList();
         }
 
-        if (residentIds.isEmpty()) {
+        if (recipientIds.isEmpty()) {
             return;
         }
 
         notificationService.createAnnouncementNotifications(
-                residentIds,
+                recipientIds,
                 event.title(),
                 event.condominiumId(),
                 event.condominiumName()

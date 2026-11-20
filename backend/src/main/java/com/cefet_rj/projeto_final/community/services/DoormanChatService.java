@@ -29,8 +29,10 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -191,15 +193,14 @@ public class DoormanChatService {
 
         // Envia via SSE apenas para os participantes autorizados (destinatário, remetente e equipe ativa do condomínio)
         RealtimeEventDTO realtimeEvent = RealtimeEventDTO.of("CHAT_MESSAGE", condominiumId, result);
+        Set<Long> sseTargets = new LinkedHashSet<>(
+                membershipRepository.findActiveStaffUserIdsByCondominiumId(condominiumId)
+        );
         if (recipientUser != null) {
-            realtimeEmitterService.sendToUser(recipientUser.getId(), realtimeEvent);
+            sseTargets.add(recipientUser.getId());
         }
-        realtimeEmitterService.sendToUser(currentUser.getId(), realtimeEvent);
-        membershipRepository.findActiveAndPendingByCondominiumId(condominiumId).stream()
-                .filter(m -> m.getStatus() == MembershipStatus.ACTIVE
-                        && m.getUser() != null && m.getRole() != null
-                        && ("ROLE_MANAGER".equals(m.getRole().getAuthority()) || "ROLE_DOORMAN".equals(m.getRole().getAuthority())))
-                .forEach(m -> realtimeEmitterService.sendToUser(m.getUser().getId(), realtimeEvent));
+        sseTargets.add(currentUser.getId());
+        realtimeEmitterService.sendToUsers(sseTargets, realtimeEvent);
 
         return result;
     }

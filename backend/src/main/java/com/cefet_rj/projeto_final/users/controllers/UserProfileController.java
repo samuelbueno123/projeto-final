@@ -36,6 +36,7 @@ public class UserProfileController {
         return new UserProfileDTO(authenticatedUser.getAuthenticatedUser());
     }
 
+    @org.springframework.transaction.annotation.Transactional
     @PutMapping("/profile")
     public UserProfileDTO updateProfile(@Valid @RequestBody UserProfileUpdateDTO request) {
         User user = authenticatedUser.getAuthenticatedUser();
@@ -60,14 +61,29 @@ public class UserProfileController {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Este email já está em uso.");
             }
         }
-        String storedPicturePath = pictureStorageService.resolveOrStoreProfileImage(
-                user.getId(),
-                request.profileImage(),
-                user.getProfileImage()
-        );
+        boolean keepExternalAvatar = user.getProfileImage() != null
+                && (user.getProfileImage().startsWith("https://") || user.getProfileImage().startsWith("http://"))
+                && (request.profileImage() == null || request.profileImage().trim().equals(user.getProfileImage()));
+        String storedPicturePath = keepExternalAvatar
+                ? user.getProfileImage()
+                : pictureStorageService.resolveOrStoreProfileImage(
+                        user.getId(),
+                        request.profileImage(),
+                        user.getProfileImage()
+                );
         user.setFirstName(request.firstName().trim());
         user.setLastName(request.lastName() == null ? "" : request.lastName().trim());
         user.setEmail(email);
+        if (request.phone() != null) {
+            String phoneDigits = request.phone().replaceAll("\\D", "");
+            if (!phoneDigits.isEmpty()
+                    && (phoneDigits.length() < 10 || phoneDigits.length() > 11
+                    || phoneDigits.charAt(0) == '0' || phoneDigits.charAt(1) == '0')) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Informe um telefone válido com DDD (10 ou 11 dígitos).");
+            }
+            user.setPhone(phoneDigits.isEmpty() ? null : phoneDigits);
+        }
         user.setProfileImage(storedPicturePath);
         if (request.themePreference() != null && !request.themePreference().isBlank()) {
             user.setThemePreference(request.themePreference().trim().toUpperCase());
@@ -75,14 +91,21 @@ public class UserProfileController {
         return new UserProfileDTO(users.save(user));
     }
 
+    @org.springframework.transaction.annotation.Transactional
     @PatchMapping("/theme")
     public UserProfileDTO updateTheme(@RequestBody Map<String, String> body) {
         User user = authenticatedUser.getAuthenticatedUser();
-        String theme = body.getOrDefault("theme", "SYSTEM");
-        if (theme != null) {
+        String theme = body != null ? body.getOrDefault("theme", "SYSTEM") : "SYSTEM";
+        if (theme != null && !theme.isBlank()) {
             theme = theme.trim().toUpperCase();
         } else {
             theme = "SYSTEM";
+        }
+        if (!java.util.Set.of("LIGHT", "DARK", "SYSTEM").contains(theme)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST,
+                    "Tema inválido. Valores permitidos: LIGHT, DARK, SYSTEM."
+            );
         }
         user.setThemePreference(theme);
         return new UserProfileDTO(users.save(user));

@@ -27,6 +27,9 @@ public class ActuatorObservabilityController {
     @Value("${spring.application.name:projeto-final}")
     private String appName;
 
+    @Value("${management.endpoint.health.show-details:when_authorized}")
+    private String showDetails;
+
     public ActuatorObservabilityController(JdbcTemplate jdbcTemplate, OperationalMetricsService metricsService) {
         this.jdbcTemplate = jdbcTemplate;
         this.metricsService = metricsService;
@@ -75,11 +78,20 @@ public class ActuatorObservabilityController {
 
         components.put("ping", Map.of("status", "UP"));
 
+        boolean includeDetails = "always".equalsIgnoreCase(showDetails) || isAdminAuthenticated();
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("status", overallStatus);
-        response.put("components", components);
+        if (includeDetails) {
+            response.put("components", components);
+        }
 
         return ResponseEntity.status(allOk ? HttpStatus.OK : HttpStatus.SERVICE_UNAVAILABLE).body(response);
+    }
+
+    private boolean isAdminAuthenticated() {
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        return auth != null && auth.isAuthenticated() && auth.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
     }
 
     @GetMapping("/health/liveness")

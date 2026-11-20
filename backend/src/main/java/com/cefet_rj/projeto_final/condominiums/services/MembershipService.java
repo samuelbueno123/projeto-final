@@ -56,6 +56,9 @@ public class MembershipService {
     private final NotificationRepository notificationRepository;
     private final AuthenticatedUserService authenticatedUserService;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.cefet_rj.projeto_final.realtime.services.RealtimeEmitterService realtimeEmitterService;
+
     @Transactional(readOnly = true)
     public List<MembershipDTO> findMine() {
         Long userId = authenticatedUserService.getAuthenticatedUser().getId();
@@ -284,6 +287,11 @@ public class MembershipService {
                 .filter(m -> m.getCondominium().getId().equals(condominiumId))
                 .orElseThrow(() -> new ResourceNotFoundException("Solicitação não encontrada neste condomínio."));
 
+        if (membership.getStatus() != MembershipStatus.REQUESTED
+                && membership.getStatus() != MembershipStatus.PENDING) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Esta solicitação já foi processada.");
+        }
+
         membership.setStatus(MembershipStatus.DECLINED);
         membership.setRespondedAt(LocalDateTime.now());
         membershipRepository.saveAndFlush(membership);
@@ -314,6 +322,13 @@ public class MembershipService {
                 .filter(m -> m.getCondominium().getId().equals(condominiumId))
                 .orElseThrow(() -> new ResourceNotFoundException("Vínculo não encontrado neste condomínio."));
 
+        if (membership.getStatus() == MembershipStatus.DECLINED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Não é possível vincular unidade a uma solicitação recusada.");
+        }
+        if (!"ROLE_RESIDENT".equals(membership.getRole().getAuthority())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Apenas vínculos de moradores podem ser associados a uma unidade.");
+        }
+
         Unit unit = unitRepository.findById(unitId)
                 .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada: " + unitId));
         if (!unit.getSector().getCondominium().getId().equals(condominiumId)) {
@@ -332,7 +347,9 @@ public class MembershipService {
         membership.setRequestedResidentType(rType);
         membership = membershipRepository.saveAndFlush(membership);
 
-        linkUserToUnit(membership.getUser(), unit, rType);
+        if (membership.getStatus() == MembershipStatus.ACTIVE) {
+            linkUserToUnit(membership.getUser(), unit, rType);
+        }
         return enrichWithUnitInfo(membership);
     }
 
@@ -571,19 +588,24 @@ public class MembershipService {
                 .orElseThrow(() -> new ResourceNotFoundException("Vínculo não encontrado neste condomínio."));
 
         String authority = membership.getRole().getAuthority();
-        if ("ROLE_MANAGER".equals(authority)) {
-            throw new ForbiddenException("Síndicos não podem remover vínculos de outro síndico por esta operação.");
+        if ("ROLE_MANAGER".equals(authority) || "ROLE_ADMIN".equals(authority)) {
+            throw new ForbiddenException("Síndicos não podem remover vínculos de outro síndico ou administrador por esta operação.");
         }
 
         User targetUser = membership.getUser();
         if ("ROLE_RESIDENT".equals(authority)) {
-            residentRepository.findFirstByUserIdAndUnitSectorCondominiumId(targetUser.getId(), condominiumId)
-                    .ifPresent(residentRepository::delete);
+            List<Resident> residentsInCondo = residentRepository.findByUserIdAndCondominiumId(targetUser.getId(), condominiumId);
+            if (!residentsInCondo.isEmpty()) {
+                residentRepository.deleteAll(residentsInCondo);
+            }
         }
         updateInvitationNotifications(membership.getId(), MembershipStatus.DECLINED.name());
         membershipRepository.delete(membership);
         membershipRepository.flush();
         syncUserRoles(targetUser);
+        if (realtimeEmitterService != null && !membershipRepository.existsByUserIdAndCondominiumId(targetUser.getId(), condominiumId)) {
+            realtimeEmitterService.evictUserFromCondominium(targetUser.getId(), condominiumId);
+        }
     }
 
     @Transactional

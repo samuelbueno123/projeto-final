@@ -73,7 +73,20 @@ public class AssemblyService {
                 : voteRepository.findAllByTopicIdsAndUserId(allTopicIds, caller.getId()).stream()
                 .collect(Collectors.toMap(v -> v.getTopic().getId(), AssemblyVote::getVoteChoice, (v1, v2) -> v1));
 
-        return assemblies.stream().map(assembly -> buildAssemblyDTO(assembly, caller.getId(), userVotesByTopicId)).toList();
+        List<Long> assemblyIds = assemblies.stream().map(CondominiumAssembly::getId).toList();
+        Map<Long, List<AssemblyParticipant>> participantsByAssemblyId = assemblyIds.isEmpty()
+                ? Map.of()
+                : participantRepository.findByAssemblyIdInOrderByCheckedInAtAsc(assemblyIds).stream()
+                .collect(Collectors.groupingBy(p -> p.getAssembly().getId()));
+
+        return assemblies.stream()
+                .map(assembly -> buildAssemblyDTO(
+                        assembly,
+                        caller.getId(),
+                        userVotesByTopicId,
+                        participantsByAssemblyId.getOrDefault(assembly.getId(), List.of())
+                ))
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -163,7 +176,7 @@ public class AssemblyService {
 
     @Transactional
     public AssemblyTopicDTO toggleTopicVoting(Long topicId, boolean open) {
-        AssemblyTopic topic = topicRepository.findByIdWithAssembly(topicId)
+        AssemblyTopic topic = topicRepository.findByIdWithAssemblyForUpdate(topicId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pauta não encontrada: " + topicId));
         Long condoId = topic.getAssembly().getCondominium().getId();
         condominiumAccessService.validateManagerAccess(condoId);
@@ -234,7 +247,7 @@ public class AssemblyService {
     public AssemblyTopicDTO castVote(Long topicId, CastVoteDTO dto) {
         User caller = authenticatedUserService.getAuthenticatedUser();
 
-        AssemblyTopic topic = topicRepository.findByIdWithAssembly(topicId)
+        AssemblyTopic topic = topicRepository.findByIdWithAssemblyForUpdate(topicId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pauta não encontrada: " + topicId));
 
         CondominiumAssembly assembly = topic.getAssembly();
@@ -302,7 +315,7 @@ public class AssemblyService {
         AssemblyTopicDTO result = new AssemblyTopicDTO(topic).withUserVote(choice);
 
         realtimeEmitterService.sendToCondominium(condoId,
-                RealtimeEventDTO.of("ASSEMBLY_UPDATED", condoId, result));
+                RealtimeEventDTO.of("ASSEMBLY_UPDATED", condoId, new AssemblyTopicDTO(topic)));
 
         return result;
     }
@@ -349,12 +362,21 @@ public class AssemblyService {
     }
 
     private AssemblyDTO buildAssemblyDTO(CondominiumAssembly assembly, Long viewerId, Map<Long, String> userVotes) {
+        List<AssemblyParticipant> partEntities = participantRepository.findByAssemblyIdOrderByCheckedInAtAsc(assembly.getId());
+        return buildAssemblyDTO(assembly, viewerId, userVotes, partEntities);
+    }
+
+    private AssemblyDTO buildAssemblyDTO(
+            CondominiumAssembly assembly,
+            Long viewerId,
+            Map<Long, String> userVotes,
+            List<AssemblyParticipant> partEntities
+    ) {
         List<AssemblyTopicDTO> enrichedTopics = assembly.getTopics().stream().map(t -> {
             String vote = userVotes.get(t.getId());
             return new AssemblyTopicDTO(t).withUserVote(vote);
         }).toList();
 
-        List<AssemblyParticipant> partEntities = participantRepository.findByAssemblyIdOrderByCheckedInAtAsc(assembly.getId());
         boolean checkedIn = partEntities.stream().anyMatch(p -> p.getUser().getId().equals(viewerId));
         List<AssemblyParticipantDTO> partDtos = partEntities.stream().map(AssemblyParticipantDTO::new).toList();
 

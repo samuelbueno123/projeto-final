@@ -27,10 +27,21 @@ public class RealtimeEmitterService {
     /**
      * Registra uma nova conexão SSE para o usuário autenticado e seus condomínios.
      */
+    private static final int MAX_EMITTERS_PER_USER = 5;
+
     public SseEmitter registerEmitter(Long userId, Collection<Long> condominiumIds) {
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT);
 
-        userEmitters.computeIfAbsent(userId, k -> new CopyOnWriteArrayList<>()).add(emitter);
+        CopyOnWriteArrayList<SseEmitter> emitters =
+                userEmitters.computeIfAbsent(userId, k -> new CopyOnWriteArrayList<>());
+        while (emitters.size() >= MAX_EMITTERS_PER_USER) {
+            SseEmitter oldest = emitters.remove(0);
+            try {
+                oldest.complete();
+            } catch (Exception ignored) {
+            }
+        }
+        emitters.add(emitter);
 
         if (condominiumIds != null) {
             for (Long condoId : condominiumIds) {
@@ -53,15 +64,38 @@ public class RealtimeEmitterService {
 
         // Envia evento de confirmação de conexão inicial
         try {
-            emitter.send(SseEmitter.event()
-                    .name("CONNECTED")
-                    .data(RealtimeEventDTO.of("CONNECTED", Map.of("userId", userId, "status", "ONLINE"))));
-        } catch (IOException e) {
+            synchronized (emitter) {
+                emitter.send(SseEmitter.event()
+                        .name("CONNECTED")
+                        .data(RealtimeEventDTO.of("CONNECTED", Map.of("userId", userId, "status", "ONLINE"))));
+            }
+            CopyOnWriteArrayList<SseEmitter> list = userEmitters.get(userId);
+            log.debug("Nova conexão SSE estabelecida para userId {}. Total ativos: {}", userId, list != null ? list.size() : 0);
+        } catch (IOException | IllegalStateException e) {
             removeEmitter(userId, emitter);
         }
 
-        log.debug("Nova conexão SSE estabelecida para userId {}. Total ativos: {}", userId, userEmitters.get(userId).size());
         return emitter;
+    }
+
+    public void evictUserFromCondominium(Long userId, Long condominiumId) {
+        if (userId == null || condominiumId == null) {
+            return;
+        }
+        CopyOnWriteArraySet<Long> users = condoUsers.get(condominiumId);
+        if (users != null) {
+            users.remove(userId);
+        }
+    }
+
+    public void sendToUsers(Collection<Long> userIds, RealtimeEventDTO event) {
+        if (userIds == null || userIds.isEmpty()) {
+            return;
+        }
+        Set<Long> uniqueIds = new java.util.LinkedHashSet<>(userIds);
+        for (Long userId : uniqueIds) {
+            sendToUser(userId, event);
+        }
     }
 
     /**
@@ -77,9 +111,11 @@ public class RealtimeEmitterService {
         List<SseEmitter> deadEmitters = new ArrayList<>();
         for (SseEmitter emitter : emitters) {
             try {
-                emitter.send(SseEmitter.event()
-                        .name(event.type())
-                        .data(event));
+                synchronized (emitter) {
+                    emitter.send(SseEmitter.event()
+                            .name(event.type())
+                            .data(event));
+                }
             } catch (Exception e) {
                 deadEmitters.add(emitter);
             }
@@ -126,7 +162,9 @@ public class RealtimeEmitterService {
 
             for (SseEmitter emitter : emitters) {
                 try {
-                    emitter.send(SseEmitter.event().comment("ping"));
+                    synchronized (emitter) {
+                        emitter.send(SseEmitter.event().comment("ping"));
+                    }
                 } catch (Exception e) {
                     deadEmitters.add(emitter);
                 }

@@ -48,6 +48,10 @@ public class User implements UserDetails {
     private String themePreference = "SYSTEM";
 
     @Setter
+    @Column(length = 32)
+    private String phone;
+
+    @Setter
     @Column(name = "google_subject", unique = true)
     private String googleSubject;
 

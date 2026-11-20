@@ -25,8 +25,20 @@ public class AuditLogService {
 
     private AuditLogRepository auditLogRepository;
     private TransactionTemplate requiresNewTxTemplate;
+    private java.util.concurrent.Executor asyncExecutor;
+
+    @org.springframework.beans.factory.annotation.Value("${app.audit.async:true}")
+    private boolean asyncAuditEnabled = true;
 
     public AuditLogService() {
+    }
+
+    @Autowired(required = false)
+    public void setAsyncExecutor(
+            @org.springframework.beans.factory.annotation.Qualifier("asyncTaskExecutor")
+            java.util.concurrent.Executor asyncExecutor
+    ) {
+        this.asyncExecutor = asyncExecutor;
     }
 
     @Autowired(required = false)
@@ -112,10 +124,10 @@ public class AuditLogService {
                 "AUDIT_AUTH: timestamp=\"{}\" correlationId=\"{}\" username=\"{}\" ipAddress=\"{}\" outcome=\"{}\" reason=\"{}\"",
                 Instant.now(),
                 correlationId != null ? correlationId : "N/A",
-                safeUsername,
-                ipAddress != null ? ipAddress : "UNKNOWN",
+                sanitize(safeUsername),
+                sanitize(ipAddress != null ? ipAddress : "UNKNOWN"),
                 success ? "SUCCESS" : "FAILURE",
-                reason != null ? reason : "OK"
+                sanitize(reason != null ? reason : "OK")
         );
 
         persistAuditRecord(
@@ -326,6 +338,19 @@ public class AuditLogService {
                     .details(truncate(sanitize(details), 2000))
                     .build();
 
+            if (asyncAuditEnabled && asyncExecutor != null) {
+                final AuditLog finalRecord = record;
+                asyncExecutor.execute(() -> writeAuditRecordSync(finalRecord));
+            } else {
+                writeAuditRecordSync(record);
+            }
+        } catch (Exception ignored) {
+            // Never allow audit persistence failure to break application flow
+        }
+    }
+
+    private void writeAuditRecordSync(AuditLog record) {
+        try {
             if (requiresNewTxTemplate != null) {
                 requiresNewTxTemplate.executeWithoutResult(status -> auditLogRepository.save(record));
             } else {

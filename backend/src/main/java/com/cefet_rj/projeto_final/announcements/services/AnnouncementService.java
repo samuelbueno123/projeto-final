@@ -107,6 +107,8 @@ public class AnnouncementService {
                         condominiumId,
                         condominium.getName(),
                         targetUnit != null ? targetUnit.getId() : null,
+                        targetSector != null ? targetSector.getId() : null,
+                        normalizedRole,
                         announcement.getTitle(),
                         LocalDateTime.now()
                 )
@@ -114,8 +116,8 @@ public class AnnouncementService {
 
         AnnouncementDTO dtoResult = new AnnouncementDTO(announcement, 0L, false);
         if (realtimeEmitterService != null) {
-            realtimeEmitterService.sendToCondominium(
-                    condominiumId,
+            realtimeEmitterService.sendToUsers(
+                    resolveAnnouncementSseRecipientIds(condominiumId, announcement),
                     com.cefet_rj.projeto_final.realtime.dtos.RealtimeEventDTO.of(
                             "ANNOUNCEMENT_CREATED",
                             condominiumId,
@@ -155,6 +157,13 @@ public class AnnouncementService {
         validateCondominiumAccess(condominiumId);
 
         User user = authenticatedUserService.getAuthenticatedUser();
+        boolean isManagerOrAdmin = condominiumAccessService.isManagerOrAdmin(user, condominiumId);
+        if (!isManagerOrAdmin && (!Boolean.TRUE.equals(announcement.getActive())
+                || !isNotExpired(announcement)
+                || !visibleTo(user, condominiumId).test(announcement))) {
+            throw new ForbiddenException("Você não possui permissão para acessar este comunicado.");
+        }
+
         Optional<AnnouncementRead> existing = announcementReadRepository.findByAnnouncementIdAndUserId(id, user.getId());
         if (existing.isEmpty()) {
             AnnouncementRead read = new AnnouncementRead();
@@ -259,8 +268,7 @@ public class AnnouncementService {
         return announcement -> {
             if (announcement.getTargetRole() != null && !announcement.getTargetRole().isBlank()) {
                 String role = announcement.getTargetRole();
-                boolean matchesRole = membershipRepository.hasActiveRoleInCondominium(user.getId(), condominiumId, role)
-                        || user.hasRole(role);
+                boolean matchesRole = membershipRepository.hasActiveRoleInCondominium(user.getId(), condominiumId, role);
                 if (!matchesRole) {
                     return false;
                 }
@@ -380,6 +388,38 @@ public class AnnouncementService {
 
         announcement.setActive(true);
         announcementRepository.save(announcement);
+    }
+
+    private Collection<Long> resolveAnnouncementSseRecipientIds(Long condominiumId, Announcement announcement) {
+        Set<Long> managerAndAdminIds = membershipRepository.findActiveManagersByCondominiumId(condominiumId).stream()
+                .map(m -> m.getUser().getId())
+                .collect(java.util.stream.Collectors.toSet());
+
+        List<Long> targetUserIds;
+        if (announcement.getTargetRole() != null && !announcement.getTargetRole().isBlank()) {
+            targetUserIds = membershipRepository.findActiveUserIdsByCondominiumIdAndAuthority(
+                    condominiumId,
+                    announcement.getTargetRole()
+            );
+        } else {
+            targetUserIds = membershipRepository.findActiveUserIdsByCondominiumId(condominiumId);
+        }
+
+        if (announcement.getUnit() != null) {
+            Set<Long> staffAndUnit = new HashSet<>(
+                    membershipRepository.findActiveStaffUserIdsByCondominiumId(condominiumId));
+            staffAndUnit.addAll(residentRepository.findUserIdsByUnitId(announcement.getUnit().getId()));
+            targetUserIds = targetUserIds.stream().filter(staffAndUnit::contains).toList();
+        } else if (announcement.getSector() != null) {
+            Set<Long> staffAndSector = new HashSet<>(
+                    membershipRepository.findActiveStaffUserIdsByCondominiumId(condominiumId));
+            staffAndSector.addAll(residentRepository.findUserIdsBySectorId(announcement.getSector().getId()));
+            targetUserIds = targetUserIds.stream().filter(staffAndSector::contains).toList();
+        }
+
+        Set<Long> allRecipients = new LinkedHashSet<>(managerAndAdminIds);
+        allRecipients.addAll(targetUserIds);
+        return allRecipients;
     }
 
     private Announcement findAnnouncementById(Long id) {

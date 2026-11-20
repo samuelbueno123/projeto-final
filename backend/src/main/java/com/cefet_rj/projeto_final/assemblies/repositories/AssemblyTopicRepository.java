@@ -15,5 +15,9 @@ public interface AssemblyTopicRepository extends JpaRepository<AssemblyTopic, Lo
     @Query("SELECT t FROM AssemblyTopic t LEFT JOIN FETCH t.assembly a WHERE t.id = :id")
     Optional<AssemblyTopic> findByIdWithAssembly(@Param("id") Long id);
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT t FROM AssemblyTopic t LEFT JOIN FETCH t.assembly a WHERE t.id = :id")
+    Optional<AssemblyTopic> findByIdWithAssemblyForUpdate(@Param("id") Long id);
+
     List<AssemblyTopic> findByAssemblyIdOrderByDisplayOrderAsc(Long assemblyId);
 }

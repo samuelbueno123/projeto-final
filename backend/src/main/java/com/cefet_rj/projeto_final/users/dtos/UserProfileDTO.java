@@ -8,10 +8,16 @@ public record UserProfileDTO(
         String lastName,
         String email,
         String profileImage,
-        String themePreference
+        String themePreference,
+        String phone
 ) {
     public UserProfileDTO(Long id, String firstName, String lastName, String email, String profileImage) {
-        this(id, firstName, lastName, email, profileImage, "SYSTEM");
+        this(id, firstName, lastName, email, profileImage, "SYSTEM", null);
+    }
+
+    public UserProfileDTO(Long id, String firstName, String lastName, String email,
+                          String profileImage, String themePreference) {
+        this(id, firstName, lastName, email, profileImage, themePreference, null);
     }
 
     public UserProfileDTO(User user) {
@@ -21,7 +27,8 @@ public record UserProfileDTO(
                 user.getLastName(),
                 user.getEmail(),
                 user.getProfileImage(),
-                user.getThemePreference() != null ? user.getThemePreference() : "SYSTEM"
+                user.getThemePreference() != null ? user.getThemePreference() : "SYSTEM",
+                user.getPhone()
         );
     }
 }

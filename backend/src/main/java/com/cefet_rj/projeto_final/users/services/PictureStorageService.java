@@ -53,9 +53,12 @@ public class PictureStorageService {
      * Armazena foto de perfil de usuário na subpasta "profiles".
      */
     public String resolveOrStoreProfileImage(Long userId, String inputImage, String existingPath) {
+        if (userId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Identificador do usuário é obrigatório.");
+        }
         return storeDecodedImage(
                 PROFILES_FOLDER,
-                userId == null ? "user" : "user_" + userId,
+                "user_" + userId,
                 inputImage,
                 existingPath
         );
@@ -65,9 +68,12 @@ public class PictureStorageService {
      * Armazena imagem do condomínio ou área comum na subpasta "condominiums".
      */
     public String resolveOrStoreCondominiumImage(Long condominiumId, String inputImage, String existingPath) {
+        if (condominiumId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Identificador do condomínio é obrigatório.");
+        }
         return storeDecodedImage(
                 CONDOMINIUMS_FOLDER,
-                condominiumId == null ? "condo" : "condo_" + condominiumId,
+                "condo_" + condominiumId,
                 inputImage,
                 existingPath
         );
@@ -124,6 +130,7 @@ public class PictureStorageService {
             case "webp" -> "webp";
             default -> "png";
         };
+        validateImageMagicBytes(bytes, extension);
 
         String token = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
         String fileName = prefix + "_" + token + "." + extension;
@@ -160,6 +167,17 @@ public class PictureStorageService {
         }
 
         String extension = resolveExtension(file.getContentType(), file.getOriginalFilename());
+        byte[] bytes;
+        try {
+            bytes = file.getBytes();
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Não foi possível ler o arquivo de imagem enviado.");
+        }
+        if (bytes.length == 0 || bytes.length > MAX_PICTURE_BYTES) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A imagem deve ter no máximo 10 MB.");
+        }
+        validateImageMagicBytes(bytes, extension);
+
         String token = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
         String fileName = prefix + "_" + token + "." + extension;
         String relativePath = folder + "/" + fileName;
@@ -171,7 +189,7 @@ public class PictureStorageService {
             if (!target.startsWith(storageDirectory)) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Caminho de imagem inválido.");
             }
-            Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+            Files.write(target, bytes);
         } catch (IOException e) {
             throw new ResponseStatusException(
                     HttpStatus.INTERNAL_SERVER_ERROR,
@@ -181,6 +199,38 @@ public class PictureStorageService {
 
         deleteFileIfPresent(existingPath);
         return PICTURES_DB_PREFIX + relativePath;
+    }
+
+    private void validateImageMagicBytes(byte[] bytes, String expectedExtension) {
+        boolean isPng = bytes.length >= 8
+                && (bytes[0] & 0xFF) == 0x89
+                && bytes[1] == 0x50
+                && bytes[2] == 0x4E
+                && bytes[3] == 0x47
+                && bytes[4] == 0x0D
+                && bytes[5] == 0x0A
+                && bytes[6] == 0x1A
+                && bytes[7] == 0x0A;
+        boolean isJpeg = bytes.length >= 3
+                && (bytes[0] & 0xFF) == 0xFF
+                && (bytes[1] & 0xFF) == 0xD8
+                && (bytes[2] & 0xFF) == 0xFF;
+        boolean isWebp = bytes.length >= 12
+                && bytes[0] == 'R' && bytes[1] == 'I' && bytes[2] == 'F' && bytes[3] == 'F'
+                && bytes[8] == 'W' && bytes[9] == 'E' && bytes[10] == 'B' && bytes[11] == 'P';
+
+        boolean matches = switch (expectedExtension) {
+            case "png" -> isPng;
+            case "jpg" -> isJpeg;
+            case "webp" -> isWebp;
+            default -> false;
+        };
+        if (!matches) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "O conteúdo do arquivo não corresponde a uma imagem PNG, JPEG ou WebP válida."
+            );
+        }
     }
 
     public StoredPicture loadPicture(String requestedPath) {

@@ -16,11 +16,16 @@ public class CondominiumFeatureAccessService {
 
     private final CondominiumRepository condominiumRepository;
 
+    @org.springframework.beans.factory.annotation.Autowired
+    @org.springframework.context.annotation.Lazy
+    private CondominiumFeatureAccessService self;
+
     public void validateFeatureEnabled(
             Long condominiumId,
             FeatureCode featureCode
     ) {
-        if (!hasFeature(condominiumId, featureCode)) {
+        boolean enabled = (self != null ? self : this).hasFeature(condominiumId, featureCode);
+        if (!enabled) {
             throw new ForbiddenException(
                     "Feature " + featureCode
                             + " is not enabled for condominium "

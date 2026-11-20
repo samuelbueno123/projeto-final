@@ -388,12 +388,12 @@ public class ReportService {
         LocalDate today = LocalDate.now();
         List<MaintenanceEquipment> equipmentList = equipmentRepository.findByCondominiumIdOrderByNextMaintenanceDateAsc(condominiumId);
         long overdueEquipment = equipmentList.stream()
-                .filter(e -> "ACTIVE".equalsIgnoreCase(e.getStatus())
+                .filter(e -> ("OPERATIONAL".equalsIgnoreCase(e.getStatus()) || "ACTIVE".equalsIgnoreCase(e.getStatus()))
                         && e.getNextMaintenanceDate() != null
                         && e.getNextMaintenanceDate().isBefore(today))
                 .count();
         long dueSoonEquipment = equipmentList.stream()
-                .filter(e -> "ACTIVE".equalsIgnoreCase(e.getStatus())
+                .filter(e -> ("OPERATIONAL".equalsIgnoreCase(e.getStatus()) || "ACTIVE".equalsIgnoreCase(e.getStatus()))
                         && e.getNextMaintenanceDate() != null
                         && !e.getNextMaintenanceDate().isBefore(today)
                         && !e.getNextMaintenanceDate().isAfter(today.plusDays(7)))
@@ -494,7 +494,7 @@ public class ReportService {
     }
 
     private boolean isWithinRange(LocalDateTime value, LocalDateTime from, LocalDateTime to) {
-        if (value == null) return true;
+        if (value == null) return from == null && to == null;
         if (from != null && value.isBefore(from)) return false;
         if (to != null && !value.isBefore(to)) return false;
         return true;
@@ -513,47 +513,77 @@ public class ReportService {
         if (value == null) return "";
         return java.text.Normalizer.normalize(value, java.text.Normalizer.Form.NFD)
                 .replaceAll("\\p{M}", "")
+                .replace("\r", " ")
+                .replace("\n", " ")
                 .replace("(", "[")
                 .replace(")", "]")
                 .replace("\\", "/");
     }
 
     private byte[] buildSimplePdf(List<String> lines) {
-        StringBuilder stream = new StringBuilder();
-        stream.append("BT\n/F1 10 Tf\n40 790 Td\n14 TL\n");
-        for (String line : lines) {
-            stream.append("(").append(sanitizePdfText(line)).append(") Tj\nT*\n");
+        final int maxLinesPerPage = 48;
+        List<List<String>> pages = new ArrayList<>();
+        if (lines == null || lines.isEmpty()) {
+            pages.add(List.of(""));
+        } else {
+            for (int i = 0; i < lines.size(); i += maxLinesPerPage) {
+                pages.add(lines.subList(i, Math.min(i + maxLinesPerPage, lines.size())));
+            }
         }
-        stream.append("ET\n");
-        byte[] contentBytes = stream.toString().getBytes(StandardCharsets.US_ASCII);
 
+        int pageCount = pages.size();
+        int totalObjects = 3 + pageCount * 2;
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         List<Integer> offsets = new ArrayList<>();
         writeAscii(out, "%PDF-1.4\n");
 
+        // 1: Catalog
         offsets.add(out.size());
         writeAscii(out, "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n");
 
+        // 2: Pages
+        StringBuilder kids = new StringBuilder();
+        for (int i = 0; i < pageCount; i++) {
+            int pageObjId = 4 + i * 2;
+            if (i > 0) kids.append(" ");
+            kids.append(pageObjId).append(" 0 R");
+        }
         offsets.add(out.size());
-        writeAscii(out, "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n");
+        writeAscii(out, "2 0 obj\n<< /Type /Pages /Kids [" + kids + "] /Count " + pageCount + " >>\nendobj\n");
 
+        // 3: Helvetica Font
         offsets.add(out.size());
-        writeAscii(out, "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>\nendobj\n");
+        writeAscii(out, "3 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n");
 
-        offsets.add(out.size());
-        writeAscii(out, "4 0 obj\n<< /Length " + contentBytes.length + " >>\nstream\n");
-        out.writeBytes(contentBytes);
-        writeAscii(out, "endstream\nendobj\n");
+        // 4..N: Page & Content Stream pairs
+        for (int i = 0; i < pageCount; i++) {
+            int pageObjId = 4 + i * 2;
+            int contentObjId = pageObjId + 1;
 
-        offsets.add(out.size());
-        writeAscii(out, "5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n");
+            StringBuilder stream = new StringBuilder();
+            stream.append("BT\n/F1 10 Tf\n40 790 Td\n14 TL\n");
+            for (String line : pages.get(i)) {
+                stream.append("(").append(sanitizePdfText(line)).append(") Tj\nT*\n");
+            }
+            stream.append("ET\n");
+            byte[] contentBytes = stream.toString().getBytes(StandardCharsets.US_ASCII);
+
+            offsets.add(out.size());
+            writeAscii(out, pageObjId + " 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents "
+                    + contentObjId + " 0 R /Resources << /Font << /F1 3 0 R >> >> >>\nendobj\n");
+
+            offsets.add(out.size());
+            writeAscii(out, contentObjId + " 0 obj\n<< /Length " + contentBytes.length + " >>\nstream\n");
+            out.writeBytes(contentBytes);
+            writeAscii(out, "endstream\nendobj\n");
+        }
 
         int xrefOffset = out.size();
-        writeAscii(out, "xref\n0 6\n0000000000 65535 f \n");
+        writeAscii(out, "xref\n0 " + (totalObjects + 1) + "\n0000000000 65535 f \n");
         for (int offset : offsets) {
             writeAscii(out, String.format("%010d 00000 n \n", offset));
         }
-        writeAscii(out, "trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n" + xrefOffset + "\n%%EOF\n");
+        writeAscii(out, "trailer\n<< /Size " + (totalObjects + 1) + " /Root 1 0 R >>\nstartxref\n" + xrefOffset + "\n%%EOF\n");
         return out.toByteArray();
     }
 

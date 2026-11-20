@@ -555,6 +555,86 @@ public class ResourceExceptionHandler {
         return ResponseEntity.status(status).body(error);
     }
 
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    public ResponseEntity<StandardError> noResourceFound(
+            org.springframework.web.servlet.resource.NoResourceFoundException exception,
+            HttpServletRequest request
+    ) {
+        HttpStatus status = HttpStatus.NOT_FOUND;
+        String correlationId = getCorrelationId(request);
+        StandardError error = new StandardError(
+                Instant.now(),
+                status.value(),
+                status.getReasonPhrase(),
+                "Recurso não encontrado: " + exception.getResourcePath(),
+                request.getRequestURI(),
+                correlationId
+        );
+        return ResponseEntity.status(status).body(error);
+    }
+
+    @ExceptionHandler({
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class,
+            java.time.format.DateTimeParseException.class,
+            NumberFormatException.class,
+            org.springframework.web.multipart.support.MissingServletRequestPartException.class
+    })
+    public ResponseEntity<StandardError> badInputFormat(
+            Exception exception,
+            HttpServletRequest request
+    ) {
+        HttpStatus status = HttpStatus.BAD_REQUEST;
+        String correlationId = getCorrelationId(request);
+        StandardError error = new StandardError(
+                Instant.now(),
+                status.value(),
+                status.getReasonPhrase(),
+                "Parâmetro ou formato de dado inválido.",
+                request.getRequestURI(),
+                correlationId
+        );
+        return ResponseEntity.status(status).body(error);
+    }
+
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public ResponseEntity<StandardError> maxUploadSizeExceeded(
+            org.springframework.web.multipart.MaxUploadSizeExceededException exception,
+            HttpServletRequest request
+    ) {
+        HttpStatus status = HttpStatus.PAYLOAD_TOO_LARGE;
+        String correlationId = getCorrelationId(request);
+        StandardError error = new StandardError(
+                Instant.now(),
+                status.value(),
+                status.getReasonPhrase(),
+                "O arquivo enviado excede o tamanho máximo permitido (10 MB).",
+                request.getRequestURI(),
+                correlationId
+        );
+        return ResponseEntity.status(status).body(error);
+    }
+
+    @ExceptionHandler({
+            org.springframework.dao.PessimisticLockingFailureException.class,
+            jakarta.persistence.PessimisticLockException.class
+    })
+    public ResponseEntity<StandardError> pessimisticLockConflict(
+            Exception exception,
+            HttpServletRequest request
+    ) {
+        HttpStatus status = HttpStatus.CONFLICT;
+        String correlationId = getCorrelationId(request);
+        StandardError error = new StandardError(
+                Instant.now(),
+                status.value(),
+                status.getReasonPhrase(),
+                "Recurso ocupado por outra operação simultânea. Tente novamente em instantes.",
+                request.getRequestURI(),
+                correlationId
+        );
+        return ResponseEntity.status(status).body(error);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<StandardError> genericException(
             Exception exception,

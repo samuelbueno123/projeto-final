@@ -11,7 +11,8 @@ public record UserProfileUpdateDTO(
         @Size(max = 4_200_000) String profileImage,
         String currentPassword,
         String googleIdToken,
-        String themePreference
+        String themePreference,
+        @Size(max = 32) String phone
 ) {
     public UserProfileUpdateDTO(
             String firstName,
@@ -21,6 +22,18 @@ public record UserProfileUpdateDTO(
             String currentPassword,
             String googleIdToken
     ) {
-        this(firstName, lastName, email, profileImage, currentPassword, googleIdToken, null);
+        this(firstName, lastName, email, profileImage, currentPassword, googleIdToken, null, null);
+    }
+
+    public UserProfileUpdateDTO(
+            String firstName,
+            String lastName,
+            String email,
+            String profileImage,
+            String currentPassword,
+            String googleIdToken,
+            String themePreference
+    ) {
+        this(firstName, lastName, email, profileImage, currentPassword, googleIdToken, themePreference, null);
     }
 }
