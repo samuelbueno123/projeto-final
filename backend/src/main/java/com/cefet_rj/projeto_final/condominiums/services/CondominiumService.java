@@ -45,6 +45,10 @@ public class CondominiumService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.cefet_rj.projeto_final.condominiums.security.CondominiumFeatureAccessService featureAccessService;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    @org.springframework.context.annotation.Lazy
+    private com.cefet_rj.projeto_final.billing.services.CondominiumSubscriptionService subscriptionService;
+
     @Transactional(readOnly = true)
     public Page<CondominiumDTO> findAllPaged(Pageable pageable) {
         Page<Condominium> list = condominiumRepository.findAll(pageable);
@@ -59,6 +63,20 @@ public class CondominiumService {
         if (!user.hasRole("ROLE_ADMIN")) {
             condominiumAccessService.validateUserBelongsToCondominium(user.getId(), id);
         }
+        if (featureAccessService != null) {
+            java.util.List<String> effectiveFeatures = featureAccessService.getEnabledFeatureCodes(id);
+            return new CondominiumDTO(
+                    entity.getId(),
+                    entity.getName(),
+                    entity.getAddress(),
+                    entity.getBillingPlan() != null ? entity.getBillingPlan().getId() : null,
+                    entity.getBillingPlan() != null ? entity.getBillingPlan().getName() : null,
+                    entity.getIsActive(),
+                    entity.getPlanSelected() != null ? entity.getPlanSelected() : false,
+                    effectiveFeatures,
+                    entity.getImageUrl()
+            );
+        }
         return new CondominiumDTO(entity);
     }
 
@@ -67,8 +85,11 @@ public class CondominiumService {
         Condominium entity = new Condominium();
         linkAssociations(dto.name(), dto.address(), dto.billingPlan(), dto.isActive(), dto.imageUrl(), entity);
         entity = condominiumRepository.save(entity);
+        if (subscriptionService != null) {
+            subscriptionService.ensureSubscriptionExists(entity);
+        }
         if (featureAccessService != null) {
-            featureAccessService.evictCondoFeaturesCache();
+            featureAccessService.evictCondoFeaturesCache(entity.getId());
         }
         if (auditLogService != null) {
             auditLogService.logAdminOperation(
@@ -92,7 +113,7 @@ public class CondominiumService {
             linkAssociations(dto.name(), dto.address(), dto.billingPlan(), dto.isActive(), dto.imageUrl(), entity);
             entity = condominiumRepository.save(entity);
             if (featureAccessService != null) {
-                featureAccessService.evictCondoFeaturesCache();
+                featureAccessService.evictCondoFeaturesCache(entity.getId());
             }
             if (auditLogService != null) {
                 auditLogService.logAdminOperation(
@@ -117,7 +138,7 @@ public class CondominiumService {
         Condominium entity = condominiumRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Condomínio não encontrado: " + id));
         condominiumAccessService.validateManagerAccess(id);
-        entity.setImageUrl(imageUrl);
+        entity.setImageUrl(com.cefet_rj.projeto_final.shared.validation.UrlSanitizer.sanitizeMediaUrl(imageUrl, "imageUrl"));
         entity = condominiumRepository.save(entity);
         return new CondominiumDTO(entity);
     }
@@ -130,7 +151,7 @@ public class CondominiumService {
         try {
             condominiumRepository.deleteById(id);
             if (featureAccessService != null) {
-                featureAccessService.evictCondoFeaturesCache();
+                featureAccessService.evictCondoFeaturesCache(id);
             }
             if (auditLogService != null) {
                 auditLogService.logAdminOperation(
@@ -150,21 +171,31 @@ public class CondominiumService {
     }
 
     private BillingPlan getBillingPlanOrThrow(String billingPlanName) {
-        String normalized = billingPlanName == null ? "Básico" : billingPlanName.trim();
+        String normalized = billingPlanName == null ? "Essencial" : billingPlanName.trim();
         if (normalized.isEmpty()) {
-            normalized = "Básico";
+            normalized = "Essencial";
         }
         final String targetName = normalized;
-        return billingPlanRepository
-                .findByNameIgnoreCase(targetName)
-                .orElseGet(() -> {
-                    BillingPlan created = new BillingPlan();
-                    created.setName(targetName);
-                    created.setActive(true);
-                    created.setMonthlyFee(defaultFeeForPlan(targetName));
-                    created.setFeatures(new HashSet<>(featureRepository.findAll()));
-                    return billingPlanRepository.save(created);
-                });
+        Optional<BillingPlan> direct = billingPlanRepository.findByNameIgnoreCase(targetName);
+        if (direct.isPresent()) {
+            return direct.get();
+        }
+        String lower = targetName.toLowerCase(Locale.ROOT);
+        if (lower.equals("básico") || lower.equals("basico") || lower.equals("essencial")) {
+            Optional<BillingPlan> alias = billingPlanRepository.findByNameIgnoreCase("Essencial")
+                    .or(() -> billingPlanRepository.findByNameIgnoreCase("Básico"));
+            if (alias.isPresent()) return alias.get();
+        } else if (lower.equals("premium") || lower.equals("enterprise")) {
+            Optional<BillingPlan> alias = billingPlanRepository.findByNameIgnoreCase("Enterprise")
+                    .or(() -> billingPlanRepository.findByNameIgnoreCase("Premium"));
+            if (alias.isPresent()) return alias.get();
+        }
+        BillingPlan created = new BillingPlan();
+        created.setName(targetName);
+        created.setActive(true);
+        created.setMonthlyFee(defaultFeeForPlan(targetName));
+        created.setFeatures(new HashSet<>(featureRepository.findAll()));
+        return billingPlanRepository.save(created);
     }
 
     private BigDecimal defaultFeeForPlan(String planName) {
@@ -195,7 +226,7 @@ public class CondominiumService {
 
         entity.setIsActive(isActive != null ? isActive : Boolean.TRUE);
         if (imageUrl != null) {
-            entity.setImageUrl(imageUrl.trim());
+            entity.setImageUrl(com.cefet_rj.projeto_final.shared.validation.UrlSanitizer.sanitizeMediaUrl(imageUrl, "imageUrl"));
         }
     }
 }

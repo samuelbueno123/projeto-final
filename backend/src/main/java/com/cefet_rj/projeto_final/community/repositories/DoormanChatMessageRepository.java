@@ -19,12 +19,32 @@ public interface DoormanChatMessageRepository extends JpaRepository<DoormanChatM
         LEFT JOIN FETCH m.unit u
         LEFT JOIN FETCH u.sector
         WHERE m.condominium.id = :condoId
+          AND m.unit IS NULL
           AND (m.sender.id = :userId OR m.recipient.id = :userId)
         ORDER BY m.sentAt ASC
     """)
-    List<DoormanChatMessage> findResidentConversation(
+    List<DoormanChatMessage> findResidentDirectConversation(
             @Param("condoId") Long condoId,
             @Param("userId") Long userId
+    );
+
+    @Query("""
+        SELECT m FROM DoormanChatMessage m
+        JOIN FETCH m.sender
+        LEFT JOIN FETCH m.recipient
+        LEFT JOIN FETCH m.unit u
+        LEFT JOIN FETCH u.sector
+        WHERE m.condominium.id = :condoId
+          AND (
+            (m.unit IS NOT NULL AND m.unit.id IN :unitIds)
+            OR (m.unit IS NULL AND (m.sender.id = :userId OR m.recipient.id = :userId))
+          )
+        ORDER BY m.sentAt ASC
+    """)
+    List<DoormanChatMessage> findResidentConversationScoped(
+            @Param("condoId") Long condoId,
+            @Param("userId") Long userId,
+            @Param("unitIds") List<Long> unitIds
     );
 
     @Query("""
@@ -52,6 +72,34 @@ public interface DoormanChatMessageRepository extends JpaRepository<DoormanChatM
         ORDER BY m.sentAt ASC
     """)
     List<DoormanChatMessage> findAllByCondominiumIdWithDetails(@Param("condoId") Long condoId);
+
+    @Query("""
+        SELECT m.sender.id, r.id, MAX(m.id)
+        FROM DoormanChatMessage m
+        LEFT JOIN m.recipient r
+        WHERE m.condominium.id = :condoId
+        GROUP BY m.sender.id, r.id
+    """)
+    List<Object[]> findLatestMessageIdsPerPair(@Param("condoId") Long condoId);
+
+    @Query("""
+        SELECT m FROM DoormanChatMessage m
+        JOIN FETCH m.sender
+        LEFT JOIN FETCH m.recipient
+        WHERE m.id IN :ids
+        ORDER BY m.sentAt ASC, m.id ASC
+    """)
+    List<DoormanChatMessage> findAllByIdInWithParticipants(@Param("ids") List<Long> ids);
+
+    @Query("""
+        SELECT m.sender.id, COUNT(m)
+        FROM DoormanChatMessage m
+        WHERE m.condominium.id = :condoId
+          AND m.isRead = false
+          AND m.sender IS NOT NULL
+        GROUP BY m.sender.id
+    """)
+    List<Object[]> countUnreadBySenderForCondominium(@Param("condoId") Long condoId);
 
     @Query("""
         SELECT COUNT(m) FROM DoormanChatMessage m

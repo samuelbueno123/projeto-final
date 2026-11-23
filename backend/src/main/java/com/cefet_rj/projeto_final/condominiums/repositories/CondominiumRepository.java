@@ -14,4 +14,11 @@ public interface CondominiumRepository extends JpaRepository<Condominium, Long> 
 
     @EntityGraph(attributePaths = {"billingPlan"})
     Page<Condominium> findByNameContainingIgnoreCase(String name, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"billingPlan"})
+    java.util.List<Condominium> findByIsActiveTrue();
+
+    long countByIsActiveTrue();
+
+    long countByIsActiveFalse();
 }

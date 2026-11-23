@@ -84,7 +84,7 @@ class ConcurrencyAndEdgeCasesIntegrationTests {
         plan.setName("CONCURRENCY_TEST_PLAN_" + uid);
         plan.setMonthlyFee(new BigDecimal("99.90"));
         plan.setActive(true);
-        plan.setFeatures(Set.of(resFeature, commFeature));
+        plan.setFeatures(java.util.Arrays.stream(FeatureCode.values()).map(this::getOrCreateFeature).collect(java.util.stream.Collectors.toSet()));
         plan = billingPlanRepository.save(plan);
 
         condo = new Condominium();

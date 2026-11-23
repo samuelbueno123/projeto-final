@@ -57,7 +57,9 @@ public class CondominiumCommunityController {
             @RequestParam(required = false, defaultValue = "20") Integer size
     ) {
         if (page != null) {
-            org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page, Math.min(size, 100));
+            int safePage = Math.max(0, page);
+            int safeSize = size == null ? 20 : Math.min(Math.max(1, size), 100);
+            org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(safePage, safeSize);
             return communityService.listVisitorsPaged(condominiumId, mine, pageable);
         }
         return communityService.listVisitors(condominiumId, mine);
@@ -118,11 +120,24 @@ public class CondominiumCommunityController {
     @PostMapping("/polls/{pollId}/vote")
     public PollDTO voteOnPoll(
             @PathVariable Long pollId,
-            @RequestBody Map<String, Object> body
+            @RequestBody(required = false) Map<String, Object> body
     ) {
-        Long optionId = body.get("optionId") instanceof Number n
-                ? n.longValue()
-                : Long.parseLong(body.get("optionId").toString());
+        if (body == null || body.get("optionId") == null) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST, "optionId é obrigatório.");
+        }
+        Long optionId;
+        Object rawOption = body.get("optionId");
+        if (rawOption instanceof Number n) {
+            optionId = n.longValue();
+        } else {
+            try {
+                optionId = Long.parseLong(rawOption.toString().trim());
+            } catch (NumberFormatException ex) {
+                throw new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.BAD_REQUEST, "optionId inválido.");
+            }
+        }
         return communityService.voteOnPoll(pollId, optionId);
     }
 

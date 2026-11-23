@@ -26,6 +26,7 @@ public class AuditLogService {
     private AuditLogRepository auditLogRepository;
     private TransactionTemplate requiresNewTxTemplate;
     private java.util.concurrent.Executor asyncExecutor;
+    private OperationalMetricsService operationalMetricsService;
 
     @org.springframework.beans.factory.annotation.Value("${app.audit.async:true}")
     private boolean asyncAuditEnabled = true;
@@ -44,6 +45,11 @@ public class AuditLogService {
     @Autowired(required = false)
     public void setAuditLogRepository(AuditLogRepository auditLogRepository) {
         this.auditLogRepository = auditLogRepository;
+    }
+
+    @Autowired(required = false)
+    public void setOperationalMetricsService(OperationalMetricsService operationalMetricsService) {
+        this.operationalMetricsService = operationalMetricsService;
     }
 
     @Autowired(required = false)
@@ -299,6 +305,49 @@ public class AuditLogService {
         );
     }
 
+    public void logAdminDataMutation(
+            String principal,
+            String action,
+            String resourceType,
+            String resourceId,
+            Long condominiumId,
+            String condominiumName,
+            String details,
+            String beforeState,
+            String afterState,
+            String reason
+    ) {
+        String safePrincipal = resolvePrincipal(principal);
+        String correlationId = MDC.get(ObservabilityConstants.CORRELATION_ID_MDC_KEY);
+        auditLog.info(
+                "AUDIT_ADMIN_DATA: timestamp=\"{}\" correlationId=\"{}\" principal=\"{}\" action=\"{}\" resourceType=\"{}\" resourceId=\"{}\" reason=\"{}\"",
+                Instant.now(),
+                correlationId != null ? correlationId : "N/A",
+                safePrincipal,
+                action,
+                resourceType,
+                resourceId,
+                sanitize(reason)
+        );
+        persistAuditRecord(
+                "ADMIN_DATA",
+                action != null ? action : "ADMIN_DATA_MUTATION",
+                "INFO",
+                safePrincipal,
+                action != null ? action : "ADMIN_DATA_MUTATION",
+                resourceType,
+                resourceId,
+                condominiumId,
+                condominiumName,
+                null,
+                "SUCCESS",
+                details,
+                beforeState,
+                afterState,
+                reason
+        );
+    }
+
     public void persistAuditRecord(
             String category,
             String eventType,
@@ -312,6 +361,42 @@ public class AuditLogService {
             String ipAddress,
             String outcome,
             String details
+    ) {
+        persistAuditRecord(
+                category,
+                eventType,
+                severity,
+                principal,
+                action,
+                resourceType,
+                resourceId,
+                condominiumId,
+                condominiumName,
+                ipAddress,
+                outcome,
+                details,
+                null,
+                null,
+                null
+        );
+    }
+
+    public void persistAuditRecord(
+            String category,
+            String eventType,
+            String severity,
+            String principal,
+            String action,
+            String resourceType,
+            String resourceId,
+            Long condominiumId,
+            String condominiumName,
+            String ipAddress,
+            String outcome,
+            String details,
+            String beforeState,
+            String afterState,
+            String reason
     ) {
         if (auditLogRepository == null) {
             return;
@@ -336,28 +421,52 @@ public class AuditLogService {
                     .ipAddress(truncate(ipAddress, 64))
                     .outcome(truncate(outcome != null ? outcome : "SUCCESS", 30))
                     .details(truncate(sanitize(details), 2000))
+                    .beforeState(truncate(beforeState, 8000))
+                    .afterState(truncate(afterState, 8000))
+                    .reason(truncate(sanitize(reason), 500))
                     .build();
 
             if (asyncAuditEnabled && asyncExecutor != null) {
                 final AuditLog finalRecord = record;
-                asyncExecutor.execute(() -> writeAuditRecordSync(finalRecord));
+                try {
+                    asyncExecutor.execute(() -> writeAuditRecordWithRetry(finalRecord));
+                } catch (Exception dispatchEx) {
+                    auditLog.warn("Async audit executor unavailable ({}), falling back to synchronous write", dispatchEx.getMessage());
+                    writeAuditRecordWithRetry(finalRecord);
+                }
             } else {
-                writeAuditRecordSync(record);
+                writeAuditRecordWithRetry(record);
             }
-        } catch (Exception ignored) {
-            // Never allow audit persistence failure to break application flow
+        } catch (Exception ex) {
+            auditLog.error("Failed to prepare audit record action={} resourceType={}: {}", action, resourceType, ex.getMessage());
+            if (operationalMetricsService != null) {
+                operationalMetricsService.recordAuditWriteFailure();
+            }
+        }
+    }
+
+    private void writeAuditRecordWithRetry(AuditLog record) {
+        try {
+            writeAuditRecordSync(record);
+        } catch (Exception firstEx) {
+            auditLog.warn("First attempt to persist audit record failed ({}), retrying once...", firstEx.getMessage());
+            try {
+                writeAuditRecordSync(record);
+            } catch (Exception retryEx) {
+                auditLog.error("Audit persistence permanently failed after retry (action={}, resourceType={}): {}",
+                        record.getAction(), record.getResourceType(), retryEx.getMessage());
+                if (operationalMetricsService != null) {
+                    operationalMetricsService.recordAuditWriteFailure();
+                }
+            }
         }
     }
 
     private void writeAuditRecordSync(AuditLog record) {
-        try {
-            if (requiresNewTxTemplate != null) {
-                requiresNewTxTemplate.executeWithoutResult(status -> auditLogRepository.save(record));
-            } else {
-                auditLogRepository.save(record);
-            }
-        } catch (Exception ignored) {
-            // Never allow audit persistence failure to break application flow
+        if (requiresNewTxTemplate != null) {
+            requiresNewTxTemplate.executeWithoutResult(status -> auditLogRepository.save(record));
+        } else {
+            auditLogRepository.save(record);
         }
     }
 

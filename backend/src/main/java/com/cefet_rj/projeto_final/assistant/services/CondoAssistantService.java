@@ -16,8 +16,17 @@ public class CondoAssistantService {
 
     private final CondominiumAccessService condominiumAccessService;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.cefet_rj.projeto_final.condominiums.security.CondominiumFeatureAccessService featureAccessService;
+
     public AssistantResponseDTO answerQuestion(Long condominiumId, AssistantQueryDTO query) {
         condominiumAccessService.validateAccess(condominiumId);
+        if (featureAccessService != null) {
+            featureAccessService.validateFeatureEnabled(
+                    condominiumId,
+                    com.cefet_rj.projeto_final.billing.enums.FeatureCode.AI_ASSISTANT
+            );
+        }
 
         String rawQuestion = query.question();
         String normalized = normalize(rawQuestion);

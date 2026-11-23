@@ -12,8 +12,41 @@ public record ManagerDashboardDTO(
         long totalUsers,
         long totalReservations,
         List<UnitInfo> units,
-        List<ReservationInfo> reservations
+        List<ReservationInfo> reservations,
+        ManagerSummaryDTO summary
 ) {
+    public ManagerDashboardDTO(
+            Long condominiumId,
+            String condominiumName,
+            long totalUnits,
+            long totalUsers,
+            long totalReservations,
+            List<UnitInfo> units,
+            List<ReservationInfo> reservations
+    ) {
+        this(condominiumId, condominiumName, totalUnits, totalUsers, totalReservations, units, reservations, null);
+    }
+
+    public record ManagerSummaryDTO(
+            long occupiedUnits,
+            long vacantUnits,
+            long recentMembershipsCount,
+            long pendingMembershipRequestsCount,
+            long activeReservationsCount,
+            long todayReservationsCount,
+            long weekReservationsCount,
+            long openTicketsCount,
+            long overdueMaintenanceCount,
+            long openMaintenanceCount,
+            long pendingAssembliesCount,
+            BigDecimal totalInvoiced,
+            BigDecimal totalCollected,
+            BigDecimal totalPending,
+            BigDecimal overdueAmount,
+            long paidUnitsCount,
+            long pendingUnitsCount,
+            long overdueUnitsCount
+    ) {}
     public record UnitInfo(
             Long id,
             String identifier,

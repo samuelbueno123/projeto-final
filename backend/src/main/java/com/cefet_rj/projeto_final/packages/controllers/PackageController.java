@@ -56,8 +56,11 @@ public class PackageController {
 
     @PreAuthorize("isAuthenticated()")
     @GetMapping("/my")
-    public ResponseEntity<Page<PackageDTO>> findMyPackages(Pageable pageable) {
-        Page<PackageDTO> list = packageService.findMyPackages(pageable);
+    public ResponseEntity<Page<PackageDTO>> findMyPackages(
+            @RequestParam(required = false) Long condominiumId,
+            Pageable pageable
+    ) {
+        Page<PackageDTO> list = packageService.findMyPackages(condominiumId, pageable);
         return ResponseEntity.ok(list);
     }
 

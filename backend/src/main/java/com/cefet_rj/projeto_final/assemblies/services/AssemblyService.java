@@ -28,6 +28,7 @@ import com.cefet_rj.projeto_final.manager.repositories.UnitPaymentRepository;
 import com.cefet_rj.projeto_final.realtime.dtos.RealtimeEventDTO;
 import com.cefet_rj.projeto_final.realtime.services.RealtimeEmitterService;
 import com.cefet_rj.projeto_final.shared.exceptions.ForbiddenException;
+import java.time.LocalDate;
 import com.cefet_rj.projeto_final.shared.exceptions.ResourceNotFoundException;
 import com.cefet_rj.projeto_final.users.entities.User;
 import lombok.RequiredArgsConstructor;
@@ -57,9 +58,22 @@ public class AssemblyService {
     private final CondominiumAccessService condominiumAccessService;
     private final RealtimeEmitterService realtimeEmitterService;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.cefet_rj.projeto_final.condominiums.security.CondominiumFeatureAccessService featureAccessService;
+
+    private void ensureAssembliesFeature(Long condominiumId) {
+        if (featureAccessService != null) {
+            featureAccessService.validateFeatureEnabled(
+                    condominiumId,
+                    com.cefet_rj.projeto_final.billing.enums.FeatureCode.ASSEMBLIES
+            );
+        }
+    }
+
     @Transactional(readOnly = true)
     public List<AssemblyDTO> listAssemblies(Long condominiumId) {
         condominiumAccessService.validateAccess(condominiumId);
+        ensureAssembliesFeature(condominiumId);
         User caller = authenticatedUserService.getAuthenticatedUser();
 
         List<CondominiumAssembly> assemblies = assemblyRepository.findAllByCondominiumIdWithTopics(condominiumId);
@@ -94,6 +108,7 @@ public class AssemblyService {
         CondominiumAssembly assembly = assemblyRepository.findByIdWithTopics(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Assembleia não encontrada: " + id));
         condominiumAccessService.validateAccess(assembly.getCondominium().getId());
+        ensureAssembliesFeature(assembly.getCondominium().getId());
         User caller = authenticatedUserService.getAuthenticatedUser();
 
         List<Long> topicIds = assembly.getTopics().stream().map(AssemblyTopic::getId).toList();
@@ -107,6 +122,7 @@ public class AssemblyService {
     @Transactional
     public AssemblyDTO createAssembly(Long condominiumId, CreateAssemblyDTO dto) {
         condominiumAccessService.validateManagerAccess(condominiumId);
+        ensureAssembliesFeature(condominiumId);
         User caller = authenticatedUserService.getAuthenticatedUser();
 
         if (dto.meetingDate() == null) {
@@ -152,6 +168,7 @@ public class AssemblyService {
         CondominiumAssembly assembly = assemblyRepository.findById(assemblyId)
                 .orElseThrow(() -> new ResourceNotFoundException("Assembleia não encontrada: " + assemblyId));
         condominiumAccessService.validateManagerAccess(assembly.getCondominium().getId());
+        ensureAssembliesFeature(assembly.getCondominium().getId());
 
         if ("CONCLUDED".equalsIgnoreCase(assembly.getStatus()) || "CANCELLED".equalsIgnoreCase(assembly.getStatus())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Não é possível adicionar pautas a uma assembleia encerrada ou cancelada.");
@@ -180,6 +197,7 @@ public class AssemblyService {
                 .orElseThrow(() -> new ResourceNotFoundException("Pauta não encontrada: " + topicId));
         Long condoId = topic.getAssembly().getCondominium().getId();
         condominiumAccessService.validateManagerAccess(condoId);
+        ensureAssembliesFeature(condoId);
 
         if ("CONCLUDED".equalsIgnoreCase(topic.getAssembly().getStatus()) || "CANCELLED".equalsIgnoreCase(topic.getAssembly().getStatus())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Não é possível alterar a votação de uma assembleia encerrada ou cancelada.");
@@ -206,6 +224,7 @@ public class AssemblyService {
                 .orElseThrow(() -> new ResourceNotFoundException("Assembleia não encontrada: " + assemblyId));
         Long condoId = assembly.getCondominium().getId();
         condominiumAccessService.validateAccess(condoId);
+        ensureAssembliesFeature(condoId);
 
         if ("CONCLUDED".equalsIgnoreCase(assembly.getStatus()) || "CANCELLED".equalsIgnoreCase(assembly.getStatus())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Não é possível registrar presença em uma assembleia encerrada ou cancelada.");
@@ -238,6 +257,7 @@ public class AssemblyService {
         CondominiumAssembly assembly = assemblyRepository.findById(assemblyId)
                 .orElseThrow(() -> new ResourceNotFoundException("Assembleia não encontrada: " + assemblyId));
         condominiumAccessService.validateAccess(assembly.getCondominium().getId());
+        ensureAssembliesFeature(assembly.getCondominium().getId());
         return participantRepository.findByAssemblyIdOrderByCheckedInAtAsc(assemblyId).stream()
                 .map(AssemblyParticipantDTO::new)
                 .toList();
@@ -253,6 +273,7 @@ public class AssemblyService {
         CondominiumAssembly assembly = topic.getAssembly();
         Long condoId = assembly.getCondominium().getId();
         condominiumAccessService.validateAccess(condoId);
+        ensureAssembliesFeature(condoId);
 
         if (!topic.isVotingOpen() || "CONCLUDED".equalsIgnoreCase(assembly.getStatus()) || "CANCELLED".equalsIgnoreCase(assembly.getStatus())) {
             throw new ForbiddenException("A votação para esta pauta não está aberta no momento.");
@@ -277,7 +298,13 @@ public class AssemblyService {
 
         if (assembly.isBlockDelinquentUnits() && unit != null) {
             Optional<UnitPayment> paymentOpt = paymentRepository.findByUnitId(unit.getId());
-            if (paymentOpt.isPresent() && paymentOpt.get().getStatus() == UnitPaymentStatus.OVERDUE) {
+            boolean delinquent = paymentOpt.isPresent() && (
+                    paymentOpt.get().getStatus() == UnitPaymentStatus.OVERDUE
+                    || (paymentOpt.get().getStatus() == UnitPaymentStatus.CONFIRMATION_REQUESTED
+                            && paymentOpt.get().getDueDate() != null
+                            && paymentOpt.get().getDueDate().isBefore(LocalDate.now()))
+            );
+            if (delinquent) {
                 throw new ForbiddenException("Unidades com pendência financeira em atraso não estão elegíveis para votar nesta assembleia (Art. 1.335 III CC).");
             }
         }
@@ -326,6 +353,7 @@ public class AssemblyService {
                 .orElseThrow(() -> new ResourceNotFoundException("Assembleia não encontrada: " + id));
         Long condoId = assembly.getCondominium().getId();
         condominiumAccessService.validateManagerAccess(condoId);
+        ensureAssembliesFeature(condoId);
 
         String currentStatus = assembly.getStatus() != null ? assembly.getStatus().toUpperCase() : "SCHEDULED";
         String newStatus = dto.status().trim().toUpperCase();

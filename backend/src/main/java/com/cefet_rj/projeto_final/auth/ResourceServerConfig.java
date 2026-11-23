@@ -98,7 +98,9 @@ public class ResourceServerConfig {
     }
 
     @Bean
-    public JwtAuthenticationConverter jwtAuthenticationConverter(UserRepository userRepository) {
+    public JwtAuthenticationConverter jwtAuthenticationConverter(
+            com.cefet_rj.projeto_final.auth.security.CachedUserAuthService cachedUserAuthService
+    ) {
 
         JwtGrantedAuthoritiesConverter authoritiesConverter =
                 new JwtGrantedAuthoritiesConverter();
@@ -116,14 +118,9 @@ public class ResourceServerConfig {
                 username = jwt.getSubject();
             }
             if (username != null && !username.isBlank()) {
-                var userOpt = userRepository.findByEmailIgnoreCase(username);
-                if (userOpt.isPresent()) {
-                    Collection<GrantedAuthority> dbAuthorities = userOpt.get().getRoles().stream()
-                            .map(role -> (GrantedAuthority) new SimpleGrantedAuthority(role.getAuthority()))
-                            .toList();
-                    return dbAuthorities;
-                }
-                return java.util.Collections.emptyList();
+                return cachedUserAuthService.getAuthorityNamesByEmail(username).stream()
+                        .map(authority -> (GrantedAuthority) new SimpleGrantedAuthority(authority))
+                        .toList();
             }
             return authoritiesConverter.convert(jwt);
         });

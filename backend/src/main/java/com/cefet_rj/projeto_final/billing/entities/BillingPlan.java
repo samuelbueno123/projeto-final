@@ -30,6 +30,18 @@ public class BillingPlan {
     @Column(nullable = false)
     private Boolean active;
 
+    @Column(length = 50)
+    private String code;
+
+    @Column(length = 500)
+    private String description;
+
+    @Column(name = "max_units")
+    private Integer maxUnits;
+
+    @Column(name = "display_order")
+    private Integer displayOrder = 0;
+
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
             name = "tb_billing_plan_feature",

@@ -17,6 +17,7 @@ public interface MembershipRepository extends JpaRepository<Membership, Long> {
             from Membership m
             where m.user.id = :userId
               and m.condominium.id = :condominiumId
+              and m.condominium.isActive = true
               and m.status = com.cefet_rj.projeto_final.condominiums.enums.MembershipStatus.ACTIVE
             """)
     boolean existsByUserIdAndCondominiumId(
@@ -68,6 +69,7 @@ public interface MembershipRepository extends JpaRepository<Membership, Long> {
             from Membership m
             where m.user.id = :userId
               and m.condominium.id = :condominiumId
+              and m.condominium.isActive = true
               and m.role.authority = 'ROLE_MANAGER'
               and m.status = com.cefet_rj.projeto_final.condominiums.enums.MembershipStatus.ACTIVE
             """)
@@ -78,6 +80,7 @@ public interface MembershipRepository extends JpaRepository<Membership, Long> {
             from Membership m
             where m.user.id = :userId
               and m.condominium.id = :condominiumId
+              and m.condominium.isActive = true
               and m.role.authority in ('ROLE_MANAGER', 'ROLE_DOORMAN')
               and m.status = com.cefet_rj.projeto_final.condominiums.enums.MembershipStatus.ACTIVE
             """)
@@ -95,6 +98,18 @@ public interface MembershipRepository extends JpaRepository<Membership, Long> {
             @Param("userId") Long userId,
             @Param("condominiumId") Long condominiumId,
             @Param("authority") String authority
+    );
+
+    @Query("""
+            select distinct m.role.authority
+            from Membership m
+            where m.user.id = :userId
+              and m.condominium.id = :condominiumId
+              and m.status = com.cefet_rj.projeto_final.condominiums.enums.MembershipStatus.ACTIVE
+            """)
+    List<String> findActiveAuthoritiesByUserIdAndCondominiumId(
+            @Param("userId") Long userId,
+            @Param("condominiumId") Long condominiumId
     );
 
     @Query("""
@@ -213,7 +228,17 @@ public interface MembershipRepository extends JpaRepository<Membership, Long> {
 
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"user", "condominium", "role", "requestedUnit", "requestedUnit.sector"})
     @org.springframework.lang.NonNull
+    Optional<Membership> findById(@org.springframework.lang.NonNull Long id);
+
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"user", "condominium", "role", "requestedUnit", "requestedUnit.sector"})
+    @org.springframework.lang.NonNull
     Page<Membership> findAll(@org.springframework.lang.NonNull Pageable pageable);
+
+    @Query("select m.status, count(m) from Membership m group by m.status")
+    List<Object[]> countGroupedByStatus();
+
+    @Query("select m.role.authority, count(m) from Membership m where m.status = com.cefet_rj.projeto_final.condominiums.enums.MembershipStatus.ACTIVE group by m.role.authority")
+    List<Object[]> countActiveGroupedByAuthority();
 
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"user", "condominium", "role", "requestedUnit", "requestedUnit.sector"})
     @Query(

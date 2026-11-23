@@ -126,7 +126,7 @@ class AuditRegressionIntegrationTests {
         plan.setName("AUDIT_REGRESSION_PLAN");
         plan.setMonthlyFee(new BigDecimal("299.90"));
         plan.setActive(true);
-        plan.setFeatures(Set.of(reservationsFeature, packagesFeature, notificationsFeature, announcementsFeature));
+        plan.setFeatures(java.util.Arrays.stream(FeatureCode.values()).map(this::getOrCreateFeature).collect(java.util.stream.Collectors.toSet()));
         plan = billingPlanRepository.save(plan);
 
         condo1 = new Condominium();

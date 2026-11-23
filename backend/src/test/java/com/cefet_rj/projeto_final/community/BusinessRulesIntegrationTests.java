@@ -121,7 +121,7 @@ class BusinessRulesIntegrationTests {
         plan.setName("TEST_BUSINESS_RULES_PLAN");
         plan.setMonthlyFee(new BigDecimal("250.00"));
         plan.setActive(true);
-        plan.setFeatures(Set.of(reservationsFeature, packagesFeature, announcementsFeature));
+        plan.setFeatures(java.util.Arrays.stream(FeatureCode.values()).map(this::getOrCreateFeature).collect(java.util.stream.Collectors.toSet()));
         plan = billingPlanRepository.save(plan);
 
         condo = new Condominium();

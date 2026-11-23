@@ -5,12 +5,15 @@ import com.cefet_rj.projeto_final.condominiums.enums.ResidentType;
 import com.cefet_rj.projeto_final.users.entities.Role;
 import com.cefet_rj.projeto_final.users.entities.User;
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
 
-@Data
+@Getter
+@Setter
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Table(
         name = "tb_condominium_user",
         uniqueConstraints = {
@@ -22,20 +25,18 @@ public class Membership {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
     private Long id;
 
-    @Setter
-    @ManyToOne(optional = false)
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     private User user;
 
-    @Setter
-    @ManyToOne(optional = false)
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "condominium_id")
     private Condominium condominium;
 
-    @Setter
-    @ManyToOne(optional = false)
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "role_id")
     private Role role;
 

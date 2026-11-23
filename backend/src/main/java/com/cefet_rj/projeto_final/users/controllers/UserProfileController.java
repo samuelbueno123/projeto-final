@@ -31,17 +31,23 @@ public class UserProfileController {
     private final GoogleIdentityTokenService googleTokens;
     private final PictureStorageService pictureStorageService;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.cefet_rj.projeto_final.auth.security.CachedUserAuthService cachedUserAuthService;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.cefet_rj.projeto_final.auth.security.OAuth2TokenCleanupService oauth2TokenCleanupService;
+
     @GetMapping
     public UserProfileDTO getProfile() {
         return new UserProfileDTO(authenticatedUser.getAuthenticatedUser());
     }
 
-    @org.springframework.transaction.annotation.Transactional
     @PutMapping("/profile")
     public UserProfileDTO updateProfile(@Valid @RequestBody UserProfileUpdateDTO request) {
         User user = authenticatedUser.getAuthenticatedUser();
+        String previousEmail = user.getEmail();
         String email = request.email().trim().toLowerCase();
-        boolean emailChanged = !email.equalsIgnoreCase(user.getEmail());
+        boolean emailChanged = !email.equalsIgnoreCase(previousEmail);
         if (emailChanged) {
             boolean passwordProof = request.currentPassword() != null && !request.currentPassword().isBlank()
                     && passwordEncoder.matches(request.currentPassword(), user.getPassword());
@@ -61,6 +67,26 @@ public class UserProfileController {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Este email já está em uso.");
             }
         }
+        String validatedPhone = user.getPhone();
+        if (request.phone() != null) {
+            String phoneDigits = request.phone().replaceAll("\\D", "");
+            if (!phoneDigits.isEmpty()
+                    && (phoneDigits.length() < 10 || phoneDigits.length() > 11
+                    || phoneDigits.charAt(0) == '0' || phoneDigits.charAt(1) == '0')) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Informe um telefone válido com DDD (10 ou 11 dígitos).");
+            }
+            validatedPhone = phoneDigits.isEmpty() ? null : phoneDigits;
+        }
+        String validatedTheme = user.getThemePreference();
+        if (request.themePreference() != null && !request.themePreference().isBlank()) {
+            String candidate = request.themePreference().trim().toUpperCase();
+            if (!java.util.Set.of("LIGHT", "DARK", "SYSTEM").contains(candidate)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Tema inválido. Valores permitidos: LIGHT, DARK, SYSTEM.");
+            }
+            validatedTheme = candidate;
+        }
         boolean keepExternalAvatar = user.getProfileImage() != null
                 && (user.getProfileImage().startsWith("https://") || user.getProfileImage().startsWith("http://"))
                 && (request.profileImage() == null || request.profileImage().trim().equals(user.getProfileImage()));
@@ -74,21 +100,18 @@ public class UserProfileController {
         user.setFirstName(request.firstName().trim());
         user.setLastName(request.lastName() == null ? "" : request.lastName().trim());
         user.setEmail(email);
-        if (request.phone() != null) {
-            String phoneDigits = request.phone().replaceAll("\\D", "");
-            if (!phoneDigits.isEmpty()
-                    && (phoneDigits.length() < 10 || phoneDigits.length() > 11
-                    || phoneDigits.charAt(0) == '0' || phoneDigits.charAt(1) == '0')) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                        "Informe um telefone válido com DDD (10 ou 11 dígitos).");
-            }
-            user.setPhone(phoneDigits.isEmpty() ? null : phoneDigits);
-        }
+        user.setPhone(validatedPhone);
         user.setProfileImage(storedPicturePath);
-        if (request.themePreference() != null && !request.themePreference().isBlank()) {
-            user.setThemePreference(request.themePreference().trim().toUpperCase());
+        user.setThemePreference(validatedTheme);
+        User saved = users.save(user);
+        if (cachedUserAuthService != null) {
+            cachedUserAuthService.evictUserAuth(previousEmail);
+            cachedUserAuthService.evictUserAuth(saved.getEmail());
         }
-        return new UserProfileDTO(users.save(user));
+        if (emailChanged && oauth2TokenCleanupService != null) {
+            oauth2TokenCleanupService.revokeTokensForPrincipal(previousEmail);
+        }
+        return new UserProfileDTO(saved);
     }
 
     @org.springframework.transaction.annotation.Transactional
@@ -147,5 +170,11 @@ public class UserProfileController {
         if (!authenticated) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "A reautenticação falhou.");
         user.setPassword(passwordEncoder.encode(request.newPassword()));
         users.save(user);
+        if (cachedUserAuthService != null) {
+            cachedUserAuthService.evictUserAuth(user.getEmail());
+        }
+        if (oauth2TokenCleanupService != null) {
+            oauth2TokenCleanupService.revokeTokensForPrincipal(user.getEmail());
+        }
     }
 }

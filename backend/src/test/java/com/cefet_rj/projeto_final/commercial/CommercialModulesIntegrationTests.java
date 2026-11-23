@@ -91,7 +91,7 @@ public class CommercialModulesIntegrationTests {
         plan.setName("COMMERCIAL_SUITE_TEST_PLAN");
         plan.setMonthlyFee(new BigDecimal("199.00"));
         plan.setActive(true);
-        plan.setFeatures(Set.of(reservationsFeature, packagesFeature));
+        plan.setFeatures(java.util.Arrays.stream(FeatureCode.values()).map(this::getOrCreateFeature).collect(java.util.stream.Collectors.toSet()));
         plan = billingPlanRepository.save(plan);
 
         condo = new Condominium();

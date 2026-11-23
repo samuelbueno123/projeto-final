@@ -88,9 +88,12 @@ public class UnitService {
             Unit entity = unitRepository.findById(id)
                     .orElseThrow(() -> new ResourceNotFoundException("Id " + id + " not found"));
             condominiumAccessService.validateManagerAccess(entity.getSector().getCondominium().getId());
+            Long targetSectorId = dto.sectorId() != null ? dto.sectorId() : entity.getSector().getId();
+            Sector targetSector = sectorRepository.findById(targetSectorId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Sector not found: " + targetSectorId));
+            condominiumAccessService.validateManagerAccess(targetSector.getCondominium().getId());
             if (dto.identifier() != null && !dto.identifier().isBlank()) {
                 String newIdentifier = dto.identifier().trim();
-                Long targetSectorId = dto.sectorId() != null ? dto.sectorId() : entity.getSector().getId();
                 if (!newIdentifier.equalsIgnoreCase(entity.getIdentifier()) || !targetSectorId.equals(entity.getSector().getId())) {
                     if (unitRepository.existsBySectorIdAndIdentifierIgnoreCase(targetSectorId, newIdentifier)) {
                         throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe uma unidade com este identificador no setor de destino.");
@@ -98,7 +101,6 @@ public class UnitService {
                 }
             }
             linkAssociations(dto.identifier(), dto.sectorId(), entity);
-            condominiumAccessService.validateManagerAccess(entity.getSector().getCondominium().getId());
             entity = unitRepository.save(entity);
             return new UnitDTO(entity);
         } catch (EntityNotFoundException e) {
@@ -168,6 +170,12 @@ public class UnitService {
                 }
 
                 totalProcessed++;
+                if (totalProcessed > 5000) {
+                    throw new org.springframework.web.server.ResponseStatusException(
+                            org.springframework.http.HttpStatus.BAD_REQUEST,
+                            "O arquivo CSV excede o limite de 5.000 linhas por importação."
+                    );
+                }
                 String sectorName = parts[sectorIdx].trim();
                 String unitIdentifier = parts[identifierIdx].trim();
 
@@ -200,8 +208,10 @@ public class UnitService {
                 unitRepository.save(unit);
                 importedCount++;
             }
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (Exception e) {
-            throw new DatabaseException("Erro ao processar arquivo CSV: " + e.getMessage());
+            throw new DatabaseException("Não foi possível processar o arquivo CSV. Verifique o formato UTF-8 e as colunas obrigatórias.");
         }
 
         return new UnitCsvImportResultDTO(totalProcessed, importedCount, skippedCount, errors);

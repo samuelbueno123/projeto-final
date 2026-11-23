@@ -165,7 +165,7 @@ class ReservationServiceUnitTest {
     @DisplayName("create: throws BadRequest when max duration exceeded")
     void create_throwsBadRequest_whenMaxDurationHoursExceeded() {
         setupCommonMocks();
-        LocalDateTime start = LocalDateTime.now().plusDays(3);
+        LocalDateTime start = LocalDateTime.now().plusDays(3).withHour(14).withMinute(0);
         LocalDateTime end = start.plusHours(8);
         ReservationRequestDTO dto = new ReservationRequestDTO(start, end, null, null, null, false);
 
@@ -178,7 +178,7 @@ class ReservationServiceUnitTest {
     @DisplayName("create: throws BadRequest when weekly booking limit reached")
     void create_throwsBadRequest_whenMaxWeeklyLimitReached() {
         setupCommonMocks();
-        LocalDateTime start = LocalDateTime.now().plusDays(3);
+        LocalDateTime start = LocalDateTime.now().plusDays(3).withHour(14).withMinute(0);
         LocalDateTime end = start.plusHours(3);
         ReservationRequestDTO dto = new ReservationRequestDTO(start, end, null, null, null, false);
 
@@ -194,7 +194,7 @@ class ReservationServiceUnitTest {
     @DisplayName("create: throws Conflict when user already has overlapping reservation")
     void create_throwsConflict_whenUserHasDuplicateBooking() {
         setupCommonMocks();
-        LocalDateTime start = LocalDateTime.now().plusDays(3);
+        LocalDateTime start = LocalDateTime.now().plusDays(3).withHour(14).withMinute(0);
         LocalDateTime end = start.plusHours(3);
         ReservationRequestDTO dto = new ReservationRequestDTO(start, end, null, null, null, false);
 
@@ -210,7 +210,7 @@ class ReservationServiceUnitTest {
     @DisplayName("create: throws Conflict when slot is busy and waitlist is not requested")
     void create_throwsConflict_whenSlotBusyAndWaitlistNotRequested() {
         setupCommonMocks();
-        LocalDateTime start = LocalDateTime.now().plusDays(3);
+        LocalDateTime start = LocalDateTime.now().plusDays(3).withHour(14).withMinute(0);
         LocalDateTime end = start.plusHours(3);
         ReservationRequestDTO dto = new ReservationRequestDTO(start, end, null, null, null, false);
 
@@ -226,7 +226,7 @@ class ReservationServiceUnitTest {
     @DisplayName("create: puts into waitlist when slot is busy and waitlist requested")
     void create_joinsWaitlist_whenSlotBusyAndWaitlistRequested() {
         setupCommonMocks();
-        LocalDateTime start = LocalDateTime.now().plusDays(3);
+        LocalDateTime start = LocalDateTime.now().plusDays(3).withHour(14).withMinute(0);
         LocalDateTime end = start.plusHours(3);
         ReservationRequestDTO dto = new ReservationRequestDTO(start, end, null, "11999998888", "Festa", true);
 

@@ -92,7 +92,7 @@ public class AnnouncementService {
 
         announcement.setTitle(dto.title().trim());
         announcement.setContent(dto.content().trim());
-        announcement.setImageUrl(dto.imageUrl());
+        announcement.setImageUrl(com.cefet_rj.projeto_final.shared.validation.UrlSanitizer.sanitizeMediaUrl(dto.imageUrl(), "imageUrl"));
         announcement.setCondominium(condominium);
         announcement.setCreatedBy(authenticatedUser);
         announcement.setCreatedAt(LocalDateTime.now());
@@ -114,16 +114,28 @@ public class AnnouncementService {
                 )
         );
 
+        boolean isCondominiumWide = targetUnit == null && targetSector == null && normalizedRole == null;
         AnnouncementDTO dtoResult = new AnnouncementDTO(announcement, 0L, false);
         if (realtimeEmitterService != null) {
-            realtimeEmitterService.sendToUsers(
-                    resolveAnnouncementSseRecipientIds(condominiumId, announcement),
-                    com.cefet_rj.projeto_final.realtime.dtos.RealtimeEventDTO.of(
-                            "ANNOUNCEMENT_CREATED",
-                            condominiumId,
-                            dtoResult
-                    )
-            );
+            if (isCondominiumWide) {
+                realtimeEmitterService.sendToCondominium(
+                        condominiumId,
+                        com.cefet_rj.projeto_final.realtime.dtos.RealtimeEventDTO.of(
+                                "ANNOUNCEMENT_CREATED",
+                                condominiumId,
+                                dtoResult
+                        )
+                );
+            } else {
+                realtimeEmitterService.sendToUsers(
+                        resolveAnnouncementSseRecipientIds(condominiumId, announcement),
+                        com.cefet_rj.projeto_final.realtime.dtos.RealtimeEventDTO.of(
+                                "ANNOUNCEMENT_CREATED",
+                                condominiumId,
+                                dtoResult
+                        )
+                );
+            }
         }
         return dtoResult;
     }
@@ -252,7 +264,10 @@ public class AnnouncementService {
             return announcement -> true;
         }
 
-        boolean isDoorman = membershipRepository.hasActiveRoleInCondominium(user.getId(), condominiumId, "ROLE_DOORMAN");
+        Set<String> myActiveRoles = new HashSet<>(
+                membershipRepository.findActiveAuthoritiesByUserIdAndCondominiumId(user.getId(), condominiumId)
+        );
+        boolean isDoorman = myActiveRoles.contains("ROLE_DOORMAN");
         List<Resident> myResidents = residentRepository.findByUserIdAndCondominiumId(user.getId(), condominiumId);
         Set<Long> myUnitIds = new HashSet<>();
         Set<Long> mySectorIds = new HashSet<>();
@@ -267,17 +282,20 @@ public class AnnouncementService {
 
         return announcement -> {
             if (announcement.getTargetRole() != null && !announcement.getTargetRole().isBlank()) {
-                String role = announcement.getTargetRole();
-                boolean matchesRole = membershipRepository.hasActiveRoleInCondominium(user.getId(), condominiumId, role);
-                if (!matchesRole) {
+                if (!myActiveRoles.contains(announcement.getTargetRole())) {
                     return false;
                 }
             }
             if (announcement.getUnit() != null) {
-                return isDoorman || myUnitIds.contains(announcement.getUnit().getId());
+                return myUnitIds.contains(announcement.getUnit().getId())
+                        || (announcement.getCreatedBy() != null
+                        && announcement.getCreatedBy().getId().equals(user.getId()));
             }
             if (announcement.getSector() != null) {
-                return isDoorman || mySectorIds.contains(announcement.getSector().getId());
+                return isDoorman
+                        || mySectorIds.contains(announcement.getSector().getId())
+                        || (announcement.getCreatedBy() != null
+                        && announcement.getCreatedBy().getId().equals(user.getId()));
             }
             return true;
         };
@@ -406,10 +424,12 @@ public class AnnouncementService {
         }
 
         if (announcement.getUnit() != null) {
-            Set<Long> staffAndUnit = new HashSet<>(
-                    membershipRepository.findActiveStaffUserIdsByCondominiumId(condominiumId));
-            staffAndUnit.addAll(residentRepository.findUserIdsByUnitId(announcement.getUnit().getId()));
-            targetUserIds = targetUserIds.stream().filter(staffAndUnit::contains).toList();
+            Set<Long> allowedUnitViewerIds = new HashSet<>(managerAndAdminIds);
+            if (announcement.getCreatedBy() != null) {
+                allowedUnitViewerIds.add(announcement.getCreatedBy().getId());
+            }
+            allowedUnitViewerIds.addAll(residentRepository.findUserIdsByUnitId(announcement.getUnit().getId()));
+            targetUserIds = targetUserIds.stream().filter(allowedUnitViewerIds::contains).toList();
         } else if (announcement.getSector() != null) {
             Set<Long> staffAndSector = new HashSet<>(
                     membershipRepository.findActiveStaffUserIdsByCondominiumId(condominiumId));

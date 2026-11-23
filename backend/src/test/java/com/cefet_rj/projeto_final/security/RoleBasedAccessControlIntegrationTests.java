@@ -94,7 +94,7 @@ class RoleBasedAccessControlIntegrationTests {
         plan.setName("RBAC_TEST_PLAN");
         plan.setMonthlyFee(new BigDecimal("199.90"));
         plan.setActive(true);
-        plan.setFeatures(Set.of(reservationsFeature, announcementsFeature));
+        plan.setFeatures(java.util.Arrays.stream(FeatureCode.values()).map(this::getOrCreateFeature).collect(java.util.stream.Collectors.toSet()));
         plan = billingPlanRepository.save(plan);
 
         condoAlpha = new Condominium();

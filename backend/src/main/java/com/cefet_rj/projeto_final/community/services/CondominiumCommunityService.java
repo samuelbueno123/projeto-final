@@ -84,6 +84,15 @@ public class CondominiumCommunityService {
     @Autowired(required = false)
     private OperationalMetricsService operationalMetricsService;
 
+    @Autowired(required = false)
+    private com.cefet_rj.projeto_final.condominiums.security.CondominiumFeatureAccessService featureAccessService;
+
+    private void ensureFeature(Long condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode featureCode) {
+        if (featureAccessService != null && featureCode != null) {
+            featureAccessService.validateFeatureEnabled(condominiumId, featureCode);
+        }
+    }
+
     // =========================================================================
     // 1. OCCURRENCE TICKETS (Livro de Ocorrências e Chamados de Manutenção)
     // =========================================================================
@@ -91,6 +100,7 @@ public class CondominiumCommunityService {
     @Transactional(readOnly = true)
     public List<OccurrenceTicketDTO> listTickets(Long condominiumId, boolean onlyMine) {
         User user = validateMemberAccess(condominiumId);
+        ensureFeature(condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.COMMUNITY_TICKETS);
         boolean effectiveOnlyMine = onlyMine || !condominiumAccessService.isStaffOrAdmin(user, condominiumId);
         List<OccurrenceTicket> list = effectiveOnlyMine
                 ? ticketRepository.findByCondominiumIdAndAuthorIdOrderByCreatedAtDesc(condominiumId, user.getId())
@@ -101,6 +111,7 @@ public class CondominiumCommunityService {
     @Transactional
     public OccurrenceTicketDTO createTicket(Long condominiumId, Map<String, Object> body) {
         User user = validateMemberAccess(condominiumId);
+        ensureFeature(condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.COMMUNITY_TICKETS);
         Condominium condo = getCondominium(condominiumId);
         Unit unit = resolveUserUnit(user.getId(), condominiumId, body.get("unitId"));
 
@@ -142,11 +153,18 @@ public class CondominiumCommunityService {
         boolean isStaff = condominiumAccessService.isStaffOrAdmin(caller, condoId);
 
         String status = defaultIfBlank(stringVal(body, "status"), "IN_PROGRESS").toUpperCase(Locale.ROOT);
+        if (!List.of("OPEN", "IN_PROGRESS", "RESOLVED", "REJECTED", "CLOSED", "CANCELLED").contains(status)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Status de chamado inválido: " + status);
+        }
+        String currentStatus = ticket.getStatus() == null ? "OPEN" : ticket.getStatus().toUpperCase(Locale.ROOT);
         String response = blankToNull(stringVal(body, "adminResponse"));
 
         if (!isStaff) {
             if (!"CANCELLED".equals(status)) {
                 throw new ForbiddenException("Apenas a administração pode alterar o status ou responder o chamado.");
+            }
+            if ("RESOLVED".equals(currentStatus) || "CLOSED".equals(currentStatus) || "REJECTED".equals(currentStatus)) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Não é possível cancelar um chamado já encerrado pela administração.");
             }
             ticket.setStatus("CANCELLED");
         } else {
@@ -180,6 +198,7 @@ public class CondominiumCommunityService {
     @Transactional(readOnly = true)
     public List<VisitorAccessDTO> listVisitors(Long condominiumId, boolean onlyMine) {
         User user = validateMemberAccess(condominiumId);
+        ensureFeature(condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.VISITORS);
         boolean isStaff = condominiumAccessService.isStaffOrAdmin(user, condominiumId);
         if (onlyMine || !isStaff) {
             return visitorRepository.findByCondominiumIdAndResidentIdOrderByCreatedAtDesc(condominiumId, user.getId()).stream()
@@ -195,6 +214,7 @@ public class CondominiumCommunityService {
     @Transactional(readOnly = true)
     public org.springframework.data.domain.Page<VisitorAccessDTO> listVisitorsPaged(Long condominiumId, boolean onlyMine, org.springframework.data.domain.Pageable pageable) {
         User user = validateMemberAccess(condominiumId);
+        ensureFeature(condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.VISITORS);
         boolean isStaff = condominiumAccessService.isStaffOrAdmin(user, condominiumId);
         if (onlyMine || !isStaff) {
             return visitorRepository.findByCondominiumIdAndResidentId(condominiumId, user.getId(), pageable)
@@ -207,6 +227,7 @@ public class CondominiumCommunityService {
     @Transactional
     public VisitorAccessDTO createVisitorAccess(Long condominiumId, Map<String, Object> body) {
         User caller = validateMemberAccess(condominiumId);
+        ensureFeature(condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.VISITORS);
         Condominium condo = getCondominium(condominiumId);
 
         String visitorName = stringVal(body, "visitorName");
@@ -219,6 +240,10 @@ public class CondominiumCommunityService {
         Long targetResidentId = numberVal(body.get("residentId"));
         Long targetUnitId = numberVal(body.get("unitId"));
 
+        if (isStaff && targetResidentId != null) {
+            condominiumAccessService.validateUserBelongsToCondominium(targetResidentId, condominiumId);
+        }
+
         Unit unit = resolveUserUnit(
                 (isStaff && targetResidentId != null) ? targetResidentId : caller.getId(),
                 condominiumId,
@@ -227,7 +252,8 @@ public class CondominiumCommunityService {
 
         User resident = caller;
         if (isStaff && targetResidentId != null) {
-            resident = userRepository.findById(targetResidentId).orElse(caller);
+            resident = userRepository.findById(targetResidentId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Morador não encontrado: " + targetResidentId));
         } else if (isStaff && unit != null) {
             var resOpt = residentRepository.findFirstByUnitId(unit.getId());
             if (resOpt.isPresent()) {
@@ -358,6 +384,7 @@ public class CondominiumCommunityService {
     @Transactional
     public VisitorAccessDTO validateVisitorQrCode(Long condominiumId, Map<String, Object> body) {
         User staff = validateStaffAccess(condominiumId);
+        ensureFeature(condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.VISITORS);
         String codeOrPayload = stringVal(body, "qrCode");
         if (codeOrPayload.isBlank()) {
             codeOrPayload = stringVal(body, "qrCodeOrAccessCode");
@@ -430,6 +457,7 @@ public class CondominiumCommunityService {
     @Transactional(readOnly = true)
     public List<PollDTO> listPolls(Long condominiumId) {
         User user = validateMemberAccess(condominiumId);
+        ensureFeature(condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.POLLS);
         List<Poll> polls = pollRepository.findByCondominiumIdOrderByCreatedAtDesc(condominiumId);
         if (polls.isEmpty()) {
             return List.of();
@@ -445,6 +473,7 @@ public class CondominiumCommunityService {
     @Transactional
     public PollDTO createPoll(Long condominiumId, Map<String, Object> body) {
         User user = validateManagerAccess(condominiumId);
+        ensureFeature(condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.POLLS);
         Condominium condo = getCondominium(condominiumId);
 
         String title = stringVal(body, "title");
@@ -484,7 +513,7 @@ public class CondominiumCommunityService {
         poll = pollRepository.save(poll);
 
         List<Long> residentIds = membershipRepository.findResidentUserIdsByCondominiumId(condominiumId);
-        notificationService.createAnnouncementNotifications(
+        notificationService.createAnnouncementNotificationsRequired(
                 residentIds,
                 "Nova votação: " + poll.getTitle(),
                 condominiumId,
@@ -502,6 +531,7 @@ public class CondominiumCommunityService {
         Poll poll = pollRepository.findById(pollId)
                 .orElseThrow(() -> new ResourceNotFoundException("Enquete não encontrada"));
         User user = validateMemberAccess(poll.getCondominium().getId());
+        ensureFeature(poll.getCondominium().getId(), com.cefet_rj.projeto_final.billing.enums.FeatureCode.POLLS);
 
         if (!Boolean.TRUE.equals(poll.getActive())
                 || (poll.getEndsAt() != null && LocalDateTime.now().isAfter(poll.getEndsAt()))) {
@@ -528,6 +558,7 @@ public class CondominiumCommunityService {
         Poll poll = pollRepository.findById(pollId)
                 .orElseThrow(() -> new ResourceNotFoundException("Enquete não encontrada"));
         User user = validateManagerAccess(poll.getCondominium().getId());
+        ensureFeature(poll.getCondominium().getId(), com.cefet_rj.projeto_final.billing.enums.FeatureCode.POLLS);
         poll.setActive(false);
         poll = pollRepository.save(poll);
         return toPollDTO(poll, user.getId());
@@ -549,6 +580,7 @@ public class CondominiumCommunityService {
         }
         int total = votes.size();
         List<PollOptionDTO> optDtos = poll.getOptions().stream()
+                .sorted(Comparator.comparing(PollOption::getId, Comparator.nullsLast(Comparator.naturalOrder())))
                 .map(o -> new PollOptionDTO(
                         o.getId(),
                         o.getLabel(),
@@ -581,6 +613,7 @@ public class CondominiumCommunityService {
     @Transactional(readOnly = true)
     public List<LostFoundItemDTO> listLostFound(Long condominiumId) {
         validateMemberAccess(condominiumId);
+        ensureFeature(condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.COMMUNITY_TICKETS);
         List<LostFoundItem> items = lostFoundRepository.findByCondominiumIdOrderByCreatedAtDesc(condominiumId);
         if (items.isEmpty()) {
             return List.of();
@@ -597,6 +630,7 @@ public class CondominiumCommunityService {
     @Transactional
     public LostFoundItemDTO createLostFound(Long condominiumId, Map<String, Object> body) {
         User user = validateMemberAccess(condominiumId);
+        ensureFeature(condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.COMMUNITY_TICKETS);
         Condominium condo = getCondominium(condominiumId);
 
         String title = stringVal(body, "title");
@@ -613,7 +647,7 @@ public class CondominiumCommunityService {
         item.setTitle(title);
         item.setDescription(description);
         item.setLocation(blankToNull(stringVal(body, "location")));
-        item.setImageUrl(blankToNull(stringVal(body, "imageUrl")));
+        item.setImageUrl(com.cefet_rj.projeto_final.shared.validation.UrlSanitizer.sanitizeMediaUrl(blankToNull(stringVal(body, "imageUrl")), "imageUrl"));
         item.setContactInfo(blankToNull(stringVal(body, "contactInfo")));
         item.setStatus("OPEN");
         item.setCreatedAt(LocalDateTime.now());
@@ -632,6 +666,11 @@ public class CondominiumCommunityService {
         LostFoundItem item = lostFoundRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Registro não encontrado"));
         User user = validateMemberAccess(item.getCondominium().getId());
+
+        String currentStatus = item.getStatus() == null ? "OPEN" : item.getStatus().toUpperCase(Locale.ROOT);
+        if ("RETURNED".equals(currentStatus) || "CLOSED".equals(currentStatus) || "ARCHIVED".equals(currentStatus)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Este registro de Achados e Perdidos já foi finalizado ou devolvido.");
+        }
 
         String claimMsg = blankToNull(stringVal(body, "message"));
         item.setClaimedBy(user);
@@ -679,6 +718,9 @@ public class CondominiumCommunityService {
         validateStaffOrOwner(item.getCondominium().getId(), item.getReportedBy().getId());
 
         String status = defaultIfBlank(stringVal(body, "status"), "CLOSED").toUpperCase(Locale.ROOT);
+        if (!List.of("CLOSED", "RETURNED", "ARCHIVED").contains(status)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Status de encerramento inválido: " + status);
+        }
         String notes = blankToNull(stringVal(body, "resolutionNotes"));
         item.setStatus(status);
         if (notes != null) {
@@ -749,6 +791,7 @@ public class CondominiumCommunityService {
     @Transactional(readOnly = true)
     public List<ClassifiedAdDTO> listClassifieds(Long condominiumId) {
         validateMemberAccess(condominiumId);
+        ensureFeature(condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.MARKETPLACE_INTEGRATION);
         return classifiedRepository.findByCondominiumIdOrderByCreatedAtDesc(condominiumId)
                 .stream()
                 .map(ClassifiedAdDTO::new)
@@ -758,6 +801,7 @@ public class CondominiumCommunityService {
     @Transactional
     public ClassifiedAdDTO createClassified(Long condominiumId, Map<String, Object> body) {
         User user = validateMemberAccess(condominiumId);
+        ensureFeature(condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.MARKETPLACE_INTEGRATION);
         Condominium condo = getCondominium(condominiumId);
         Unit unit = resolveUserUnit(user.getId(), condominiumId, body.get("unitId"));
 
@@ -840,6 +884,7 @@ public class CondominiumCommunityService {
     @Transactional(readOnly = true)
     public List<ParkingSpotDTO> listParkingSpots(Long condominiumId) {
         validateMemberAccess(condominiumId);
+        ensureFeature(condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.MARKETPLACE_INTEGRATION);
         return parkingSpotRepository.findByCondominiumIdOrderByCodeAsc(condominiumId)
                 .stream()
                 .map(ParkingSpotDTO::new)
@@ -849,6 +894,7 @@ public class CondominiumCommunityService {
     @Transactional
     public ParkingSpotDTO createParkingSpot(Long condominiumId, Map<String, Object> body) {
         validateManagerAccess(condominiumId);
+        ensureFeature(condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.MARKETPLACE_INTEGRATION);
         Condominium condo = getCondominium(condominiumId);
         String code = stringVal(body, "code").toUpperCase(Locale.ROOT);
         if (code.isBlank()) {
@@ -943,6 +989,7 @@ public class CondominiumCommunityService {
     @Transactional(readOnly = true)
     public List<VehicleDTO> listVehicles(Long condominiumId, boolean onlyMine) {
         User user = validateMemberAccess(condominiumId);
+        ensureFeature(condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.COMMUNITY_TICKETS);
         boolean effectiveOnlyMine = onlyMine || !condominiumAccessService.isStaffOrAdmin(user, condominiumId);
         List<Vehicle> list = effectiveOnlyMine
                 ? vehicleRepository.findByCondominiumIdAndOwnerIdOrderByCreatedAtDesc(condominiumId, user.getId())
@@ -953,6 +1000,7 @@ public class CondominiumCommunityService {
     @Transactional(readOnly = true)
     public PlateCheckResultDTO checkVehiclePlate(Long condominiumId, String plateQuery) {
         validateStaffAccess(condominiumId);
+        ensureFeature(condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.COMMUNITY_TICKETS);
         String normalized = plateQuery == null ? "" : plateQuery.replaceAll("[^A-Za-z0-9]", "").toUpperCase(Locale.ROOT);
         if (normalized.isBlank()) {
             return new PlateCheckResultDTO(plateQuery, false, "Informe uma placa para consultar.", List.of(), List.of());
@@ -989,6 +1037,7 @@ public class CondominiumCommunityService {
     @Transactional
     public VehicleDTO createVehicle(Long condominiumId, Map<String, Object> body) {
         User user = validateMemberAccess(condominiumId);
+        ensureFeature(condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.COMMUNITY_TICKETS);
         Condominium condo = getCondominium(condominiumId);
         Unit unit = resolveUserUnit(user.getId(), condominiumId, body.get("unitId"));
 
@@ -1021,11 +1070,13 @@ public class CondominiumCommunityService {
             if (isSpotInUse) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "A vaga de garagem selecionada já está ocupada ou vinculada a outro veículo.");
             }
-            spotEntity.setStatus("OCCUPIED");
-            if (spotEntity.getUnit() == null && unit != null) {
-                spotEntity.setUnit(unit);
+            if (isManager) {
+                spotEntity.setStatus("OCCUPIED");
+                if (spotEntity.getUnit() == null && unit != null) {
+                    spotEntity.setUnit(unit);
+                }
+                parkingSpotRepository.save(spotEntity);
             }
-            parkingSpotRepository.save(spotEntity);
         }
 
         Vehicle v = new Vehicle();
@@ -1069,7 +1120,14 @@ public class CondominiumCommunityService {
         if (!List.of("APPROVED", "REJECTED", "PENDING", "CANCELLED").contains(normalized)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Status de veículo inválido: " + status);
         }
-        if (("REJECTED".equals(normalized) || "CANCELLED".equals(normalized)) && v.getParkingSpotEntity() != null) {
+        if ("APPROVED".equals(normalized) && v.getParkingSpotEntity() != null) {
+            ParkingSpot spot = v.getParkingSpotEntity();
+            spot.setStatus("OCCUPIED");
+            if (spot.getUnit() == null && v.getUnit() != null) {
+                spot.setUnit(v.getUnit());
+            }
+            parkingSpotRepository.save(spot);
+        } else if (("REJECTED".equals(normalized) || "CANCELLED".equals(normalized)) && v.getParkingSpotEntity() != null) {
             ParkingSpot spot = v.getParkingSpotEntity();
             spot.setStatus("AVAILABLE");
             parkingSpotRepository.save(spot);
@@ -1097,12 +1155,18 @@ public class CondominiumCommunityService {
         Vehicle v = vehicleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Veículo não encontrado"));
         validateStaffOrOwner(v.getCondominium().getId(), v.getOwner().getId());
-        if (v.getParkingSpotEntity() != null) {
-            ParkingSpot spot = v.getParkingSpotEntity();
-            spot.setStatus("AVAILABLE");
-            parkingSpotRepository.save(spot);
-        }
+        ParkingSpot spot = v.getParkingSpotEntity();
         vehicleRepository.delete(v);
+        if (spot != null) {
+            boolean stillInUse = vehicleRepository.findByParkingSpotEntityId(spot.getId()).stream()
+                    .anyMatch(ev -> !ev.getId().equals(id)
+                            && !"REJECTED".equalsIgnoreCase(ev.getStatus())
+                            && !"CANCELLED".equalsIgnoreCase(ev.getStatus()));
+            if (!stillInUse) {
+                spot.setStatus("AVAILABLE");
+                parkingSpotRepository.save(spot);
+            }
+        }
     }
 
     // =========================================================================
@@ -1112,15 +1176,21 @@ public class CondominiumCommunityService {
     @Transactional(readOnly = true)
     public List<PetDTO> listPets(Long condominiumId, boolean onlyMine) {
         User user = validateMemberAccess(condominiumId);
-        List<Pet> list = onlyMine
+        ensureFeature(condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.COMMUNITY_TICKETS);
+        boolean isStaff = condominiumAccessService.isStaffOrAdmin(user, condominiumId);
+        boolean effectiveOnlyMine = onlyMine || !isStaff;
+        List<Pet> list = effectiveOnlyMine
                 ? petRepository.findByCondominiumIdAndOwnerIdOrderByCreatedAtDesc(condominiumId, user.getId())
                 : petRepository.findByCondominiumIdOrderByCreatedAtDesc(condominiumId);
-        return list.stream().map(PetDTO::new).toList();
+        return list.stream()
+                .map(p -> isStaff ? new PetDTO(p) : new PetDTO(p).withRedactedManagerNotes())
+                .toList();
     }
 
     @Transactional
     public PetDTO createPet(Long condominiumId, Map<String, Object> body) {
         User user = validateMemberAccess(condominiumId);
+        ensureFeature(condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.COMMUNITY_TICKETS);
         Condominium condo = getCondominium(condominiumId);
         Unit unit = resolveUserUnit(user.getId(), condominiumId, body.get("unitId"));
 
@@ -1144,7 +1214,7 @@ public class CondominiumCommunityService {
             rawVaccineDate = stringVal(body, "lastVaccinationDate");
         }
         pet.setLastVaccineDate(parseLocalDate(rawVaccineDate, null));
-        pet.setImageUrl(blankToNull(stringVal(body, "imageUrl")));
+        pet.setImageUrl(com.cefet_rj.projeto_final.shared.validation.UrlSanitizer.sanitizeMediaUrl(blankToNull(stringVal(body, "imageUrl")), "imageUrl"));
         pet.setNotes(blankToNull(stringVal(body, "notes")));
         pet.setStatus("ACTIVE");
         pet.setCreatedAt(LocalDateTime.now());
@@ -1186,7 +1256,7 @@ public class CondominiumCommunityService {
             pet.setLastVaccineDate(parseLocalDate(rawVaccineDate, pet.getLastVaccineDate()));
         }
         if (body.containsKey("imageUrl")) {
-            pet.setImageUrl(blankToNull(stringVal(body, "imageUrl")));
+            pet.setImageUrl(com.cefet_rj.projeto_final.shared.validation.UrlSanitizer.sanitizeMediaUrl(blankToNull(stringVal(body, "imageUrl")), "imageUrl"));
         }
         if (body.containsKey("notes")) {
             pet.setNotes(blankToNull(stringVal(body, "notes")));
@@ -1217,7 +1287,8 @@ public class CondominiumCommunityService {
 
     @Transactional(readOnly = true)
     public MovingAvailabilityDTO checkMovingAvailability(Long condominiumId, LocalDate date) {
-        validateMemberAccess(condominiumId);
+        User caller = validateMemberAccess(condominiumId);
+        boolean isStaff = condominiumAccessService.isStaffOrAdmin(caller, condominiumId);
         LocalDate target = date != null ? date : LocalDate.now().plusDays(1);
         List<MovingRequest> existing = movingRequestRepository
                 .findByCondominiumIdAndMovingDateOrderByCreatedAtAsc(condominiumId, target)
@@ -1228,7 +1299,11 @@ public class CondominiumCommunityService {
         boolean morningFree = existing.stream().noneMatch(m -> "MORNING".equals(m.getPeriod()) || "FULL_DAY".equals(m.getPeriod()));
         boolean afternoonFree = existing.stream().noneMatch(m -> "AFTERNOON".equals(m.getPeriod()) || "FULL_DAY".equals(m.getPeriod()));
 
-        List<MovingRequestDTO> existingDtos = existing.stream().map(MovingRequestDTO::new).toList();
+        List<MovingRequestDTO> existingDtos = existing.stream()
+                .map(m -> (isStaff || m.getRequestedBy().getId().equals(caller.getId()))
+                        ? new MovingRequestDTO(m)
+                        : new MovingRequestDTO(m).withRedactedPii())
+                .toList();
         String message = (morningFree || afternoonFree)
                 ? "Data disponível! Turnos livres: "
                     + (morningFree && afternoonFree ? "Manhã (08h-12h) e Tarde (13h-17h)"
@@ -1241,6 +1316,7 @@ public class CondominiumCommunityService {
     @Transactional(readOnly = true)
     public List<MovingRequestDTO> listMovingRequests(Long condominiumId, boolean onlyMine) {
         User user = validateMemberAccess(condominiumId);
+        ensureFeature(condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.COMMUNITY_TICKETS);
         boolean effectiveOnlyMine = onlyMine || !condominiumAccessService.isStaffOrAdmin(user, condominiumId);
         List<MovingRequest> list = effectiveOnlyMine
                 ? movingRequestRepository.findByCondominiumIdAndRequestedByIdOrderByMovingDateDescCreatedAtDesc(condominiumId, user.getId())
@@ -1251,6 +1327,7 @@ public class CondominiumCommunityService {
     @Transactional
     public MovingRequestDTO createMovingRequest(Long condominiumId, Map<String, Object> body) {
         User user = validateMemberAccess(condominiumId);
+        ensureFeature(condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.COMMUNITY_TICKETS);
         Condominium condo = getCondominium(condominiumId);
         Unit unit = resolveUserUnit(user.getId(), condominiumId, body.get("unitId"));
 
@@ -1358,6 +1435,7 @@ public class CondominiumCommunityService {
     @Transactional(readOnly = true)
     public List<CondominiumDocumentDTO> listDocuments(Long condominiumId) {
         validateMemberAccess(condominiumId);
+        ensureFeature(condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.COMMUNITY_TICKETS);
         return documentRepository.findByCondominiumIdOrderByPinnedDescCreatedAtDesc(condominiumId)
                 .stream()
                 .map(CondominiumDocumentDTO::new)
@@ -1367,6 +1445,7 @@ public class CondominiumCommunityService {
     @Transactional
     public CondominiumDocumentDTO createDocument(Long condominiumId, Map<String, Object> body) {
         User user = validateManagerAccess(condominiumId);
+        ensureFeature(condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.COMMUNITY_TICKETS);
         Condominium condo = getCondominium(condominiumId);
 
         String title = stringVal(body, "title");
@@ -1405,6 +1484,7 @@ public class CondominiumCommunityService {
     @Transactional(readOnly = true)
     public List<SmartLockerDTO> listLockers(Long condominiumId, boolean onlyMine) {
         User user = validateMemberAccess(condominiumId);
+        ensureFeature(condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.SMART_LOCKERS);
         boolean isStaff = condominiumAccessService.isStaffOrAdmin(user, condominiumId);
         if (onlyMine || !isStaff) {
             List<Long> myUnitIds = residentRepository.findUnitIdsByUserId(user.getId());
@@ -1425,6 +1505,7 @@ public class CondominiumCommunityService {
     @Transactional
     public SmartLockerDTO depositLocker(Long condominiumId, Map<String, Object> body) {
         User depositor = validateStaffAccess(condominiumId);
+        ensureFeature(condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.SMART_LOCKERS);
         Condominium condo = getCondominium(condominiumId);
 
         Long unitId = numberVal(body.get("unitId"));
@@ -1509,6 +1590,7 @@ public class CondominiumCommunityService {
                 .orElseThrow(() -> new ResourceNotFoundException("Compartimento não encontrado"));
         Long condoId = comp.getCondominium().getId();
         User user = validateMemberAccess(condoId);
+        ensureFeature(condoId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.SMART_LOCKERS);
 
         boolean isStaff = condominiumAccessService.isStaffOrAdmin(user, condoId);
         boolean isRecipient = comp.getRecipient().getId().equals(user.getId())
@@ -1540,6 +1622,7 @@ public class CondominiumCommunityService {
     @Transactional(readOnly = true)
     public List<EventGuestListDTO> listGuestLists(Long condominiumId, boolean onlyMine) {
         User user = validateMemberAccess(condominiumId);
+        ensureFeature(condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.VISITORS);
         boolean isStaff = condominiumAccessService.isStaffOrAdmin(user, condominiumId);
         List<EventGuestList> lists = (onlyMine || !isStaff)
                 ? guestListRepository.findByCondominiumIdAndHostIdOrderByEventDateDesc(condominiumId, user.getId())
@@ -1550,6 +1633,7 @@ public class CondominiumCommunityService {
     @Transactional
     public EventGuestListDTO createGuestList(Long condominiumId, Map<String, Object> body) {
         User user = validateMemberAccess(condominiumId);
+        ensureFeature(condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.VISITORS);
         Condominium condo = getCondominium(condominiumId);
 
         String title = stringVal(body, "eventTitle");
@@ -1680,6 +1764,10 @@ public class CondominiumCommunityService {
         EventGuestList list = g.getGuestList();
         validateStaffOrOwner(list.getCondominium().getId(), list.getHost().getId());
 
+        if (Boolean.TRUE.equals(g.getCheckedIn())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Não é possível remover um convidado que já realizou check-in na portaria.");
+        }
+
         list.getGuests().remove(g);
         guestEntryRepository.delete(g);
         return new EventGuestListDTO(list);
@@ -1692,6 +1780,7 @@ public class CondominiumCommunityService {
     @Transactional(readOnly = true)
     public List<CondominiumInfractionDTO> listInfractions(Long condominiumId, boolean onlyMine) {
         User user = validateMemberAccess(condominiumId);
+        ensureFeature(condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.NOTIFICATIONS);
         List<CondominiumInfraction> list;
         if (onlyMine || !condominiumAccessService.isStaffOrAdmin(user, condominiumId)) {
             List<Long> myUnitIds = residentRepository.findUnitIdsByUserId(user.getId());
@@ -1707,6 +1796,7 @@ public class CondominiumCommunityService {
     @Transactional
     public CondominiumInfractionDTO createInfraction(Long condominiumId, Map<String, Object> body) {
         User staff = validateManagerAccess(condominiumId);
+        ensureFeature(condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.NOTIFICATIONS);
         Condominium condo = getCondominium(condominiumId);
 
         Long unitId = numberVal(body.get("unitId"));
@@ -1788,6 +1878,11 @@ public class CondominiumCommunityService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Informe a fundamentação da sua defesa/recurso.");
         }
 
+        String currentInfStatus = inf.getStatus() == null ? "ISSUED" : inf.getStatus().toUpperCase(Locale.ROOT);
+        if (List.of("ACCEPTED", "REJECTED", "CANCELLED", "DISMISSED").contains(currentInfStatus)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Esta autuação já foi julgada ou encerrada e não aceita novo recurso.");
+        }
+
         if (inf.getDefenseDeadline() != null && LocalDate.now().isAfter(inf.getDefenseDeadline())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "O prazo para envio de recurso expirou em " + inf.getDefenseDeadline() + ".");
         }
@@ -1852,6 +1947,7 @@ public class CondominiumCommunityService {
     @Transactional(readOnly = true)
     public List<RenovationRequestDTO> listRenovations(Long condominiumId, boolean onlyMine) {
         User user = validateMemberAccess(condominiumId);
+        ensureFeature(condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.COMMUNITY_TICKETS);
         boolean effectiveOnlyMine = onlyMine || !condominiumAccessService.isStaffOrAdmin(user, condominiumId);
         List<RenovationRequest> list = effectiveOnlyMine
                 ? renovationRepository.findByCondominiumIdAndRequesterIdOrderByCreatedAtDesc(condominiumId, user.getId())
@@ -1862,6 +1958,7 @@ public class CondominiumCommunityService {
     @Transactional
     public RenovationRequestDTO createRenovation(Long condominiumId, Map<String, Object> body) {
         User user = validateMemberAccess(condominiumId);
+        ensureFeature(condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.COMMUNITY_TICKETS);
         Condominium condo = getCondominium(condominiumId);
         Unit unit = resolveUserUnit(user.getId(), condominiumId, body.get("unitId"));
         if (unit == null) {
@@ -1949,6 +2046,7 @@ public class CondominiumCommunityService {
     @Transactional(readOnly = true)
     public List<ConciergeShiftLogDTO> listShiftLogs(Long condominiumId) {
         validateStaffAccess(condominiumId);
+        ensureFeature(condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.CONCIERGE_OPERATIONS);
         return shiftLogRepository.findByCondominiumIdOrderByCreatedAtDesc(condominiumId)
                 .stream().map(ConciergeShiftLogDTO::new).toList();
     }
@@ -1956,6 +2054,7 @@ public class CondominiumCommunityService {
     @Transactional
     public ConciergeShiftLogDTO createShiftLog(Long condominiumId, Map<String, Object> body) {
         User staff = validateStaffAccess(condominiumId);
+        ensureFeature(condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.CONCIERGE_OPERATIONS);
         Condominium condo = getCondominium(condominiumId);
 
         String shiftType = defaultIfBlank(stringVal(body, "shiftType"), "MORNING").toUpperCase(Locale.ROOT);
@@ -1996,6 +2095,7 @@ public class CondominiumCommunityService {
     @Transactional(readOnly = true)
     public List<KeyRegistryEntryDTO> listKeys(Long condominiumId, String status) {
         validateStaffAccess(condominiumId);
+        ensureFeature(condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.CONCIERGE_OPERATIONS);
         List<KeyRegistryEntry> list = (status != null && !status.isBlank())
                 ? keyRepository.findByCondominiumIdAndCurrentStatusOrderByKeyCodeAsc(condominiumId, status.trim().toUpperCase())
                 : keyRepository.findByCondominiumIdOrderByKeyCodeAsc(condominiumId);
@@ -2005,6 +2105,7 @@ public class CondominiumCommunityService {
     @Transactional
     public KeyRegistryEntryDTO createKey(Long condominiumId, Map<String, Object> body) {
         validateStaffAccess(condominiumId);
+        ensureFeature(condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.CONCIERGE_OPERATIONS);
         Condominium condo = getCondominium(condominiumId);
 
         String code = stringVal(body, "keyCode");
@@ -2089,7 +2190,14 @@ public class CondominiumCommunityService {
                 .orElseThrow(() -> new ResourceNotFoundException("Chave não encontrada: " + id));
         User staff = validateStaffAccess(key.getCondominium().getId());
 
+        if (!"BORROWED".equalsIgnoreCase(key.getCurrentStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Esta chave já está disponível na portaria.");
+        }
+
         key.setCurrentStatus("AVAILABLE");
+        key.setBorrowerName(null);
+        key.setBorrowerDocument(null);
+        key.setBorrowerPhone(null);
         key.setReturnedAt(LocalDateTime.now());
         key.setCheckedInBy(staff);
         if (body != null && body.containsKey("notes")) {
@@ -2106,6 +2214,7 @@ public class CondominiumCommunityService {
     @Transactional(readOnly = true)
     public List<EmergencyAlertDTO> listEmergencyAlerts(Long condominiumId, String status) {
         validateStaffAccess(condominiumId);
+        ensureFeature(condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.EMERGENCY_SOS);
         List<EmergencyAlert> list = (status != null && !status.isBlank())
                 ? emergencyAlertRepository.findByCondominiumIdAndStatusOrderByCreatedAtDesc(condominiumId, status.trim().toUpperCase())
                 : emergencyAlertRepository.findByCondominiumIdOrderByCreatedAtDesc(condominiumId);
@@ -2115,6 +2224,7 @@ public class CondominiumCommunityService {
     @Transactional
     public EmergencyAlertDTO triggerEmergencyAlert(Long condominiumId, Map<String, Object> body) {
         User resident = validateMemberAccess(condominiumId);
+        ensureFeature(condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.EMERGENCY_SOS);
         Condominium condo = getCondominium(condominiumId);
         Unit unit = resolveUserUnit(resident.getId(), condominiumId, body.get("unitId"));
 
@@ -2179,13 +2289,21 @@ public class CondominiumCommunityService {
         Long condominiumId = alert.getCondominium().getId();
         User staff = validateStaffAccess(condominiumId);
 
+        if ("RESOLVED".equalsIgnoreCase(alert.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Este alerta SOS já foi encerrado.");
+        }
+
         alert.setStatus("IN_ATTENDANCE");
         alert.setAttendedBy(staff);
         alert.setAttendedAt(LocalDateTime.now());
         EmergencyAlertDTO dto = new EmergencyAlertDTO(emergencyAlertRepository.save(alert));
         if (realtimeEmitterService != null) {
-            realtimeEmitterService.sendToCondominium(
-                    condominiumId,
+            Set<Long> sseRecipients = new LinkedHashSet<>(membershipRepository.findActiveStaffUserIdsByCondominiumId(condominiumId));
+            if (alert.getResident() != null) {
+                sseRecipients.add(alert.getResident().getId());
+            }
+            realtimeEmitterService.sendToUsers(
+                    sseRecipients,
                     RealtimeEventDTO.of("EMERGENCY_ALERT", condominiumId, dto)
             );
         }
@@ -2207,8 +2325,12 @@ public class CondominiumCommunityService {
             operationalMetricsService.recordEmergencyResolved();
         }
         if (realtimeEmitterService != null) {
-            realtimeEmitterService.sendToCondominium(
-                    condominiumId,
+            Set<Long> sseRecipients = new LinkedHashSet<>(membershipRepository.findActiveStaffUserIdsByCondominiumId(condominiumId));
+            if (alert.getResident() != null) {
+                sseRecipients.add(alert.getResident().getId());
+            }
+            realtimeEmitterService.sendToUsers(
+                    sseRecipients,
                     RealtimeEventDTO.of("EMERGENCY_ALERT", condominiumId, dto)
             );
         }
@@ -2222,6 +2344,7 @@ public class CondominiumCommunityService {
     @Transactional(readOnly = true)
     public List<UtilityReadingDTO> listUtilityReadings(Long condominiumId, Integer year, Integer month, Long unitId) {
         User user = validateMemberAccess(condominiumId);
+        ensureFeature(condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.FINANCIAL);
         boolean isStaff = condominiumAccessService.isStaffOrAdmin(user, condominiumId);
         if (unitId != null) {
             Unit unit = unitRepository.findById(unitId)
@@ -2252,6 +2375,7 @@ public class CondominiumCommunityService {
     @Transactional
     public UtilityReadingDTO createUtilityReading(Long condominiumId, Map<String, Object> body) {
         User staff = validateStaffAccess(condominiumId);
+        ensureFeature(condominiumId, com.cefet_rj.projeto_final.billing.enums.FeatureCode.FINANCIAL);
         Condominium condo = getCondominium(condominiumId);
 
         Long unitId = numberVal(body.get("unitId"));
@@ -2306,7 +2430,7 @@ public class CondominiumCommunityService {
         reading.setLeakSuspicion(leak);
         reading.setReader(staff);
         reading.setNotes(blankToNull(stringVal(body, "notes")));
-        reading.setMeterPhotoUrl(blankToNull(stringVal(body, "meterPhotoUrl")));
+        reading.setMeterPhotoUrl(com.cefet_rj.projeto_final.shared.validation.UrlSanitizer.sanitizeMediaUrl(blankToNull(stringVal(body, "meterPhotoUrl")), "meterPhotoUrl"));
         if (reading.getId() == null) reading.setCreatedAt(LocalDateTime.now());
 
         return new UtilityReadingDTO(utilityReadingRepository.save(reading));
@@ -2321,6 +2445,7 @@ public class CondominiumCommunityService {
         VisitorAccess v = visitorRepository.findById(visitorId)
                 .orElseThrow(() -> new ResourceNotFoundException("Visitante não encontrado: " + visitorId));
         User user = validateMemberAccess(v.getCondominium().getId());
+        ensureFeature(v.getCondominium().getId(), com.cefet_rj.projeto_final.billing.enums.FeatureCode.VISITORS);
         boolean isStaff = condominiumAccessService.isStaffOrAdmin(user, v.getCondominium().getId());
         boolean isHost = v.getResident() != null && v.getResident().getId().equals(user.getId());
         boolean isUnitResident = v.getUnit() != null
@@ -2428,10 +2553,15 @@ public class CondominiumCommunityService {
 
     private static LocalDateTime parseDateTime(String raw, LocalDateTime fallback) {
         if (raw == null || raw.isBlank()) return fallback;
+        String clean = raw.trim();
         try {
-            String clean = raw.trim();
             if (clean.length() == 10) {
                 return LocalDate.parse(clean).atStartOfDay();
+            }
+            if (clean.endsWith("Z") || clean.matches(".*[+-]\\d{2}:?\\d{2}$")) {
+                return java.time.OffsetDateTime.parse(clean)
+                        .atZoneSameInstant(java.time.ZoneId.systemDefault())
+                        .toLocalDateTime();
             }
             return LocalDateTime.parse(clean.substring(0, Math.min(19, clean.length())));
         } catch (Exception ignored) {
@@ -2814,6 +2944,13 @@ public class CondominiumCommunityService {
                     e.getCreatedAt()
             );
         }
+
+        public PetDTO withRedactedManagerNotes() {
+            return new PetDTO(
+                    id, condominiumId, ownerId, ownerName, unitLabel, name, species, breed, size,
+                    color, vaccinated, lastVaccineDate, imageUrl, notes, status, null, createdAt
+            );
+        }
     }
 
     public record MovingRequestDTO(
@@ -2850,6 +2987,13 @@ public class CondominiumCommunityService {
                     e.getRejectionReason(),
                     e.getStatus(),
                     e.getCreatedAt()
+            );
+        }
+
+        public MovingRequestDTO withRedactedPii() {
+            return new MovingRequestDTO(
+                    id, condominiumId, null, "Morador", null, type, movingDate, period,
+                    null, null, null, null, null, status, createdAt
             );
         }
     }

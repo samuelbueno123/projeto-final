@@ -25,25 +25,31 @@ public class NotificationController {
 
     @PreAuthorize("isAuthenticated()")
     @GetMapping("/my")
-    @Operation(summary = "Lista todas as notificações do usuário")
-    public ResponseEntity<List<NotificationDTO>> findMyNotifications() {
+    @Operation(summary = "Lista todas as notificações do usuário (opcionalmente filtradas por condomínio)")
+    public ResponseEntity<List<NotificationDTO>> findMyNotifications(
+            @RequestParam(required = false) Long condominiumId
+    ) {
         return ResponseEntity.ok(
-                notificationService.findMyNotifications()
+                notificationService.findMyNotifications(condominiumId)
         );
     }
 
     @PreAuthorize("isAuthenticated()")
     @GetMapping("/my/unread-count")
     @Operation(summary = "Retorna a contagem rápida de notificações não lidas")
-    public ResponseEntity<Map<String, Long>> getUnreadCount() {
-        return ResponseEntity.ok(Map.of("unreadCount", notificationService.countUnreadNotifications()));
+    public ResponseEntity<Map<String, Long>> getUnreadCount(
+            @RequestParam(required = false) Long condominiumId
+    ) {
+        return ResponseEntity.ok(Map.of("unreadCount", notificationService.countUnreadNotifications(condominiumId)));
     }
 
     @PreAuthorize("isAuthenticated()")
     @PatchMapping("/read-all")
     @Operation(summary = "Marca todas as notificações do usuário como lidas")
-    public ResponseEntity<Void> markAllAsRead() {
-        notificationService.markAllAsRead();
+    public ResponseEntity<Void> markAllAsRead(
+            @RequestParam(required = false) Long condominiumId
+    ) {
+        notificationService.markAllAsRead(condominiumId);
         return ResponseEntity.noContent().build();
     }
 

@@ -292,3 +292,17 @@ Exportação consolidada de indicadores financeiros e operacionais em arquivo pa
 | `GET /actuator/info` | Público | Metadados do sistema (versão 1.0.0, Java runtime) | `200 OK` |
 | `GET /actuator/metrics` | `ROLE_ADMIN` | Lista todas as métricas operacionais disponíveis | `200 OK` |
 | `GET /actuator/metrics/{name}` | `ROLE_ADMIN` | Valor pontual da métrica operacional solicitada | `200 OK` |
+
+---
+
+### 2.12. Dashboards Multi-Perfil (Síndico, Morador, Porteiro e Administrador)
+
+| Método e Rota | Acesso | Descrição da Operação | Detalhes de Contrato |
+|:---|:---|:---|:---|
+| `GET /manager/dashboard?condominiumId={id}` | `ROLE_ADMIN`, `ROLE_MANAGER` (com vínculo ativo) | Retorna unidades, reservas e objeto agregado `summary` (`ManagerSummaryDTO`) com ocupação, adimplência, reservas, chamados abertos, manutenções e assembleias pendentes | Preserva compatibilidade com campos legados de topo e adiciona `summary` opcional |
+| `GET /packages/my?condominiumId={id}&page=0&size=20` | Autenticado (`ROLE_RESIDENT` e demais perfis vinculados) | Lista encomendas endereçadas ao usuário autenticado ou às suas unidades vinculadas; `condominiumId` opcional filtra por condomínio validando vínculo ativo via `CondominiumAccessService` | `403 Forbidden` se o usuário não possuir vínculo ativo no condomínio informado |
+| `GET /admin/overview` e `GET /admin/diagnostics` | `ROLE_ADMIN` | Retorna contadores globais, distribuição por perfil (`usersByRole`), volumes por módulo, logs de auditoria recentes e telemetria real de JVM/banco/SSE | Alimenta o Console Global Multi-Condomínio sem métricas estáticas |
+| `GET /notifications/my?condominiumId={id}`, `GET /notifications/my/unread-count?condominiumId={id}`, `PATCH /notifications/read-all?condominiumId={id}` | Autenticado | Lista, contabiliza ou marca notificações como lidas no escopo estrito de **um único condomínio** (`condominiumId` opcional; avisos `ANNOUNCEMENT` pertencentes a outros condomínios são isolados e somente comunicados globais `SYSTEM_ANNOUNCEMENT` sem condomínio permanecem visíveis entre contextos) | `403 Forbidden` se não administradores consultarem um `condominiumId` sem vínculo ativo |
+| `POST /condominiums/{id}/announcements` e `POST /condominiums/{id}/doorman-chat/messages` (com `unitId`) | Gestores / Porteiros / Moradores vinculados | Mensagens e comunicados direcionados a uma unidade específica (`unitId`) são visíveis exclusivamente aos residentes vinculados à unidade de destino (+ autor / síndico / admin), inclusive nos streams SSE em tempo real | Moradores de outras unidades recebem `403 Forbidden` em leituras diretas/respostas ou têm os itens omitidos das listagens e conversas |
+| `GET /condominiums/{id}/polls`, `POST /condominiums/{id}/polls`, `POST /polls/{pollId}/vote`, `PATCH /polls/{pollId}/close` | Membros ativos (criação/encerramento restritos à gestão) | Gerencia enquetes rápidas do condomínio retornando opções ordenadas com `label`, `votes`, `myOptionId` e flag booleana `active` | Votar em enquete encerrada (`active: false`) retorna `409 Conflict` |
+

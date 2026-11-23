@@ -1,5 +1,9 @@
 package com.cefet_rj.projeto_final.shared.observability;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -19,43 +23,111 @@ public class OperationalMetricsService {
     private final ConcurrentMap<String, LongAdder> emergencyTriggeredCounters = new ConcurrentHashMap<>();
     private final LongAdder emergencyResolvedCounter = new LongAdder();
     private final LongAdder visitorCheckInCounter = new LongAdder();
+    private final LongAdder auditWriteFailureCounter = new LongAdder();
+
+    private Counter loginSuccessMicrometer;
+    private Counter loginFailureMicrometer;
+    private Counter reservationCreatedMicrometer;
+    private Counter reservationConflictMicrometer;
+    private Counter packageReceivedMicrometer;
+    private Counter packageDeliveredMicrometer;
+    private Counter emergencyTriggeredMicrometer;
+    private Counter emergencyResolvedMicrometer;
+    private Counter visitorCheckInMicrometer;
+    private Counter auditWriteFailureMicrometer;
+
+    @Autowired(required = false)
+    public void bindMeterRegistry(MeterRegistry meterRegistry) {
+        if (meterRegistry == null) {
+            return;
+        }
+        this.loginSuccessMicrometer = Counter.builder("condo.auth.login.success")
+                .description("Number of successful authentications")
+                .register(meterRegistry);
+        this.loginFailureMicrometer = Counter.builder("condo.auth.login.failure")
+                .description("Number of failed authentications")
+                .register(meterRegistry);
+        this.reservationCreatedMicrometer = Counter.builder("condo.reservation.created")
+                .description("Number of reservations created")
+                .register(meterRegistry);
+        this.reservationConflictMicrometer = Counter.builder("condo.reservation.conflict")
+                .description("Number of reservation scheduling conflicts")
+                .register(meterRegistry);
+        this.packageReceivedMicrometer = Counter.builder("condo.package.received")
+                .description("Number of packages received")
+                .register(meterRegistry);
+        this.packageDeliveredMicrometer = Counter.builder("condo.package.delivered")
+                .description("Number of packages delivered to residents")
+                .register(meterRegistry);
+        this.emergencyTriggeredMicrometer = Counter.builder("condo.emergency.triggered")
+                .description("Number of emergency alerts triggered")
+                .register(meterRegistry);
+        this.emergencyResolvedMicrometer = Counter.builder("condo.emergency.resolved")
+                .description("Number of emergency alerts resolved")
+                .register(meterRegistry);
+        this.visitorCheckInMicrometer = Counter.builder("condo.visitor.checkin")
+                .description("Number of visitor check-ins")
+                .register(meterRegistry);
+        this.auditWriteFailureMicrometer = Counter.builder("condo.audit.write.failure")
+                .description("Number of failed audit log persistence attempts")
+                .register(meterRegistry);
+
+        Gauge.builder("condo.jvm.heap.used", Runtime.getRuntime(), r -> (double) (r.totalMemory() - r.freeMemory()))
+                .description("JVM heap memory used in bytes")
+                .baseUnit("bytes")
+                .register(meterRegistry);
+    }
 
     public void recordLoginSuccess() {
         loginSuccessCounter.increment();
+        if (loginSuccessMicrometer != null) loginSuccessMicrometer.increment();
     }
 
     public void recordLoginFailure(String reason) {
         String safeReason = (reason != null && !reason.isBlank()) ? reason : "unknown";
         loginFailureCounters.computeIfAbsent(safeReason, r -> new LongAdder()).increment();
+        if (loginFailureMicrometer != null) loginFailureMicrometer.increment();
     }
 
     public void recordReservationCreated() {
         reservationCreatedCounter.increment();
+        if (reservationCreatedMicrometer != null) reservationCreatedMicrometer.increment();
     }
 
     public void recordReservationConflict() {
         reservationConflictCounter.increment();
+        if (reservationConflictMicrometer != null) reservationConflictMicrometer.increment();
     }
 
     public void recordPackageReceived() {
         packageReceivedCounter.increment();
+        if (packageReceivedMicrometer != null) packageReceivedMicrometer.increment();
     }
 
     public void recordPackageDelivered() {
         packageDeliveredCounter.increment();
+        if (packageDeliveredMicrometer != null) packageDeliveredMicrometer.increment();
     }
 
     public void recordEmergencyTriggered(String severity) {
         String safeSeverity = (severity != null && !severity.isBlank()) ? severity.toUpperCase() : "GENERAL";
         emergencyTriggeredCounters.computeIfAbsent(safeSeverity, s -> new LongAdder()).increment();
+        if (emergencyTriggeredMicrometer != null) emergencyTriggeredMicrometer.increment();
     }
 
     public void recordEmergencyResolved() {
         emergencyResolvedCounter.increment();
+        if (emergencyResolvedMicrometer != null) emergencyResolvedMicrometer.increment();
     }
 
     public void recordVisitorCheckIn() {
         visitorCheckInCounter.increment();
+        if (visitorCheckInMicrometer != null) visitorCheckInMicrometer.increment();
+    }
+
+    public void recordAuditWriteFailure() {
+        auditWriteFailureCounter.increment();
+        if (auditWriteFailureMicrometer != null) auditWriteFailureMicrometer.increment();
     }
 
     public long getLoginSuccessCount() {
@@ -94,6 +166,10 @@ public class OperationalMetricsService {
         return visitorCheckInCounter.sum();
     }
 
+    public long getAuditWriteFailureCount() {
+        return auditWriteFailureCounter.sum();
+    }
+
     public List<String> getAllMetricNames() {
         return List.of(
                 "condo.auth.login.success",
@@ -105,36 +181,9 @@ public class OperationalMetricsService {
                 "condo.emergency.triggered",
                 "condo.emergency.resolved",
                 "condo.visitor.checkin",
+                "condo.audit.write.failure",
                 "jvm.memory.used",
                 "jvm.memory.max"
         );
-    }
-
-    public Map<String, Object> getMetricDetails(String metricName) {
-        if (metricName == null) return null;
-        return switch (metricName) {
-            case "condo.auth.login.success" -> createMetricMap("condo.auth.login.success", "Number of successful authentications", getLoginSuccessCount());
-            case "condo.auth.login.failure" -> createMetricMap("condo.auth.login.failure", "Number of failed authentications", getLoginFailureCount());
-            case "condo.reservation.created" -> createMetricMap("condo.reservation.created", "Number of reservations created", getReservationCreatedCount());
-            case "condo.reservation.conflict" -> createMetricMap("condo.reservation.conflict", "Number of reservation scheduling conflicts", getReservationConflictCount());
-            case "condo.package.received" -> createMetricMap("condo.package.received", "Number of packages received", getPackageReceivedCount());
-            case "condo.package.delivered" -> createMetricMap("condo.package.delivered", "Number of packages delivered to residents", getPackageDeliveredCount());
-            case "condo.emergency.triggered" -> createMetricMap("condo.emergency.triggered", "Number of emergency alerts triggered", getEmergencyTriggeredCount());
-            case "condo.emergency.resolved" -> createMetricMap("condo.emergency.resolved", "Number of emergency alerts resolved", getEmergencyResolvedCount());
-            case "condo.visitor.checkin" -> createMetricMap("condo.visitor.checkin", "Number of visitor check-ins", getVisitorCheckInCount());
-            case "jvm.memory.used" -> createMetricMap("jvm.memory.used", "JVM heap memory used in bytes", Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory());
-            case "jvm.memory.max" -> createMetricMap("jvm.memory.max", "JVM heap memory maximum in bytes", Runtime.getRuntime().maxMemory());
-            default -> null;
-        };
-    }
-
-    private Map<String, Object> createMetricMap(String name, String description, double value) {
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("name", name);
-        result.put("description", description);
-        result.put("baseUnit", null);
-        result.put("measurements", List.of(Map.of("statistic", "VALUE", "value", value)));
-        result.put("availableTags", List.of());
-        return result;
     }
 }

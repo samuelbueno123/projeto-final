@@ -39,6 +39,21 @@ public class GoogleAuthController {
     private final com.cefet_rj.projeto_final.shared.observability.OperationalMetricsService metricsService;
 
     @Value("${security.jwt.duration}") private long tokenDurationSeconds;
+    private volatile NimbusJwtEncoder cachedJwtEncoder;
+
+    private NimbusJwtEncoder getJwtEncoder() {
+        NimbusJwtEncoder encoder = this.cachedJwtEncoder;
+        if (encoder == null) {
+            synchronized (this) {
+                encoder = this.cachedJwtEncoder;
+                if (encoder == null) {
+                    encoder = new NimbusJwtEncoder(jwkSource);
+                    this.cachedJwtEncoder = encoder;
+                }
+            }
+        }
+        return encoder;
+    }
 
     @PostMapping("/google")
     public ResponseEntity<GoogleLoginResponse> signIn(@Valid @RequestBody GoogleLoginRequest request) {
@@ -55,6 +70,14 @@ public class GoogleAuthController {
         User user = users.findByGoogleSubject(subject)
                 .or(() -> users.findByEmailIgnoreCase(email))
                 .orElseGet(() -> createGoogleUser(google, email));
+        if (user.getGoogleSubject() != null && !user.getGoogleSubject().equals(subject)) {
+            auditLogService.logAuthentication(email, false, null, "GOOGLE_SUBJECT_MISMATCH");
+            metricsService.recordLoginFailure("GOOGLE_SUBJECT_MISMATCH");
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Esta conta já está vinculada a outro identificador Google."
+            );
+        }
         if (user.getGoogleSubject() == null) {
             user.setGoogleSubject(subject);
         }
@@ -73,7 +96,7 @@ public class GoogleAuthController {
                 .claim("username", user.getEmail())
                 .claim("authorities", user.getAuthorities().stream().map(a -> a.getAuthority()).toList())
                 .build();
-        String token = new NimbusJwtEncoder(jwkSource).encode(JwtEncoderParameters.from(claims)).getTokenValue();
+        String token = getJwtEncoder().encode(JwtEncoderParameters.from(claims)).getTokenValue();
         auditLogService.logAuthentication(user.getEmail(), true, null, "GOOGLE_LOGIN_SUCCESS");
         metricsService.recordLoginSuccess();
         return ResponseEntity.ok(new GoogleLoginResponse(token, "Bearer", tokenDurationSeconds,

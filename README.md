@@ -4,9 +4,8 @@
 [![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.3.6-brightgreen.svg?style=flat&logo=springboot)](https://spring.io/projects/spring-boot)
 [![Flutter](https://img.shields.io/badge/Flutter-3.x-blue.svg?style=flat&logo=flutter)](https://flutter.dev/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg?style=flat&logo=postgresql)](https://www.postgresql.org/)
-[![Flyway](https://img.shields.io/badge/Flyway-Migrations_V1--V18-red.svg?style=flat&logo=flyway)](https://flywaydb.org/)
+[![Flyway](https://img.shields.io/badge/Flyway-Migrations_V1--V26-red.svg?style=flat&logo=flyway)](https://flywaydb.org/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?style=flat&logo=docker)](https://www.docker.com/)
-[![Tests](https://img.shields.io/badge/Tests-122_Passed-success.svg?style=flat)]()
 
 **Âncora Gestão Condominial** é uma plataforma corporativa completa para administração inteligente e convivência em condomínios residenciais e comerciais. O sistema integra síndicos profissionais, administradoras, porteiros e moradores através de uma arquitetura modular, resiliente, segura e preparada para ambientes de produção.
 
@@ -33,7 +32,7 @@ flowchart LR
     end
 
     subgraph Persistence["Persistência & Dados"]
-        DB[(PostgreSQL 16\nMigrations V1-V18)]
+        DB[(PostgreSQL 16\nMigrations V1-V26)]
         Keys[(".secrets/jwt-*.pem\nChaves RSA 2048")]
     end
 
@@ -54,7 +53,9 @@ flowchart LR
 - 🗳️ **Assembleias Híbridas & Votação:** Convocação, pautas deliberativas, quórum calculado por fração ideal e votação secreta ou aberta.
 - 🛠️ **Ordens de Serviço & Manutenção:** Acompanhamento de vistorias periódicas, manutenções preventivas e corretivas com registro de fotos e custos.
 - 🚨 **Segurança, Passes QR & SOS Pânico:** Emissão de convites digitais de visitantes para WhatsApp, validação de QR Code na portaria, botão de pânico SOS com transmissão imediata via Server-Sent Events (SSE) e controle de obras sob a norma ABNT NBR 16.280.
-- 📊 **Observabilidade Enterprise:** Correlation IDs ponta a ponta (`X-Correlation-ID`), mascaramento automático de senhas/tokens em logs, endpoints `/actuator/health`, `/liveness`, `/readiness`, e métricas operacionais.
+- 📊 **Observabilidade Enterprise & Prometheus:** Correlation IDs ponta a ponta (`X-Correlation-ID`), mascaramento automático de senhas/tokens em logs, Spring Boot Actuator (`/actuator/health`, `/liveness`, `/readiness`, `/prometheus`) com métricas Micrometer reais e `JvmMemoryHealthIndicator`.
+- 💳 **Ciclo de Vida de Assinaturas & Matriz de 17 Recursos:** Gestão completa de planos comerciais (`Essencial`, `Profissional`, `Enterprise`), status (`TRIALING`, `ACTIVE`, `PAST_DUE`, `SUSPENDED`, `CANCELLED`), expiração/renovação auditada (`tb_condominium_subscription` e `tb_subscription_history`) e bloqueio *Fail-Closed* no backend e frontend.
+- 🛡️ **Editor Estruturado de Banco Admin & Auditoria Diff:** Endpoints `/admin/data/*` orientados por schema tipado com proteção de campos sensíveis/imutáveis, prévia de diff (`before_state` / `after_state`) e justificativa obrigatória (`reason`) gravada em `tb_audit_log`.
 
 ---
 
@@ -111,12 +112,12 @@ No perfil `dev`, a API provisiona automaticamente uma conta administrativa para 
 
 ## 🧪 Suíte de Testes Automatizados
 
-O sistema conta com cobertura abrangente de testes validando integridade referencial, concorrência, segurança RBAC, observabilidade e interface:
+O sistema conta com cobertura abrangente de testes validando paridade de schema Flyway (`V1..V26` + Hibernate `validate`), orçamento de queries sem N+1, concorrência, segurança RBAC/multi-tenant, ciclo de assinaturas, observabilidade Prometheus e interface Flutter:
 
 ```bash
-# Backend (122 testes)
+# Backend (Spring Boot / JUnit 5)
 cd backend && ./mvnw test
 
-# Frontend (38 testes)
-cd projeto-front && flutter test
+# Frontend (Flutter Analyze + Widget/Integration Tests)
+cd projeto-front && flutter analyze && flutter test
 ```

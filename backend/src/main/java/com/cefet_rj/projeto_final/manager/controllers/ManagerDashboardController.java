@@ -64,7 +64,22 @@ public class ManagerDashboardController {
     private com.cefet_rj.projeto_final.condominiums.security.CondominiumFeatureAccessService featureAccessService;
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.cefet_rj.projeto_final.billing.services.CondominiumSubscriptionService condominiumSubscriptionService;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.cefet_rj.projeto_final.realtime.services.RealtimeEmitterService realtimeEmitterService;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.cefet_rj.projeto_final.community.repositories.OccurrenceTicketRepository ticketRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.cefet_rj.projeto_final.maintenance.repositories.MaintenanceOrderRepository maintenanceOrderRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.cefet_rj.projeto_final.maintenance.repositories.MaintenanceEquipmentRepository maintenanceEquipmentRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.cefet_rj.projeto_final.assemblies.repositories.CondominiumAssemblyRepository assemblyRepository;
 
     @GetMapping("/manager/dashboard")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
@@ -96,7 +111,8 @@ public class ManagerDashboardController {
                     payment == null ? null : payment.getPaidAt()
             );
         }).toList();
-        var reservations = reservationRepository.findByCommonAreaCondominiumIdOrderByStartAtDesc(condominiumId)
+        var rawReservations = reservationRepository.findByCommonAreaCondominiumIdOrderByStartAtDesc(condominiumId);
+        var reservations = rawReservations
                 .stream().map(r -> new ManagerDashboardDTO.ReservationInfo(
                         r.getId(),
                         r.getStartAt(),
@@ -114,6 +130,8 @@ public class ManagerDashboardController {
                         r.getProposedEndAt()
                 ))
                 .toList();
+
+        var summary = buildSummary(condominiumId, rawUnits.size(), paymentMap, rawReservations);
         return new ManagerDashboardDTO(
                 condominiumId,
                 condo.getName(),
@@ -121,7 +139,133 @@ public class ManagerDashboardController {
                 membershipRepository.countDistinctUsers(condominiumId),
                 reservations.size(),
                 units,
-                reservations
+                reservations,
+                summary
+        );
+    }
+
+    private ManagerDashboardDTO.ManagerSummaryDTO buildSummary(
+            Long condominiumId,
+            int totalUnits,
+            Map<Long, UnitPayment> paymentMap,
+            List<com.cefet_rj.projeto_final.reservations.entities.Reservation> rawReservations
+    ) {
+        long occupiedUnits = residentRepository.countResidentsByUnitForCondominium(condominiumId).size();
+        long vacantUnits = Math.max(0L, totalUnits - occupiedUnits);
+
+        LocalDateTime now = LocalDateTime.now();
+        LocalDate today = LocalDate.now();
+        LocalDateTime sevenDaysAgo = now.minusDays(7);
+
+        var memberships = membershipRepository.findActiveAndPendingByCondominiumId(condominiumId);
+        long recentMembershipsCount = memberships.stream()
+                .filter(m -> m.getStatus() == com.cefet_rj.projeto_final.condominiums.enums.MembershipStatus.ACTIVE
+                        && m.getCreatedAt() != null
+                        && !m.getCreatedAt().isBefore(sevenDaysAgo))
+                .count();
+        long pendingMembershipRequestsCount = memberships.stream()
+                .filter(m -> m.getStatus() == com.cefet_rj.projeto_final.condominiums.enums.MembershipStatus.PENDING
+                        || m.getStatus() == com.cefet_rj.projeto_final.condominiums.enums.MembershipStatus.REQUESTED)
+                .count();
+
+        var activeReservations = rawReservations.stream()
+                .filter(r -> {
+                    String st = r.getStatus() != null ? r.getStatus().name() : "";
+                    boolean isActiveStatus = "CONFIRMED".equals(st) || "APPROVED".equals(st)
+                            || "PENDING".equals(st) || "COUNTER_PROPOSED".equals(st);
+                    return isActiveStatus && (r.getEndAt() == null || !r.getEndAt().isBefore(now));
+                })
+                .toList();
+        long activeReservationsCount = activeReservations.size();
+        long todayReservationsCount = activeReservations.stream()
+                .filter(r -> r.getStartAt() != null && r.getStartAt().toLocalDate().equals(today))
+                .count();
+        LocalDate weekEnd = today.plusDays(7);
+        long weekReservationsCount = activeReservations.stream()
+                .filter(r -> r.getStartAt() != null
+                        && !r.getStartAt().toLocalDate().isBefore(today)
+                        && !r.getStartAt().toLocalDate().isAfter(weekEnd))
+                .count();
+
+        long openTicketsCount = 0L;
+        if (ticketRepository != null) {
+            openTicketsCount = ticketRepository.findByCondominiumIdOrderByCreatedAtDesc(condominiumId).stream()
+                    .filter(t -> "OPEN".equalsIgnoreCase(t.getStatus()) || "IN_PROGRESS".equalsIgnoreCase(t.getStatus()))
+                    .count();
+        }
+
+        long openMaintenanceCount = 0L;
+        long overdueMaintenanceCount = 0L;
+        if (maintenanceOrderRepository != null) {
+            var orders = maintenanceOrderRepository.findAllByCondominiumIdWithDetails(condominiumId);
+            openMaintenanceCount = orders.stream()
+                    .filter(o -> "OPEN".equalsIgnoreCase(o.getStatus()) || "IN_PROGRESS".equalsIgnoreCase(o.getStatus()))
+                    .count();
+            overdueMaintenanceCount += orders.stream()
+                    .filter(o -> ("OPEN".equalsIgnoreCase(o.getStatus()) || "IN_PROGRESS".equalsIgnoreCase(o.getStatus()))
+                            && o.getScheduledDate() != null
+                            && o.getScheduledDate().isBefore(today))
+                    .count();
+        }
+        if (maintenanceEquipmentRepository != null) {
+            overdueMaintenanceCount += maintenanceEquipmentRepository
+                    .findByCondominiumIdOrderByNextMaintenanceDateAsc(condominiumId).stream()
+                    .filter(e -> ("OPERATIONAL".equalsIgnoreCase(e.getStatus()) || "ACTIVE".equalsIgnoreCase(e.getStatus()))
+                            && e.getNextMaintenanceDate() != null
+                            && e.getNextMaintenanceDate().isBefore(today))
+                    .count();
+        }
+
+        long pendingAssembliesCount = 0L;
+        if (assemblyRepository != null) {
+            pendingAssembliesCount = assemblyRepository.findAllByCondominiumIdWithTopics(condominiumId).stream()
+                    .filter(a -> "SCHEDULED".equalsIgnoreCase(a.getStatus()) || "IN_PROGRESS".equalsIgnoreCase(a.getStatus()))
+                    .count();
+        }
+
+        BigDecimal totalInvoiced = BigDecimal.ZERO;
+        BigDecimal totalCollected = BigDecimal.ZERO;
+        BigDecimal totalPending = BigDecimal.ZERO;
+        BigDecimal overdueAmount = BigDecimal.ZERO;
+        long paidUnitsCount = 0L;
+        long pendingUnitsCount = 0L;
+        long overdueUnitsCount = 0L;
+        for (UnitPayment p : paymentMap.values()) {
+            BigDecimal amt = p.getAmount() != null ? p.getAmount() : BigDecimal.ZERO;
+            totalInvoiced = totalInvoiced.add(amt);
+            if (p.getStatus() == UnitPaymentStatus.PAID) {
+                totalCollected = totalCollected.add(amt);
+                paidUnitsCount++;
+            } else if (p.getStatus() == UnitPaymentStatus.OVERDUE) {
+                totalPending = totalPending.add(amt);
+                overdueAmount = overdueAmount.add(amt);
+                overdueUnitsCount++;
+            } else if (p.getStatus() == UnitPaymentStatus.PENDING
+                    || p.getStatus() == UnitPaymentStatus.CONFIRMATION_REQUESTED) {
+                totalPending = totalPending.add(amt);
+                pendingUnitsCount++;
+            }
+        }
+
+        return new ManagerDashboardDTO.ManagerSummaryDTO(
+                occupiedUnits,
+                vacantUnits,
+                recentMembershipsCount,
+                pendingMembershipRequestsCount,
+                activeReservationsCount,
+                todayReservationsCount,
+                weekReservationsCount,
+                openTicketsCount,
+                overdueMaintenanceCount,
+                openMaintenanceCount,
+                pendingAssembliesCount,
+                totalInvoiced,
+                totalCollected,
+                totalPending,
+                overdueAmount,
+                paidUnitsCount,
+                pendingUnitsCount,
+                overdueUnitsCount
         );
     }
 
@@ -140,6 +284,11 @@ public class ManagerDashboardController {
         if (planId == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Informe o plano desejado.");
         }
+        if (condominiumSubscriptionService != null) {
+            condominiumSubscriptionService.changePlan(condominiumId, planId, null, "Seleção inicial do plano pelo síndico");
+            Condominium refreshed = condominiumRepository.findById(condominiumId).orElse(condo);
+            return ResponseEntity.ok(new CondominiumDTO(refreshed));
+        }
         BillingPlan plan = billingPlanRepository.findById(planId)
                 .orElseThrow(() -> new ResourceNotFoundException("Plano não encontrado: " + planId));
         if (!Boolean.TRUE.equals(plan.getActive())) {
@@ -149,7 +298,7 @@ public class ManagerDashboardController {
         condo.setPlanSelected(true);
         condo = condominiumRepository.save(condo);
         if (featureAccessService != null) {
-            featureAccessService.evictCondoFeaturesCache();
+            featureAccessService.evictCondoFeaturesCache(condominiumId);
         }
         return ResponseEntity.ok(new CondominiumDTO(condo));
     }
@@ -264,7 +413,9 @@ public class ManagerDashboardController {
         if (!unit.getSector().getCondominium().getId().equals(condominiumId)) {
             throw new AccessDeniedException("Unidade fora deste condomínio");
         }
-        ensureUnitOrManagerAccess(user, condominiumId, unitId);
+        if (!condominiumAccessService.isManagerOrAdmin(user, condominiumId)) {
+            throw new AccessDeniedException("Liquidação direta de boleto requer confirmação do síndico ou administrador.");
+        }
         UnitPayment payment = paymentRepository.findByUnitId(unitId)
                 .orElseThrow(() -> new ResourceNotFoundException("Cobrança não encontrada para esta unidade"));
 

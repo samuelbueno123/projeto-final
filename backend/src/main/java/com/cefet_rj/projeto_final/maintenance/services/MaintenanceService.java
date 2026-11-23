@@ -52,9 +52,22 @@ public class MaintenanceService {
     private final CondominiumAccessService condominiumAccessService;
     private final RealtimeEmitterService realtimeEmitterService;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.cefet_rj.projeto_final.condominiums.security.CondominiumFeatureAccessService featureAccessService;
+
+    private void ensureMaintenanceFeature(Long condominiumId) {
+        if (featureAccessService != null) {
+            featureAccessService.validateFeatureEnabled(
+                    condominiumId,
+                    com.cefet_rj.projeto_final.billing.enums.FeatureCode.MAINTENANCE
+            );
+        }
+    }
+
     @Transactional(readOnly = true)
     public List<MaintenanceOrderDTO> listOrders(Long condominiumId, String status) {
         condominiumAccessService.validateAccess(condominiumId);
+        ensureMaintenanceFeature(condominiumId);
         List<MaintenanceOrder> orders;
         if (status != null && !status.isBlank()) {
             orders = maintenanceRepository.findAllByCondominiumIdAndStatusWithDetails(condominiumId, status.trim().toUpperCase());
@@ -69,12 +82,14 @@ public class MaintenanceService {
         MaintenanceOrder order = maintenanceRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Ordem de serviço não encontrada: " + id));
         condominiumAccessService.validateAccess(order.getCondominium().getId());
+        ensureMaintenanceFeature(order.getCondominium().getId());
         return new MaintenanceOrderDTO(order);
     }
 
     @Transactional
     public MaintenanceOrderDTO createOrder(Long condominiumId, CreateMaintenanceOrderDTO dto) {
         condominiumAccessService.validateManagerAccess(condominiumId);
+        ensureMaintenanceFeature(condominiumId);
         Condominium condo = condominiumRepository.findById(condominiumId)
                 .orElseThrow(() -> new ResourceNotFoundException("Condomínio não encontrado: " + condominiumId));
 
@@ -148,6 +163,7 @@ public class MaintenanceService {
                 .orElseThrow(() -> new ResourceNotFoundException("Ordem de serviço não encontrada: " + id));
         Long condoId = order.getCondominium().getId();
         condominiumAccessService.validateManagerAccess(condoId);
+        ensureMaintenanceFeature(condoId);
 
         String newStatus = dto.status().trim().toUpperCase();
         if (!List.of("OPEN", "IN_PROGRESS", "COMPLETED", "CANCELLED").contains(newStatus)) {
@@ -214,6 +230,7 @@ public class MaintenanceService {
     @Transactional(readOnly = true)
     public List<MaintenanceEquipmentDTO> listEquipment(Long condominiumId) {
         condominiumAccessService.validateAccess(condominiumId);
+        ensureMaintenanceFeature(condominiumId);
         List<MaintenanceEquipment> equipment = equipmentRepository.findByCondominiumIdOrderByNextMaintenanceDateAsc(condominiumId);
         if (equipment.isEmpty()) {
             return List.of();
@@ -237,6 +254,7 @@ public class MaintenanceService {
     @Transactional
     public MaintenanceEquipmentDTO createEquipment(Long condominiumId, Map<String, Object> body) {
         condominiumAccessService.validateManagerAccess(condominiumId);
+        ensureMaintenanceFeature(condominiumId);
         Condominium condo = condominiumRepository.findById(condominiumId)
                 .orElseThrow(() -> new ResourceNotFoundException("Condomínio não encontrado: " + condominiumId));
 
@@ -288,6 +306,7 @@ public class MaintenanceService {
                 .orElseThrow(() -> new ResourceNotFoundException("Equipamento não encontrado: " + id));
         Long condoId = eq.getCondominium().getId();
         condominiumAccessService.validateManagerAccess(condoId);
+        ensureMaintenanceFeature(condoId);
 
         if (!stringVal(body, "name").isBlank()) {
             eq.setName(stringVal(body, "name"));
@@ -346,6 +365,7 @@ public class MaintenanceService {
         MaintenanceEquipment eq = equipmentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Equipamento não encontrado: " + id));
         condominiumAccessService.validateManagerAccess(eq.getCondominium().getId());
+        ensureMaintenanceFeature(eq.getCondominium().getId());
         equipmentRepository.delete(eq);
     }
 
@@ -355,7 +375,8 @@ public class MaintenanceService {
 
     @Transactional(readOnly = true)
     public List<SupplierDTO> listSuppliers(Long condominiumId) {
-        condominiumAccessService.validateAccess(condominiumId);
+        condominiumAccessService.validateStaffAccess(condominiumId);
+        ensureMaintenanceFeature(condominiumId);
         List<Supplier> suppliers = supplierRepository.findByCondominiumIdOrderByCompanyNameAsc(condominiumId);
         if (suppliers.isEmpty()) {
             return List.of();
@@ -379,6 +400,7 @@ public class MaintenanceService {
     @Transactional
     public SupplierDTO createSupplier(Long condominiumId, Map<String, Object> body) {
         condominiumAccessService.validateManagerAccess(condominiumId);
+        ensureMaintenanceFeature(condominiumId);
         Condominium condo = condominiumRepository.findById(condominiumId)
                 .orElseThrow(() -> new ResourceNotFoundException("Condomínio não encontrado: " + condominiumId));
 
@@ -412,6 +434,7 @@ public class MaintenanceService {
         Supplier s = supplierRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Fornecedor não encontrado: " + id));
         condominiumAccessService.validateManagerAccess(s.getCondominium().getId());
+        ensureMaintenanceFeature(s.getCondominium().getId());
 
         if (!stringVal(body, "companyName").isBlank()) {
             s.setCompanyName(stringVal(body, "companyName"));
@@ -460,6 +483,7 @@ public class MaintenanceService {
         Supplier s = supplierRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Fornecedor não encontrado: " + id));
         condominiumAccessService.validateManagerAccess(s.getCondominium().getId());
+        ensureMaintenanceFeature(s.getCondominium().getId());
         supplierRepository.delete(s);
     }
 
@@ -625,6 +649,7 @@ public class MaintenanceService {
     @Transactional(readOnly = true)
     public List<MaintenanceChecklistDTO> listChecklists(Long condominiumId) {
         condominiumAccessService.validateStaffAccess(condominiumId);
+        ensureMaintenanceFeature(condominiumId);
         return checklistRepository.findByCondominiumIdOrderByCreatedAtDesc(condominiumId)
                 .stream().map(MaintenanceChecklistDTO::new).toList();
     }
@@ -633,6 +658,7 @@ public class MaintenanceService {
     public MaintenanceChecklistDTO createChecklist(Long condominiumId, Map<String, Object> body) {
         User staff = authenticatedUserService.getAuthenticatedUser();
         condominiumAccessService.validateStaffAccess(condominiumId);
+        ensureMaintenanceFeature(condominiumId);
         Condominium condo = condominiumRepository.findById(condominiumId)
                 .orElseThrow(() -> new ResourceNotFoundException("Condomínio não encontrado: " + condominiumId));
 
@@ -675,6 +701,10 @@ public class MaintenanceService {
         MaintenanceChecklist cl = checklistRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Checklist não encontrado: " + id));
         condominiumAccessService.validateStaffAccess(cl.getCondominium().getId());
+        ensureMaintenanceFeature(cl.getCondominium().getId());
+        if ("COMPLETED".equalsIgnoreCase(cl.getStatus()) || "REQUIRES_ACTION".equalsIgnoreCase(cl.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Este checklist de inspeção já foi finalizado.");
+        }
 
         cl.setStatus("COMPLETED");
         cl.setInspectedAt(LocalDateTime.now());
@@ -698,6 +728,7 @@ public class MaintenanceService {
     @Transactional(readOnly = true)
     public List<ServiceContractDTO> listContracts(Long condominiumId, String status) {
         condominiumAccessService.validateStaffAccess(condominiumId);
+        ensureMaintenanceFeature(condominiumId);
         List<ServiceContract> list = (status != null && !status.isBlank())
                 ? contractRepository.findByCondominiumIdAndStatusOrderByEndDateAsc(condominiumId, status.trim().toUpperCase(Locale.ROOT))
                 : contractRepository.findByCondominiumIdOrderByEndDateAsc(condominiumId);
@@ -707,6 +738,7 @@ public class MaintenanceService {
     @Transactional
     public ServiceContractDTO createContract(Long condominiumId, Map<String, Object> body) {
         condominiumAccessService.validateManagerAccess(condominiumId);
+        ensureMaintenanceFeature(condominiumId);
         Condominium condo = condominiumRepository.findById(condominiumId)
                 .orElseThrow(() -> new ResourceNotFoundException("Condomínio não encontrado: " + condominiumId));
 
@@ -772,6 +804,7 @@ public class MaintenanceService {
         ServiceContract sc = contractRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Contrato não encontrado: " + id));
         condominiumAccessService.validateManagerAccess(sc.getCondominium().getId());
+        ensureMaintenanceFeature(sc.getCondominium().getId());
         sc.setStatus("TERMINATED");
         return new ServiceContractDTO(contractRepository.save(sc));
     }

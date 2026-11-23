@@ -91,6 +91,8 @@ public class AdminDashboardController {
     private final NotificationRepository notifications;
     private final BillingPlanRepository billingPlans;
     private final FeatureRepository features;
+    private final com.cefet_rj.projeto_final.billing.repositories.CondominiumSubscriptionRepository subscriptions;
+    private final com.cefet_rj.projeto_final.billing.repositories.SubscriptionHistoryRepository subscriptionHistories;
     private final OccurrenceTicketRepository tickets;
     private final VisitorAccessRepository visitors;
     private final LostFoundItemRepository lostFound;
@@ -142,50 +144,45 @@ public class AdminDashboardController {
     @GetMapping("/overview")
     @Transactional(readOnly = true)
     public Map<String, Object> overview() {
-        List<Condominium> allCondos = condominiums.findAll();
-        long activeCondos = allCondos.stream().filter(c -> Boolean.TRUE.equals(c.getIsActive())).count();
-        long inactiveCondos = allCondos.size() - activeCondos;
+        long activeCondos = condominiums.countByIsActiveTrue();
+        long inactiveCondos = condominiums.countByIsActiveFalse();
+        long totalCondos = activeCondos + inactiveCondos;
+        long totalUsers = users.count();
+        long totalMemberships = memberships.count();
 
-        List<User> allUsers = users.findAll();
-        Map<String, java.util.Set<Long>> usersByRoleSet = new LinkedHashMap<>();
-        usersByRoleSet.put("ROLE_ADMIN", new java.util.LinkedHashSet<>());
-        usersByRoleSet.put("ROLE_MANAGER", new java.util.LinkedHashSet<>());
-        usersByRoleSet.put("ROLE_DOORMAN", new java.util.LinkedHashSet<>());
-        usersByRoleSet.put("ROLE_RESIDENT", new java.util.LinkedHashSet<>());
+        Map<String, Long> usersByRole = new LinkedHashMap<>();
+        usersByRole.put("ROLE_ADMIN", 0L);
+        usersByRole.put("ROLE_MANAGER", 0L);
+        usersByRole.put("ROLE_DOORMAN", 0L);
+        usersByRole.put("ROLE_RESIDENT", 0L);
 
-        for (User u : allUsers) {
-            if (u.getRoles() != null) {
-                for (Role r : u.getRoles()) {
-                    if (r.getAuthority() != null) {
-                        usersByRoleSet.computeIfAbsent(r.getAuthority(), k -> new java.util.LinkedHashSet<>()).add(u.getId());
-                    }
-                }
+        for (Object[] row : users.countUsersGroupedByRole()) {
+            if (row[0] != null && row[1] != null) {
+                usersByRole.put(String.valueOf(row[0]), ((Number) row[1]).longValue());
+            }
+        }
+        for (Object[] row : memberships.countActiveGroupedByAuthority()) {
+            if (row[0] != null && row[1] != null) {
+                String role = String.valueOf(row[0]);
+                long membershipCount = ((Number) row[1]).longValue();
+                usersByRole.merge(role, membershipCount, Math::max);
             }
         }
 
-        List<Membership> allMemberships = memberships.findAll();
         Map<String, Long> membershipsByStatus = new LinkedHashMap<>();
         for (MembershipStatus st : MembershipStatus.values()) {
             membershipsByStatus.put(st.name(), 0L);
         }
-        for (Membership m : allMemberships) {
-            if (m.getStatus() != null) {
-                membershipsByStatus.merge(m.getStatus().name(), 1L, Long::sum);
-            }
-            if (m.getRole() != null && m.getRole().getAuthority() != null
-                    && m.getStatus() == MembershipStatus.ACTIVE && m.getUser() != null) {
-                usersByRoleSet.computeIfAbsent(m.getRole().getAuthority(), k -> new java.util.LinkedHashSet<>())
-                        .add(m.getUser().getId());
+        for (Object[] row : memberships.countGroupedByStatus()) {
+            if (row[0] != null && row[1] != null) {
+                membershipsByStatus.put(String.valueOf(row[0]), ((Number) row[1]).longValue());
             }
         }
 
-        Map<String, Long> usersByRole = new LinkedHashMap<>();
-        usersByRoleSet.forEach((role, ids) -> usersByRole.put(role, (long) ids.size()));
-
         Map<String, Long> moduleVolumes = new LinkedHashMap<>();
-        moduleVolumes.put("users", (long) allUsers.size());
-        moduleVolumes.put("condominiums", (long) allCondos.size());
-        moduleVolumes.put("memberships", (long) allMemberships.size());
+        moduleVolumes.put("users", totalUsers);
+        moduleVolumes.put("condominiums", totalCondos);
+        moduleVolumes.put("memberships", totalMemberships);
         moduleVolumes.put("sectors", sectors.count());
         moduleVolumes.put("units", units.count());
         moduleVolumes.put("residents", residents.count());
@@ -272,13 +269,13 @@ public class AdminDashboardController {
                 predicates.add(cb.lessThanOrEqualTo(root.get("timestamp"), endDateTime));
             }
             if (category != null && !category.isBlank() && !"ALL".equalsIgnoreCase(category)) {
-                predicates.add(cb.equal(cb.upper(root.get("category")), category.trim().toUpperCase(Locale.ROOT)));
+                predicates.add(cb.equal(root.get("category"), category.trim().toUpperCase(Locale.ROOT)));
             }
             if (severity != null && !severity.isBlank() && !"ALL".equalsIgnoreCase(severity)) {
-                predicates.add(cb.equal(cb.upper(root.get("severity")), severity.trim().toUpperCase(Locale.ROOT)));
+                predicates.add(cb.equal(root.get("severity"), severity.trim().toUpperCase(Locale.ROOT)));
             }
             if (outcome != null && !outcome.isBlank() && !"ALL".equalsIgnoreCase(outcome)) {
-                predicates.add(cb.equal(cb.upper(root.get("outcome")), outcome.trim().toUpperCase(Locale.ROOT)));
+                predicates.add(cb.equal(root.get("outcome"), outcome.trim().toUpperCase(Locale.ROOT)));
             }
             if (principal != null && !principal.isBlank()) {
                 String pattern = "%" + principal.trim().toLowerCase(Locale.ROOT) + "%";
@@ -540,58 +537,82 @@ public class AdminDashboardController {
             @RequestParam(required = false) @Size(max = 100) String query,
             Pageable pageable
     ) {
-        return switch (resource) {
-            case "users" -> queryPage(users, UserDTO::new, query, pageable);
-            case "condominiums" -> queryPage(condominiums, CondominiumDTO::new, query, pageable);
-            case "memberships" -> queryPage(memberships, MembershipDTO::new, query, pageable);
-            case "sectors" -> queryPage(sectors, SectorDTO::new, query, pageable);
-            case "units" -> queryPage(units, UnitDTO::new, query, pageable);
-            case "residents" -> queryPage(residents, ResidentDTO::new, query, pageable);
-            case "packages" -> queryPage(packages, PackageDTO::new, query, pageable);
-            case "package-history" -> queryPage(packageHistories, PackageHistoryDTO::new, query, pageable);
-            case "announcements" -> queryPage(announcements, AnnouncementDTO::new, query, pageable);
-            case "reservations" -> queryPage(reservations, ReservationDTO::new, query, pageable);
-            case "common-areas" -> queryPage(commonAreas, CommonAreaDTO::new, query, pageable);
-            case "notifications" -> queryPage(notifications, NotificationDTO::new, query, pageable);
-            case "billing-plans" -> queryPage(billingPlans, BillingPlanDTO::new, query, pageable);
-            case "features" -> queryPage(features, FeatureDTO::new, query, pageable);
-            case "tickets" -> queryPage(tickets, OccurrenceTicketDTO::new, query, pageable);
-            case "visitors" -> queryPage(visitors, VisitorAccessDTO::new, query, pageable);
-            case "lost-found" -> queryPage(lostFound, LostFoundItemDTO::new, query, pageable);
-            case "classifieds" -> queryPage(classifieds, ClassifiedAdDTO::new, query, pageable);
-            case "vehicles" -> queryPage(vehicles, VehicleDTO::new, query, pageable);
-            case "pets" -> queryPage(pets, PetDTO::new, query, pageable);
-            case "moving-requests" -> queryPage(movingRequests, MovingRequestDTO::new, query, pageable);
-            case "documents" -> queryPage(documents, CondominiumDocumentDTO::new, query, pageable);
-            case "lockers" -> queryPage(lockers, SmartLockerDTO::new, query, pageable);
-            case "guest-lists" -> queryPage(guestLists, EventGuestListDTO::new, query, pageable);
-            case "infractions" -> queryPage(infractions, CondominiumInfractionDTO::new, query, pageable);
-            case "assemblies" -> queryPage(assemblies, AssemblyDTO::new, query, pageable);
-            case "maintenance-orders" -> queryPage(maintenanceOrders, MaintenanceOrderDTO::new, query, pageable);
-            case "expenses" -> queryPage(expenses, ExpenseDTO::new, query, pageable);
-            case "unit-payments", "unitPayments" -> queryPage(unitPayments, AdminUnitPaymentDTO::new, query, pageable);
-            case "emergency-alerts" -> queryPage(emergencyAlerts, EmergencyAlertDTO::new, query, pageable);
-            case "shift-logs" -> queryPage(shiftLogs, ConciergeShiftLogDTO::new, query, pageable);
-            case "renovation-requests" -> queryPage(renovationRequests, RenovationRequestDTO::new, query, pageable);
-            case "key-registry" -> queryPage(keyRegistryEntries, KeyRegistryEntryDTO::new, query, pageable);
-            case "utility-readings" -> queryPage(utilityReadings, UtilityReadingDTO::new, query, pageable);
-            case "parking-spots" -> queryPage(parkingSpots, ParkingSpotDTO::new, query, pageable);
-            case "polls" -> queryPage(polls, p -> new PollDTO(
-                    p.getId(),
-                    p.getCondominium().getId(),
-                    p.getTitle(),
-                    p.getDescription(),
-                    p.getActive(),
-                    p.getEndsAt(),
-                    p.getCreatedAt(),
-                    0,
-                    null,
-                    List.of(),
-                    p.getCreatedBy() != null ? (p.getCreatedBy().getFirstName() + " " + p.getCreatedBy().getLastName()).trim() : "Sistema"
-            ), query, pageable);
-            case "audit-logs" -> queryPage(auditLogs, AuditLogDTO::new, query, pageable);
-            default -> throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown admin resource: " + resource);
-        };
+        Pageable safePageable = clampPageable(pageable);
+        String trimmedQuery = query == null ? null : query.trim();
+        boolean singleTermQuery = trimmedQuery != null && !trimmedQuery.isBlank() && !trimmedQuery.contains(" ");
+        try {
+            return switch (resource) {
+                case "users" -> singleTermQuery
+                        ? users.searchByName(trimmedQuery, safePageable).map(UserDTO::new)
+                        : queryPage(users, UserDTO::new, query, safePageable);
+                case "condominiums" -> singleTermQuery
+                        ? condominiums.findByNameContainingIgnoreCase(trimmedQuery, safePageable).map(CondominiumDTO::new)
+                        : queryPage(condominiums, CondominiumDTO::new, query, safePageable);
+                case "memberships" -> queryPage(memberships, MembershipDTO::new, query, safePageable);
+                case "sectors" -> queryPage(sectors, SectorDTO::new, query, safePageable);
+                case "units" -> queryPage(units, UnitDTO::new, query, safePageable);
+                case "residents" -> queryPage(residents, ResidentDTO::new, query, safePageable);
+                case "packages" -> queryPage(packages, PackageDTO::new, query, safePageable);
+                case "package-history" -> queryPage(packageHistories, PackageHistoryDTO::new, query, safePageable);
+                case "announcements" -> queryPage(announcements, AnnouncementDTO::new, query, safePageable);
+                case "reservations" -> queryPage(reservations, ReservationDTO::new, query, safePageable);
+                case "common-areas" -> queryPage(commonAreas, CommonAreaDTO::new, query, safePageable);
+                case "notifications" -> queryPage(notifications, NotificationDTO::new, query, safePageable);
+                case "billing-plans" -> queryPage(billingPlans, BillingPlanDTO::new, query, safePageable);
+                case "condominium-subscriptions" -> queryPage(subscriptions, com.cefet_rj.projeto_final.billing.dtos.CondominiumSubscriptionDTO::new, query, safePageable);
+                case "subscription-history" -> queryPage(subscriptionHistories, com.cefet_rj.projeto_final.billing.dtos.SubscriptionHistoryDTO::new, query, safePageable);
+                case "features" -> queryPage(features, FeatureDTO::new, query, safePageable);
+                case "tickets" -> queryPage(tickets, OccurrenceTicketDTO::new, query, safePageable);
+                case "visitors" -> queryPage(visitors, VisitorAccessDTO::new, query, safePageable);
+                case "lost-found" -> queryPage(lostFound, LostFoundItemDTO::new, query, safePageable);
+                case "classifieds" -> queryPage(classifieds, ClassifiedAdDTO::new, query, safePageable);
+                case "vehicles" -> queryPage(vehicles, VehicleDTO::new, query, safePageable);
+                case "pets" -> queryPage(pets, PetDTO::new, query, safePageable);
+                case "moving-requests" -> queryPage(movingRequests, MovingRequestDTO::new, query, safePageable);
+                case "documents" -> queryPage(documents, CondominiumDocumentDTO::new, query, safePageable);
+                case "lockers" -> queryPage(lockers, SmartLockerDTO::new, query, safePageable);
+                case "guest-lists" -> queryPage(guestLists, EventGuestListDTO::new, query, safePageable);
+                case "infractions" -> queryPage(infractions, CondominiumInfractionDTO::new, query, safePageable);
+                case "assemblies" -> queryPage(assemblies, AssemblyDTO::new, query, safePageable);
+                case "maintenance-orders" -> queryPage(maintenanceOrders, MaintenanceOrderDTO::new, query, safePageable);
+                case "expenses" -> queryPage(expenses, ExpenseDTO::new, query, safePageable);
+                case "unit-payments", "unitPayments" -> queryPage(unitPayments, AdminUnitPaymentDTO::new, query, safePageable);
+                case "emergency-alerts" -> queryPage(emergencyAlerts, EmergencyAlertDTO::new, query, safePageable);
+                case "shift-logs" -> queryPage(shiftLogs, ConciergeShiftLogDTO::new, query, safePageable);
+                case "renovation-requests" -> queryPage(renovationRequests, RenovationRequestDTO::new, query, safePageable);
+                case "key-registry" -> queryPage(keyRegistryEntries, KeyRegistryEntryDTO::new, query, safePageable);
+                case "utility-readings" -> queryPage(utilityReadings, UtilityReadingDTO::new, query, safePageable);
+                case "parking-spots" -> queryPage(parkingSpots, ParkingSpotDTO::new, query, safePageable);
+                case "polls" -> queryPage(polls, p -> new PollDTO(
+                        p.getId(),
+                        p.getCondominium().getId(),
+                        p.getTitle(),
+                        p.getDescription(),
+                        p.getActive(),
+                        p.getEndsAt(),
+                        p.getCreatedAt(),
+                        0,
+                        null,
+                        List.of(),
+                        p.getCreatedBy() != null ? (p.getCreatedBy().getFirstName() + " " + p.getCreatedBy().getLastName()).trim() : "Sistema"
+                ), query, safePageable);
+                case "audit-logs" -> queryPage(auditLogs, AuditLogDTO::new, query, safePageable);
+                default -> throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown admin resource: " + resource);
+            };
+        } catch (org.springframework.data.mapping.PropertyReferenceException
+                 | org.springframework.dao.InvalidDataAccessApiUsageException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Critério de ordenação inválido para este recurso.");
+        }
+    }
+
+    private Pageable clampPageable(Pageable pageable) {
+        if (pageable == null || pageable.isUnpaged()) {
+            return PageRequest.of(0, 50, Sort.by(Sort.Direction.ASC, "id"));
+        }
+        int page = Math.max(0, pageable.getPageNumber());
+        int size = Math.min(Math.max(1, pageable.getPageSize()), 100);
+        Sort sort = pageable.getSort().isSorted() ? pageable.getSort() : Sort.by(Sort.Direction.ASC, "id");
+        return PageRequest.of(page, size, sort);
     }
 
     private <E, D> Page<D> queryPage(
@@ -616,18 +637,33 @@ public class AdminDashboardController {
                 ? pageable.getSort()
                 : Sort.by(Sort.Direction.ASC, "id");
 
-        List<D> filtered = repository.findAll(sort).stream()
-                .map(mapper)
-                .filter(dto -> matchesTerms(dto, terms))
-                .toList();
+        final int batchSize = 200;
+        final int maxBatches = 10;
+        List<D> filtered = new ArrayList<>();
+        boolean truncated = false;
+        long totalScanned = 0;
 
-        if (pageable.isUnpaged()) {
-            return new PageImpl<>(filtered);
+        for (int batchIndex = 0; batchIndex < maxBatches; batchIndex++) {
+            Page<E> batch = repository.findAll(PageRequest.of(batchIndex, batchSize, sort));
+            for (E entity : batch.getContent()) {
+                D dto = mapper.apply(entity);
+                if (matchesTerms(dto, terms)) {
+                    filtered.add(dto);
+                }
+            }
+            totalScanned += batch.getNumberOfElements();
+            if (!batch.hasNext()) {
+                break;
+            }
+            if (batchIndex == maxBatches - 1) {
+                truncated = batch.getTotalElements() > totalScanned;
+            }
         }
 
         int start = (int) Math.min(pageable.getOffset(), filtered.size());
         int end = Math.min(start + pageable.getPageSize(), filtered.size());
-        return new PageImpl<>(filtered.subList(start, end), pageable, filtered.size());
+        long reportedTotal = truncated ? Math.max(filtered.size(), start + (long) pageable.getPageSize()) : filtered.size();
+        return new PageImpl<>(filtered.subList(start, end), pageable, reportedTotal);
     }
 
     private boolean matchesTerms(Object dto, List<String> terms) {

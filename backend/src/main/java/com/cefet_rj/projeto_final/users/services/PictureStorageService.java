@@ -24,6 +24,7 @@ public class PictureStorageService {
     public static final String PICTURES_DB_PREFIX = "media/pictures/";
     public static final String PROFILES_FOLDER = "profiles";
     public static final String CONDOMINIUMS_FOLDER = "condominiums";
+    public static final String ANNOUNCEMENTS_FOLDER = "announcements";
 
     private static final long MAX_PICTURE_BYTES = 10L * 1024L * 1024L; // 10 MB
     private static final Pattern DATA_IMAGE_PATTERN = Pattern.compile(
@@ -40,9 +41,18 @@ public class PictureStorageService {
             Files.createDirectories(this.storageDirectory);
             Files.createDirectories(this.storageDirectory.resolve(PROFILES_FOLDER));
             Files.createDirectories(this.storageDirectory.resolve(CONDOMINIUMS_FOLDER));
+            Files.createDirectories(this.storageDirectory.resolve(ANNOUNCEMENTS_FOLDER));
         } catch (IOException e) {
             throw new IllegalStateException("Não foi possível criar o diretório de fotos: " + this.storageDirectory, e);
         }
+    }
+
+    /**
+     * Persiste uma única cópia em disco para imagens de avisos globais em vez de duplicar
+     * strings base64 em todas as linhas de tb_notification.
+     */
+    public String storeSystemAnnouncementImage(String inputImage) {
+        return storeDecodedImage(ANNOUNCEMENTS_FOLDER, "sys", inputImage, null);
     }
 
     public Path getStorageDirectory() {

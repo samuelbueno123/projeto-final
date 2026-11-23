@@ -36,6 +36,12 @@ public class UserService {
 	@org.springframework.beans.factory.annotation.Autowired(required = false)
 	private com.cefet_rj.projeto_final.shared.observability.AuditLogService auditLogService;
 
+	@org.springframework.beans.factory.annotation.Autowired(required = false)
+	private com.cefet_rj.projeto_final.auth.security.CachedUserAuthService cachedUserAuthService;
+
+	@org.springframework.beans.factory.annotation.Autowired(required = false)
+	private com.cefet_rj.projeto_final.auth.security.OAuth2TokenCleanupService oauth2TokenCleanupService;
+
     @Transactional(readOnly = true)
     public Page<UserDTO> findAllPaged(Pageable pageable) {
         Page<User> list = userRepository.findAll(pageable);
@@ -105,6 +111,7 @@ public class UserService {
 	public UserDTO update(Long id, UserUpdateDTO dto) {
 		try {
 			User entity = userRepository.getReferenceById(id);
+			String previousEmail = entity.getEmail();
 			linkAssociations(dto.firstName(), dto.lastName(), dto.email().trim().toLowerCase(java.util.Locale.ROOT), entity);
 
 			Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -137,6 +144,13 @@ public class UserService {
 			}
 
 			entity = userRepository.save(entity);
+			if (cachedUserAuthService != null) {
+				cachedUserAuthService.evictUserAuth(previousEmail);
+				cachedUserAuthService.evictUserAuth(entity.getEmail());
+			}
+			if (previousEmail != null && !previousEmail.equalsIgnoreCase(entity.getEmail()) && oauth2TokenCleanupService != null) {
+				oauth2TokenCleanupService.revokeTokensForPrincipal(previousEmail);
+			}
 			if (auditLogService != null) {
 				auditLogService.logAdminOperation(
 						null,
@@ -158,11 +172,17 @@ public class UserService {
 
 	@Transactional(propagation = Propagation.SUPPORTS)
 	public void delete(Long id) {
-		if (!userRepository.existsById(id)) {
-			throw new ResourceNotFoundException("Resource not found");
-		}
+		var existing = userRepository.findById(id)
+				.orElseThrow(() -> new ResourceNotFoundException("Resource not found"));
+		String deletedEmail = existing.getEmail();
 		try {
 			userRepository.deleteById(id);
+			if (cachedUserAuthService != null) {
+				cachedUserAuthService.evictUserAuth(deletedEmail);
+			}
+			if (oauth2TokenCleanupService != null) {
+				oauth2TokenCleanupService.revokeTokensForPrincipal(deletedEmail);
+			}
 			if (auditLogService != null) {
 				auditLogService.logAdminOperation(
 						null,

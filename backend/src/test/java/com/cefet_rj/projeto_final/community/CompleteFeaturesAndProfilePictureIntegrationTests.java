@@ -104,7 +104,7 @@ class CompleteFeaturesAndProfilePictureIntegrationTests {
         plan.setName("FULL_SUITE_TEST_PLAN");
         plan.setMonthlyFee(new BigDecimal("299.00"));
         plan.setActive(true);
-        plan.setFeatures(Set.of(reservationsFeature, packagesFeature, announcementsFeature, notificationsFeature));
+        plan.setFeatures(java.util.Arrays.stream(FeatureCode.values()).map(this::getOrCreateFeature).collect(java.util.stream.Collectors.toSet()));
         plan = billingPlanRepository.save(plan);
 
         condo = new Condominium();

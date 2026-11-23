@@ -39,7 +39,7 @@ RUN apt-get update && \
 WORKDIR /app
 
 # Create necessary application directories and assign ownership to appuser
-RUN mkdir -p /app/.secrets /app/media/pictures /app/logs && \
+RUN mkdir -p /app/.secrets /app/media/pictures/profiles /app/media/pictures/condominiums /app/media/pictures/announcements /app/logs && \
     chown -R appuser:appgroup /app
 
 # Copy executable jar from builder stage

@@ -59,12 +59,13 @@ public class MembershipService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.cefet_rj.projeto_final.realtime.services.RealtimeEmitterService realtimeEmitterService;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.cefet_rj.projeto_final.auth.security.CachedUserAuthService cachedUserAuthService;
+
     @Transactional(readOnly = true)
     public List<MembershipDTO> findMine() {
         Long userId = authenticatedUserService.getAuthenticatedUser().getId();
-        return membershipRepository.findAllByUserId(userId).stream()
-                .map(this::enrichWithUnitInfo)
-                .toList();
+        return enrichWithUnitInfoBatch(membershipRepository.findAllByUserId(userId));
     }
 
     @Transactional
@@ -83,36 +84,30 @@ public class MembershipService {
     @Transactional(readOnly = true)
     public List<MembershipDTO> findMyPendingAndRequests() {
         Long userId = authenticatedUserService.getAuthenticatedUser().getId();
-        return membershipRepository.findPendingAndRequestedByUserId(userId).stream()
-                .map(this::enrichWithUnitInfo)
-                .toList();
+        return enrichWithUnitInfoBatch(membershipRepository.findPendingAndRequestedByUserId(userId));
     }
 
     @Transactional(readOnly = true)
     public List<AvailableCondominiumDTO> findAvailableCondominiums() {
-        return condominiumRepository.findAll().stream()
-                .filter(c -> Boolean.TRUE.equals(c.getIsActive()))
+        return condominiumRepository.findByIsActiveTrue().stream()
                 .map(c -> new AvailableCondominiumDTO(c.getId(), c.getName(), c.getAddress()))
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public List<AvailableUnitDTO> findAvailableUnits(Long condominiumId) {
-        ensureCondominiumExists(condominiumId);
+        Condominium condo = getCondominiumOrThrow(condominiumId);
+        if (!Boolean.TRUE.equals(condo.getIsActive())) {
+            throw new ForbiddenException("Este condomínio está desativado no momento.");
+        }
         List<Unit> units = unitRepository.findAllForCondominium(condominiumId);
-        List<Object[]> residentCounts = residentRepository.countResidentsByUnitForCondominium(condominiumId);
-        Map<Long, Integer> countMap = residentCounts.stream()
-                .collect(Collectors.toMap(
-                        row -> (Long) row[0],
-                        row -> ((Number) row[1]).intValue()
-                ));
         return units.stream()
                 .map(u -> new AvailableUnitDTO(
                         u.getId(),
                         u.getIdentifier(),
                         u.getSector().getId(),
                         u.getSector().getName(),
-                        countMap.getOrDefault(u.getId(), 0)
+                        0
                 ))
                 .toList();
     }
@@ -121,6 +116,9 @@ public class MembershipService {
     public MembershipDTO requestMembership(Long condominiumId, MembershipRequestCreateDTO dto) {
         User user = authenticatedUserService.getAuthenticatedUser();
         Condominium condominium = getCondominiumOrThrow(condominiumId);
+        if (!Boolean.TRUE.equals(condominium.getIsActive())) {
+            throw new ForbiddenException("Não é possível solicitar vínculo em um condomínio desativado.");
+        }
 
         String authority = dto.authority() == null || dto.authority().isBlank()
                 ? "ROLE_RESIDENT"
@@ -226,9 +224,11 @@ public class MembershipService {
                 .filter(m -> m.getCondominium().getId().equals(condominiumId))
                 .orElseThrow(() -> new ResourceNotFoundException("Solicitação não encontrada neste condomínio."));
 
-        if (membership.getStatus() != MembershipStatus.REQUESTED
-                && membership.getStatus() != MembershipStatus.PENDING) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Esta solicitação já foi processada.");
+        if (membership.getStatus() != MembershipStatus.REQUESTED) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Apenas solicitações enviadas pelo próprio usuário podem ser aprovadas pela administração."
+            );
         }
 
         Unit targetUnit = membership.getRequestedUnit();
@@ -259,6 +259,12 @@ public class MembershipService {
         User targetUser = membership.getUser();
         targetUser.addRole(membership.getRole());
         userRepository.save(targetUser);
+        if (cachedUserAuthService != null) {
+            cachedUserAuthService.evictUserAuth(targetUser.getEmail());
+        }
+        if (realtimeEmitterService != null) {
+            realtimeEmitterService.subscribeUserToCondominium(targetUser.getId(), condominiumId);
+        }
 
         if ("ROLE_RESIDENT".equals(membership.getRole().getAuthority()) && targetUnit != null) {
             linkUserToUnit(targetUser, targetUnit, targetType);
@@ -287,9 +293,11 @@ public class MembershipService {
                 .filter(m -> m.getCondominium().getId().equals(condominiumId))
                 .orElseThrow(() -> new ResourceNotFoundException("Solicitação não encontrada neste condomínio."));
 
-        if (membership.getStatus() != MembershipStatus.REQUESTED
-                && membership.getStatus() != MembershipStatus.PENDING) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Esta solicitação já foi processada.");
+        if (membership.getStatus() != MembershipStatus.REQUESTED) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Apenas solicitações enviadas pelo próprio usuário podem ser aprovadas pela administração."
+            );
         }
 
         membership.setStatus(MembershipStatus.DECLINED);
@@ -364,7 +372,51 @@ public class MembershipService {
         residentRepository.save(resident);
     }
 
+    private List<MembershipDTO> enrichWithUnitInfoBatch(List<Membership> memberships) {
+        if (memberships == null || memberships.isEmpty()) {
+            return List.of();
+        }
+        java.util.Set<Long> userIdsNeedingLookup = new java.util.HashSet<>();
+        for (Membership m : memberships) {
+            if (m.getRequestedUnit() == null && m.getUser() != null && m.getCondominium() != null) {
+                userIdsNeedingLookup.add(m.getUser().getId());
+            }
+        }
+        java.util.Map<String, Resident> residentByUserAndCondo = new java.util.HashMap<>();
+        if (!userIdsNeedingLookup.isEmpty()) {
+            for (Resident r : residentRepository.findByUserIdInWithUnit(userIdsNeedingLookup)) {
+                if (r.getUser() != null && r.getUnit() != null && r.getUnit().getSector() != null
+                        && r.getUnit().getSector().getCondominium() != null) {
+                    String key = r.getUser().getId() + ":" + r.getUnit().getSector().getCondominium().getId();
+                    residentByUserAndCondo.putIfAbsent(key, r);
+                }
+            }
+        }
+        java.util.List<MembershipDTO> result = new java.util.ArrayList<>(memberships.size());
+        for (Membership m : memberships) {
+            result.add(toEnrichedDto(m, residentByUserAndCondo));
+        }
+        return result;
+    }
+
     private MembershipDTO enrichWithUnitInfo(Membership m) {
+        if (m.getRequestedUnit() != null) {
+            return toEnrichedDto(m, java.util.Collections.emptyMap());
+        }
+        java.util.Map<String, Resident> map = java.util.Collections.emptyMap();
+        if (m.getUser() != null && m.getCondominium() != null) {
+            var resOpt = residentRepository.findFirstByUserIdAndUnitSectorCondominiumId(
+                    m.getUser().getId(),
+                    m.getCondominium().getId()
+            );
+            if (resOpt.isPresent()) {
+                map = java.util.Map.of(m.getUser().getId() + ":" + m.getCondominium().getId(), resOpt.get());
+            }
+        }
+        return toEnrichedDto(m, map);
+    }
+
+    private MembershipDTO toEnrichedDto(Membership m, java.util.Map<String, Resident> residentByUserAndCondo) {
         MembershipDTO base = new MembershipDTO(m);
         if (m.getRequestedUnit() != null) {
             Unit u = m.getRequestedUnit();
@@ -374,12 +426,8 @@ public class MembershipService {
             return base.withUnitInfo(u.getId(), label, rType, u.getIdentifier(), sectorName);
         }
         if (m.getUser() != null && m.getCondominium() != null) {
-            var resOpt = residentRepository.findFirstByUserIdAndUnitSectorCondominiumId(
-                    m.getUser().getId(),
-                    m.getCondominium().getId()
-            );
-            if (resOpt.isPresent()) {
-                Resident r = resOpt.get();
+            Resident r = residentByUserAndCondo.get(m.getUser().getId() + ":" + m.getCondominium().getId());
+            if (r != null && r.getUnit() != null && r.getUnit().getSector() != null) {
                 Unit u = r.getUnit();
                 String label = u.getSector().getName() + " • Unid. " + u.getIdentifier();
                 String rType = r.getType() != null ? r.getType().name() : null;
@@ -395,7 +443,8 @@ public class MembershipService {
         Page<Membership> list = viewer.hasRole("ROLE_ADMIN")
                 ? membershipRepository.findAll(pageable)
                 : membershipRepository.findPagedForManager(viewer.getId(), pageable);
-        return list.map(this::enrichWithUnitInfo);
+        List<MembershipDTO> enriched = enrichWithUnitInfoBatch(list.getContent());
+        return new org.springframework.data.domain.PageImpl<>(enriched, pageable, list.getTotalElements());
     }
 
     @Transactional(readOnly = true)
@@ -453,12 +502,17 @@ public class MembershipService {
     public void delete(Long id) {
         Membership entity = membershipRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Resource not found"));
-        ensureViewerIsManagerOrAdminOf(entity.getCondominium().getId());
+        Long condominiumId = entity.getCondominium().getId();
+        ensureViewerIsManagerOrAdminOf(condominiumId);
         User targetUser = entity.getUser();
         try {
             membershipRepository.delete(entity);
             membershipRepository.flush();
             syncUserRoles(targetUser);
+            if (realtimeEmitterService != null
+                    && !membershipRepository.existsByUserIdAndCondominiumId(targetUser.getId(), condominiumId)) {
+                realtimeEmitterService.evictUserFromCondominium(targetUser.getId(), condominiumId);
+            }
         } catch (DataIntegrityViolationException e) {
             throw new DatabaseException("Integrity violation");
         }
@@ -468,9 +522,7 @@ public class MembershipService {
     public List<MembershipDTO> findByCondominiumForManager(Long condominiumId) {
         ensureCondominiumExists(condominiumId);
         ensureViewerIsManagerOrAdminOf(condominiumId);
-        return membershipRepository.findActiveAndPendingByCondominiumId(condominiumId).stream()
-                .map(this::enrichWithUnitInfo)
-                .toList();
+        return enrichWithUnitInfoBatch(membershipRepository.findActiveAndPendingByCondominiumId(condominiumId));
     }
 
     @Transactional
@@ -631,6 +683,12 @@ public class MembershipService {
 
         viewer.addRole(invitation.getRole());
         userRepository.save(viewer);
+        if (cachedUserAuthService != null) {
+            cachedUserAuthService.evictUserAuth(viewer.getEmail());
+        }
+        if (realtimeEmitterService != null && invitation.getCondominium() != null) {
+            realtimeEmitterService.subscribeUserToCondominium(viewer.getId(), invitation.getCondominium().getId());
+        }
 
         if ("ROLE_RESIDENT".equals(invitation.getRole().getAuthority()) && invitation.getRequestedUnit() != null) {
             linkUserToUnit(viewer, invitation.getRequestedUnit(), invitation.getRequestedResidentType());
@@ -669,9 +727,7 @@ public class MembershipService {
     public List<MembershipDTO> findManagersByCondominiumForAdmin(Long condominiumId) {
         ensureViewerIsSystemAdmin();
         ensureCondominiumExists(condominiumId);
-        return membershipRepository.findActiveManagersByCondominiumId(condominiumId).stream()
-                .map(this::enrichWithUnitInfo)
-                .toList();
+        return enrichWithUnitInfoBatch(membershipRepository.findActiveManagersByCondominiumId(condominiumId));
     }
 
     @Transactional
@@ -715,6 +771,12 @@ public class MembershipService {
 
         targetUser.addRole(managerRole);
         userRepository.save(targetUser);
+        if (cachedUserAuthService != null) {
+            cachedUserAuthService.evictUserAuth(targetUser.getEmail());
+        }
+        if (realtimeEmitterService != null) {
+            realtimeEmitterService.subscribeUserToCondominium(targetUser.getId(), condominiumId);
+        }
 
         Notification notification = new Notification();
         notification.setRecipient(targetUser);
@@ -748,6 +810,10 @@ public class MembershipService {
         membershipRepository.delete(membership);
         membershipRepository.flush();
         syncUserRoles(targetUser);
+        if (realtimeEmitterService != null
+                && !membershipRepository.existsByUserIdAndCondominiumId(targetUser.getId(), condominiumId)) {
+            realtimeEmitterService.evictUserFromCondominium(targetUser.getId(), condominiumId);
+        }
     }
 
     private void updateInvitationNotifications(Long invitationId, String status) {
@@ -780,6 +846,9 @@ public class MembershipService {
             managedUser.addRole(getOrCreateRole("ROLE_RESIDENT"));
         }
         userRepository.save(managedUser);
+        if (cachedUserAuthService != null) {
+            cachedUserAuthService.evictUserAuth(managedUser.getEmail());
+        }
     }
 
     private void ensureViewerIsManagerOrAdminOf(Long condominiumId) {

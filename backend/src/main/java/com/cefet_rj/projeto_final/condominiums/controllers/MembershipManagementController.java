@@ -103,9 +103,24 @@ public class MembershipManagementController {
     public ResponseEntity<MembershipDTO> assignUnit(
             @PathVariable Long condominiumId,
             @PathVariable Long membershipId,
-            @RequestBody Map<String, Object> body
+            @RequestBody(required = false) Map<String, Object> body
     ) {
-        Long unitId = body.get("unitId") instanceof Number num ? num.longValue() : null;
+        if (body == null) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Dados da unidade são obrigatórios.");
+        }
+        Long unitId = null;
+        Object rawUnit = body.get("unitId");
+        if (rawUnit instanceof Number num) {
+            unitId = num.longValue();
+        } else if (rawUnit != null) {
+            try {
+                unitId = Long.parseLong(rawUnit.toString().trim());
+            } catch (NumberFormatException ex) {
+                throw new org.springframework.web.server.ResponseStatusException(
+                        HttpStatus.BAD_REQUEST, "Identificador de unidade inválido.");
+            }
+        }
         String residentType = body.get("residentType") instanceof String str ? str : "OWNER";
         return ResponseEntity.ok(
                 membershipService.assignResidentUnit(condominiumId, membershipId, unitId, residentType)

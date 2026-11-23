@@ -149,6 +149,35 @@ public record ReservationDTO(
         );
     }
 
+    public ReservationDTO withRedactedWaitlistPii() {
+        return new ReservationDTO(
+                id,
+                commonAreaId,
+                commonAreaName,
+                condominiumId,
+                condominiumName,
+                null,
+                waitlistPosition != null ? "Morador #" + waitlistPosition : "Morador na fila",
+                null,
+                null,
+                null,
+                null,
+                null,
+                proposedStartAt,
+                proposedEndAt,
+                null,
+                null,
+                reviewedAt,
+                startAt,
+                endAt,
+                status,
+                createdAt,
+                cancelledAt,
+                imageUrl,
+                waitlistPosition
+        );
+    }
+
     public record CounterProposalDTO(
             LocalDateTime proposedStartAt,
             LocalDateTime proposedEndAt,

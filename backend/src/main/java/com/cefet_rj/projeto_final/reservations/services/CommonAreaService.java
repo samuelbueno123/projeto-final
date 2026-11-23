@@ -77,7 +77,7 @@ public class CommonAreaService {
 
         commonArea.setOpeningHour(openHour);
         commonArea.setClosingHour(closeHour);
-        commonArea.setImageUrl(dto.imageUrl());
+        commonArea.setImageUrl(com.cefet_rj.projeto_final.shared.validation.UrlSanitizer.sanitizeMediaUrl(dto.imageUrl(), "imageUrl"));
         commonArea.setMinAdvanceHours(dto.minAdvanceHours() != null ? dto.minAdvanceHours() : 1);
         commonArea.setMaxAdvanceDays(dto.maxAdvanceDays() != null ? dto.maxAdvanceDays() : 60);
         commonArea.setMaxDurationHours(dto.maxDurationHours() != null ? dto.maxDurationHours() : 8);
@@ -327,7 +327,7 @@ public class CommonAreaService {
         }
         validateOperatingHours(commonArea.getOpeningHour(), commonArea.getClosingHour());
         if (dto.imageUrl() != null) {
-            commonArea.setImageUrl(dto.imageUrl());
+            commonArea.setImageUrl(com.cefet_rj.projeto_final.shared.validation.UrlSanitizer.sanitizeMediaUrl(dto.imageUrl(), "imageUrl"));
         }
         if (dto.minAdvanceHours() != null) {
             commonArea.setMinAdvanceHours(dto.minAdvanceHours());
@@ -356,7 +356,7 @@ public class CommonAreaService {
         CommonArea commonArea = findCommonAreaById(id);
         Long condominiumId = commonArea.getCondominium().getId();
         condominiumAccessService.validateManagerAccess(condominiumId);
-        commonArea.setImageUrl(imageUrl);
+        commonArea.setImageUrl(com.cefet_rj.projeto_final.shared.validation.UrlSanitizer.sanitizeMediaUrl(imageUrl, "imageUrl"));
         commonArea = commonAreaRepository.save(commonArea);
         return new CommonAreaDTO(commonArea);
     }

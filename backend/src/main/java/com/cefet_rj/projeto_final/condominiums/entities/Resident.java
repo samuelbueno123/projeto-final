@@ -3,9 +3,13 @@ package com.cefet_rj.projeto_final.condominiums.entities;
 import com.cefet_rj.projeto_final.condominiums.enums.ResidentType;
 import com.cefet_rj.projeto_final.users.entities.User;
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
 
-@Data
+@Getter
+@Setter
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Table(
         name = "tb_resident",
         uniqueConstraints = {
@@ -17,13 +21,14 @@ public class Resident {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
     private Long id;
 
-    @ManyToOne(optional = false)
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     private User user;
 
-    @ManyToOne(optional = false)
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "unit_id")
     private Unit unit;
 

@@ -18,6 +18,22 @@ public interface ResidentRepository extends JpaRepository<Resident, Long> {
     @NonNull
     Page<Resident> findAll(@NonNull Pageable pageable);
 
+    @EntityGraph(attributePaths = {"user", "unit", "unit.sector", "unit.sector.condominium"})
+    @NonNull
+    Optional<Resident> findById(@NonNull Long id);
+
+    @Query("""
+            select r
+            from Resident r
+            join fetch r.user
+            join fetch r.unit u
+            join fetch u.sector s
+            join fetch s.condominium
+            where r.user.id in :userIds
+            order by r.id asc
+            """)
+    List<Resident> findByUserIdInWithUnit(@Param("userIds") java.util.Collection<Long> userIds);
+
     @Query("""
             select r.unit.id, count(r)
             from Resident r

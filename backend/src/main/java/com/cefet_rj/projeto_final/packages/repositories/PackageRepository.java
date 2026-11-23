@@ -4,12 +4,19 @@ import com.cefet_rj.projeto_final.packages.entities.Package;
 import com.cefet_rj.projeto_final.packages.enums.PackageStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.lang.NonNull;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface PackageRepository extends JpaRepository<Package, Long> {
+
+    @EntityGraph(attributePaths = {"recipient", "unit", "unit.sector", "unit.sector.condominium"})
+    @NonNull
+    Optional<Package> findById(@NonNull Long id);
 
     @Query(
             value = """
@@ -18,6 +25,7 @@ public interface PackageRepository extends JpaRepository<Package, Long> {
         JOIN FETCH p.recipient
         JOIN FETCH p.unit u
         JOIN FETCH u.sector s
+        JOIN FETCH s.condominium
         WHERE s.condominium.id = :condominiumId
     """,
             countQuery = """
@@ -37,6 +45,7 @@ public interface PackageRepository extends JpaRepository<Package, Long> {
         JOIN FETCH p.recipient
         JOIN FETCH p.unit u
         JOIN FETCH u.sector s
+        JOIN FETCH s.condominium
         WHERE s.condominium.id = :condominiumId
           AND (
                 LOWER(p.description) LIKE LOWER(CONCAT('%', :search, '%'))
@@ -77,7 +86,57 @@ public interface PackageRepository extends JpaRepository<Package, Long> {
         FROM Package p
         JOIN FETCH p.recipient
         JOIN FETCH p.unit u
-        JOIN FETCH u.sector
+        JOIN FETCH u.sector s
+        JOIN FETCH s.condominium
+        WHERE p.recipient.id = :userId
+          AND (:condominiumId IS NULL OR s.condominium.id = :condominiumId)
+    """,
+            countQuery = """
+        SELECT COUNT(p)
+        FROM Package p
+        JOIN p.unit u
+        JOIN u.sector s
+        WHERE p.recipient.id = :userId
+          AND (:condominiumId IS NULL OR s.condominium.id = :condominiumId)
+    """
+    )
+    Page<Package> findByRecipientIdAndCondominiumId(Long userId, Long condominiumId, Pageable pageable);
+
+    @Query(
+            value = """
+        SELECT p
+        FROM Package p
+        JOIN FETCH p.recipient
+        JOIN FETCH p.unit u
+        JOIN FETCH u.sector s
+        JOIN FETCH s.condominium
+        WHERE (p.recipient.id = :userId OR u.id IN :unitIds)
+          AND (:condominiumId IS NULL OR s.condominium.id = :condominiumId)
+    """,
+            countQuery = """
+        SELECT COUNT(p)
+        FROM Package p
+        JOIN p.unit u
+        JOIN u.sector s
+        WHERE (p.recipient.id = :userId OR u.id IN :unitIds)
+          AND (:condominiumId IS NULL OR s.condominium.id = :condominiumId)
+    """
+    )
+    Page<Package> findByRecipientIdOrUnitIdsAndCondominiumId(
+            Long userId,
+            List<Long> unitIds,
+            Long condominiumId,
+            Pageable pageable
+    );
+
+    @Query(
+            value = """
+        SELECT p
+        FROM Package p
+        JOIN FETCH p.recipient
+        JOIN FETCH p.unit u
+        JOIN FETCH u.sector s
+        JOIN FETCH s.condominium
         WHERE p.recipient.id = :userId
     """,
             countQuery = """

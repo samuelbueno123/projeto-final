@@ -19,7 +19,10 @@ public record AuditLogDTO(
         String condominiumName,
         String ipAddress,
         String outcome,
-        String details
+        String details,
+        String beforeState,
+        String afterState,
+        String reason
 ) {
     public AuditLogDTO(AuditLog entity) {
         this(
@@ -37,7 +40,10 @@ public record AuditLogDTO(
                 entity.getCondominiumName(),
                 entity.getIpAddress(),
                 entity.getOutcome(),
-                entity.getDetails()
+                entity.getDetails(),
+                entity.getBeforeState(),
+                entity.getAfterState(),
+                entity.getReason()
         );
     }
 }

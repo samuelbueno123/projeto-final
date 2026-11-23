@@ -42,7 +42,8 @@ public class ReservationNotificationListener {
         notificationService.createReservationNotification(
                 event.recipientId(),
                 event.commonAreaName(),
-                event.startAt()
+                event.startAt(),
+                event.condominiumId()
         );
     }
 }

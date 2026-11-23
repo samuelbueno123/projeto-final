@@ -68,4 +68,13 @@ public class AuditLog {
 
     @Column(length = 2000, updatable = false)
     private String details;
+
+    @Column(name = "before_state", columnDefinition = "TEXT", updatable = false)
+    private String beforeState;
+
+    @Column(name = "after_state", columnDefinition = "TEXT", updatable = false)
+    private String afterState;
+
+    @Column(length = 500, updatable = false)
+    private String reason;
 }

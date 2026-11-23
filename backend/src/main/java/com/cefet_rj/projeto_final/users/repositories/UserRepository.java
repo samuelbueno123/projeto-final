@@ -33,4 +33,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
             + "or lower(u.lastName) like lower(concat('%', :query, '%')) "
             + "or lower(u.email) like lower(concat('%', :query, '%'))")
     Page<User> searchByName(@Param("query") String query, Pageable pageable);
+
+    @Query("SELECT r.authority, COUNT(DISTINCT u.id) FROM User u JOIN u.roles r GROUP BY r.authority")
+    java.util.List<Object[]> countUsersGroupedByRole();
 }

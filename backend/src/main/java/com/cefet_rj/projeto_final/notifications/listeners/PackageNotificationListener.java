@@ -56,7 +56,8 @@ public class PackageNotificationListener {
 
         notificationService.createPackageNotification(
                 event.recipientId(),
-                event.packageId()
+                event.packageId(),
+                event.condominiumId()
         );
     }
 }

@@ -6,10 +6,12 @@ import com.cefet_rj.projeto_final.condominiums.dtos.update.ResidentUpdateDTO;
 import com.cefet_rj.projeto_final.condominiums.entities.Resident;
 import com.cefet_rj.projeto_final.condominiums.entities.Unit;
 import com.cefet_rj.projeto_final.condominiums.enums.ResidentType;
+import com.cefet_rj.projeto_final.condominiums.repositories.MembershipRepository;
 import com.cefet_rj.projeto_final.condominiums.repositories.ResidentRepository;
 import com.cefet_rj.projeto_final.condominiums.repositories.UnitRepository;
 import com.cefet_rj.projeto_final.condominiums.security.CondominiumAccessService;
 import com.cefet_rj.projeto_final.shared.exceptions.DatabaseException;
+import com.cefet_rj.projeto_final.shared.exceptions.ForbiddenException;
 import com.cefet_rj.projeto_final.shared.exceptions.ResourceNotFoundException;
 import com.cefet_rj.projeto_final.users.entities.User;
 import com.cefet_rj.projeto_final.users.repositories.UserRepository;
@@ -33,6 +35,7 @@ public class ResidentService {
     private final ResidentRepository residentRepository;
     private final UnitRepository unitRepository;
     private final UserRepository userRepository;
+    private final MembershipRepository membershipRepository;
     private final CondominiumAccessService condominiumAccessService;
 
     @Transactional(readOnly = true)
@@ -51,12 +54,19 @@ public class ResidentService {
 
     @Transactional
     public ResidentDTO insert(ResidentInsertDTO dto) {
-        Resident entity = new Resident();
-        linkAssociations(dto.type(), dto.unitId(), dto.userId(), entity);
-        condominiumAccessService.validateManagerAccess(entity.getUnit().getSector().getCondominium().getId());
+        Unit unit = unitRepository.findById(dto.unitId())
+                .orElseThrow(() -> new ResourceNotFoundException("Unit not found: " + dto.unitId()));
+        Long condominiumId = unit.getSector().getCondominium().getId();
+        User caller = condominiumAccessService.validateManagerAccess(condominiumId);
+        if (!caller.hasRole("ROLE_ADMIN")
+                && !membershipRepository.existsByUserIdAndCondominiumId(dto.userId(), condominiumId)) {
+            throw new ForbiddenException("O usuário precisa possuir vínculo ativo neste condomínio antes de ser associado a uma unidade.");
+        }
         if (residentRepository.existsByUserIdAndUnitId(dto.userId(), dto.unitId())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Este usuário já está cadastrado como morador desta unidade.");
         }
+        Resident entity = new Resident();
+        linkAssociations(dto.type(), unit, dto.userId(), entity);
         entity = residentRepository.save(entity);
         return new ResidentDTO(entity);
     }
@@ -67,13 +77,20 @@ public class ResidentService {
             Resident entity = residentRepository.findById(id)
                     .orElseThrow(() -> new ResourceNotFoundException("Id " + id + " not found"));
             condominiumAccessService.validateManagerAccess(entity.getUnit().getSector().getCondominium().getId());
+            Unit targetUnit = unitRepository.findById(dto.unitId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Unit not found: " + dto.unitId()));
+            Long targetCondoId = targetUnit.getSector().getCondominium().getId();
+            User caller = condominiumAccessService.validateManagerAccess(targetCondoId);
+            if (!caller.hasRole("ROLE_ADMIN")
+                    && !membershipRepository.existsByUserIdAndCondominiumId(dto.userId(), targetCondoId)) {
+                throw new ForbiddenException("O usuário precisa possuir vínculo ativo no condomínio de destino.");
+            }
             residentRepository.findByUserIdAndUnitId(dto.userId(), dto.unitId())
                     .filter(other -> !other.getId().equals(id))
                     .ifPresent(other -> {
                         throw new ResponseStatusException(HttpStatus.CONFLICT, "Este usuário já está vinculado a esta unidade em outro registro.");
                     });
-            linkAssociations(dto.type(), dto.unitId(), dto.userId(), entity);
-            condominiumAccessService.validateManagerAccess(entity.getUnit().getSector().getCondominium().getId());
+            linkAssociations(dto.type(), targetUnit, dto.userId(), entity);
             entity = residentRepository.save(entity);
             return new ResidentDTO(entity);
         } catch (EntityNotFoundException e) {
@@ -95,14 +112,11 @@ public class ResidentService {
 
     private void linkAssociations(
             String type,
-            Long unitId,
+            Unit unit,
             Long userId,
             Resident entity
     ) {
         entity.setType(ResidentType.fromString(type));
-
-        Unit unit = unitRepository.findById(unitId)
-                .orElseThrow(() -> new ResourceNotFoundException("Unit not found: " + unitId));
         entity.setUnit(unit);
 
         User user = userRepository.findById(userId)

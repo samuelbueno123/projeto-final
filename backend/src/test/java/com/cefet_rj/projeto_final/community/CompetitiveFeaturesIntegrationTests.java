@@ -91,6 +91,9 @@ public class CompetitiveFeaturesIntegrationTests {
     @Autowired
     private VisitorAccessRepository visitorAccessRepository;
 
+    @Autowired
+    private com.cefet_rj.projeto_final.billing.repositories.FeatureRepository featureRepository;
+
     private Condominium condo;
     private Sector sectorA;
     private Unit unit101;
@@ -108,6 +111,17 @@ public class CompetitiveFeaturesIntegrationTests {
         plan.setName("COMPETITIVE_PRO_PLAN");
         plan.setMonthlyFee(new BigDecimal("499.00"));
         plan.setActive(true);
+        java.util.Set<com.cefet_rj.projeto_final.billing.entities.Feature> allFeatures = new java.util.HashSet<>();
+        for (com.cefet_rj.projeto_final.billing.enums.FeatureCode code : com.cefet_rj.projeto_final.billing.enums.FeatureCode.values()) {
+            var feature = featureRepository.findByCode(code.name()).orElseGet(() -> {
+                var f = new com.cefet_rj.projeto_final.billing.entities.Feature();
+                f.setCode(code.name());
+                f.setName(code.name());
+                return featureRepository.save(f);
+            });
+            allFeatures.add(feature);
+        }
+        plan.setFeatures(allFeatures);
         plan = billingPlanRepository.save(plan);
 
         condo = new Condominium();

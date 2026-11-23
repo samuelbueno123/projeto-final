@@ -48,9 +48,22 @@ public class FinancialService {
     private final CondominiumAccessService condominiumAccessService;
     private final RealtimeEmitterService realtimeEmitterService;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.cefet_rj.projeto_final.condominiums.security.CondominiumFeatureAccessService featureAccessService;
+
+    private void ensureFinancialFeature(Long condominiumId) {
+        if (featureAccessService != null) {
+            featureAccessService.validateFeatureEnabled(
+                    condominiumId,
+                    com.cefet_rj.projeto_final.billing.enums.FeatureCode.FINANCIAL
+            );
+        }
+    }
+
     @Transactional(readOnly = true)
     public List<ExpenseDTO> listExpenses(Long condominiumId) {
         condominiumAccessService.validateAccess(condominiumId);
+        ensureFinancialFeature(condominiumId);
         return expenseRepository.findByCondominiumIdOrderByDueDateDesc(condominiumId).stream()
                 .map(ExpenseDTO::new)
                 .toList();
@@ -59,6 +72,7 @@ public class FinancialService {
     @Transactional
     public ExpenseDTO createExpense(Long condominiumId, CreateExpenseDTO dto) {
         condominiumAccessService.validateManagerAccess(condominiumId);
+        ensureFinancialFeature(condominiumId);
         User caller = authenticatedUserService.getAuthenticatedUser();
 
         if (dto.amount() == null || dto.amount().compareTo(BigDecimal.ZERO) <= 0) {
@@ -76,7 +90,7 @@ public class FinancialService {
         expense.setDueDate(dto.dueDate());
         expense.setSupplier(dto.supplier() != null ? dto.supplier().trim() : null);
         expense.setDocumentNumber(dto.documentNumber() != null ? dto.documentNumber().trim() : null);
-        expense.setReceiptUrl(dto.receiptUrl() != null ? dto.receiptUrl().trim() : null);
+        expense.setReceiptUrl(com.cefet_rj.projeto_final.shared.validation.UrlSanitizer.sanitizeMediaUrl(dto.receiptUrl(), "receiptUrl"));
         expense.setStatus("PENDING");
         expense.setCreatedBy(caller);
         expense.setCreatedAt(LocalDateTime.now());
@@ -96,6 +110,7 @@ public class FinancialService {
                 .orElseThrow(() -> new ResourceNotFoundException("Despesa não encontrada: " + expenseId));
 
         condominiumAccessService.validateManagerAccess(expense.getCondominium().getId());
+        ensureFinancialFeature(expense.getCondominium().getId());
 
         String currentStatus = expense.getStatus() != null ? expense.getStatus().toUpperCase() : "PENDING";
         if ("PAID".equals(currentStatus)) {
@@ -122,6 +137,7 @@ public class FinancialService {
                 .orElseThrow(() -> new ResourceNotFoundException("Despesa não encontrada: " + expenseId));
 
         condominiumAccessService.validateManagerAccess(expense.getCondominium().getId());
+        ensureFinancialFeature(expense.getCondominium().getId());
 
         String currentStatus = expense.getStatus() != null ? expense.getStatus().toUpperCase() : "PENDING";
         if ("PAID".equals(currentStatus)) {
@@ -144,6 +160,7 @@ public class FinancialService {
     @Transactional(readOnly = true)
     public FinancialSummaryDTO getFinancialSummary(Long condominiumId) {
         condominiumAccessService.validateAccess(condominiumId);
+        ensureFinancialFeature(condominiumId);
 
         List<Unit> units = unitRepository.findAllForCondominium(condominiumId);
         List<Long> unitIds = units.stream().map(Unit::getId).toList();
@@ -201,6 +218,7 @@ public class FinancialService {
     @Transactional(readOnly = true)
     public BudgetComparisonSummaryDTO getBudgetComparison(Long condominiumId, Integer year, Integer month) {
         condominiumAccessService.validateAccess(condominiumId);
+        ensureFinancialFeature(condominiumId);
         int targetYear = (year != null && year > 2000) ? year : LocalDate.now().getYear();
         int targetMonth = (month != null && month >= 1 && month <= 12) ? month : LocalDate.now().getMonthValue();
 
@@ -289,6 +307,7 @@ public class FinancialService {
     @Transactional
     public BudgetForecastDTO saveBudgetForecast(Long condominiumId, Map<String, Object> body) {
         condominiumAccessService.validateManagerAccess(condominiumId);
+        ensureFinancialFeature(condominiumId);
         Condominium condo = condominiumRepository.findById(condominiumId)
                 .orElseThrow(() -> new ResourceNotFoundException("Condomínio não encontrado: " + condominiumId));
 

@@ -270,3 +270,18 @@ flowchart LR
 ```
 
 - **Resiliência de Rede:** Todas as comunicações síncronas para o exterior possuem `connectTimeout` e `readTimeout` definidos em **5000 milissegundos**, evitando o enfileiramento infinito de requisições no servidor.
+
+---
+
+## 8. Frontend SaaS Design System & Dashboards Integrados
+
+O cliente Flutter (`projeto-front/`) adota um sistema visual unificado baseado em tokens semânticos (`AncoraThemeTokens`, `SaaSColors` e `saas_dashboard_widgets.dart`):
+
+- **Paleta, Modo Escuro e Tipografia:** Canvas escuro `#080B14`, superfícies de cards em `#0F1424` com bordas sutis (`Colors.white` em baixa opacidade e `#1E293B`), acentos funcionais (`#2563EB` primário, `#10B981` sucesso, `#F59E0B` alerta, `#EF4444` crítico, `#8B5CF6` IA/especial) aplicados de forma consistente inclusive em diálogos, chat, hub comunitário e reservas, com fonte `Inter` / `Geist` e fallback `Noto Color Emoji`.
+- **Componentes Compartilhados:** `SaaSGlassCard` (com glassmorphism seguro em produção e desabilitado em ambiente de teste), `AncoraNavigationShell` com barra lateral esquerda recolhível/expansível (`_collapsed`) e navegação inline sem popups/menus extras, barra de busca `Ctrl+K`, `SmartImage` para resolução uniforme de mídias relativas `/media/...` e base64, indicador de status SSE (`AncoraConnectionStatusPill`), relógio operacional (`AncoraLiveClockPill`), gráfico `SaaSFinancialMiniChart` e utilitário `CarrierVisual`.
+- **Dashboards por Perfil (conectados às APIs reais):**
+  1. **Painel do Síndico (`ManagerPage`):** Barra lateral recolhível com alternância inline entre Painel, Unidades e Pagamentos, Reservas, Comunidade, Galeria de Fotos, Vínculos/Moradores e Notificações; cabeçalho com seletor de condomínio, banner com fachada e ações reais, 4 KPIs de `ManagerDashboardDTO.summary`, gráfico arrecadação vs inadimplência e fila de chamados/manutenções.
+  2. **Painel do Morador (`HomePage`):** Barra lateral recolhível unificada com seções inline (Início, Comunidade, Meus Recados, Notificações escopadas por condomínio e Meu Perfil), cabeçalho contextual com unidade/bloco reais, 4 cards de status rápido, 6 ações rápidas (PIX, reserva, QR visitor pass, chat com portaria, ocorrências e mural) e votação real em enquetes.
+  3. **Painel do Porteiro (`DoormanPage`):** Migrado para `AncoraNavigationShell` com barra lateral recolhível de 9 módulos inline (Encomendas, Visitantes, Consulta de Placas, Eventos & Convidados, Unidades & Achados, Reservas & Áreas, Smart Lockers, Chat Moradores e Notificações), métricas dinâmicas, busca/filtro de encomendas, baixa por PIN e envio de comunicados.
+  4. **Painel do Administrador (`AdminPage`):** Console Global Multi-Condomínio com barra lateral recolhível (`LayoutBuilder` responsivo), drawer mobile com alternância inline entre Visão Geral, Logs e Auditoria, Saúde/Diagnóstico, Matriz RBAC e Entidades do Banco, métricas reais de `/admin/overview` e `/admin/diagnostics` e busca avançada.
+

@@ -25,11 +25,11 @@ public class Package implements IdProjection<Long> {
 
     private String description;
 
-    @ManyToOne(optional = false)
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "recipient_id")
     private User recipient;
 
-    @ManyToOne(optional = false)
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "unit_id")
     private Unit unit;
 

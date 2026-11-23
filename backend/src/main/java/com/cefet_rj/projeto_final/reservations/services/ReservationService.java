@@ -207,9 +207,14 @@ public class ReservationService {
         featureAccessService.validateFeatureEnabled(condominiumId, FeatureCode.RESERVATIONS);
         validateCondominiumAccess(condominiumId);
 
+        User caller = authenticatedUserService.getAuthenticatedUser();
+        boolean isStaff = condominiumAccessService.isStaffOrAdmin(caller, condominiumId);
+
         return reservationRepository.findWaitlistedByCommonArea(commonAreaId)
                 .stream()
-                .map(ReservationDTO::new)
+                .map(r -> (isStaff || (r.getReservedBy() != null && r.getReservedBy().getId().equals(caller.getId())))
+                        ? new ReservationDTO(r)
+                        : new ReservationDTO(r).withRedactedWaitlistPii())
                 .toList();
     }
 
@@ -244,6 +249,22 @@ public class ReservationService {
                     HttpStatus.BAD_REQUEST,
                     "A duração máxima permitida para esta área comum é de " + maxDurationHours + "h."
             );
+        }
+
+        Integer openingHour = commonArea.getOpeningHour();
+        Integer closingHour = commonArea.getClosingHour();
+        if (openingHour != null && closingHour != null && openingHour < closingHour) {
+            boolean startsBeforeOpen = startAt.getHour() < openingHour;
+            boolean endsAfterClose = endAt.toLocalDate().isAfter(startAt.toLocalDate())
+                    || endAt.getHour() > closingHour
+                    || (endAt.getHour() == closingHour && endAt.getMinute() > 0);
+            if (startsBeforeOpen || endsAfterClose) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "A área comum funciona somente entre " + String.format("%02d:00", openingHour)
+                                + " e " + String.format("%02d:00", closingHour) + "."
+                );
+            }
         }
 
         int maxWeekly = commonArea.getMaxWeeklyBookingsPerUser() != null ? commonArea.getMaxWeeklyBookingsPerUser() : 3;
@@ -380,6 +401,10 @@ public class ReservationService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "O horário proposto de término deve ser posterior ao horário de início.");
         }
+        if (dto.proposedStartAt().isBefore(LocalDateTime.now().minusMinutes(5))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Não é possível propor um horário no passado.");
+        }
 
         User reviewer = authenticatedUserService.getAuthenticatedUser();
         reservation.setStatus(ReservationStatus.COUNTER_PROPOSED);
@@ -424,6 +449,10 @@ public class ReservationService {
         if (effectiveStart == null || effectiveEnd == null || !effectiveEnd.isAfter(effectiveStart)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "O horário de término deve ser posterior ao horário de início.");
+        }
+        if (effectiveStart.isBefore(LocalDateTime.now().minusMinutes(5))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Não é possível confirmar reserva com horário de início no passado.");
         }
 
         List<Reservation> activeOverlapping = reservationRepository.findActiveOverlapping(
@@ -490,6 +519,10 @@ public class ReservationService {
         if (effectiveStart == null || effectiveEnd == null || !effectiveEnd.isAfter(effectiveStart)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "A contraproposta possui intervalo de horários inválido.");
+        }
+        if (effectiveStart.isBefore(LocalDateTime.now().minusMinutes(5))) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "O horário da contraproposta já expirou.");
         }
 
         List<Reservation> activeOverlapping = reservationRepository.findActiveOverlapping(

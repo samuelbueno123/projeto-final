@@ -364,12 +364,25 @@ public class PackageService {
 
     @Transactional(readOnly = true)
     public Page<PackageDTO> findMyPackages(Pageable pageable) {
+        return findMyPackages(null, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<PackageDTO> findMyPackages(Long condominiumId, Pageable pageable) {
         User user = authenticatedUserService.getAuthenticatedUser();
 
-        Page<Package> page = packageRepository.findByRecipientId(
-                user.getId(),
-                pageable
-        );
+        if (condominiumId != null && !user.hasRole("ROLE_ADMIN")) {
+            condominiumAccessService.validateUserBelongsToCondominium(user.getId(), condominiumId);
+        }
+
+        List<Long> unitIds = condominiumId != null
+                ? residentRepository.findByUserIdAndCondominiumId(user.getId(), condominiumId)
+                        .stream().map(r -> r.getUnit().getId()).toList()
+                : residentRepository.findUnitIdsByUserId(user.getId());
+
+        Page<Package> page = unitIds.isEmpty()
+                ? packageRepository.findByRecipientIdAndCondominiumId(user.getId(), condominiumId, pageable)
+                : packageRepository.findByRecipientIdOrUnitIdsAndCondominiumId(user.getId(), unitIds, condominiumId, pageable);
 
         return page.map(PackageDTO::new);
     }
