@@ -325,6 +325,21 @@ class ModernizationSecurityAndReliabilityTests {
         }
     }
 
+    @Test
+    void corsAllowsPrivateLanOriginsForMobileTesting() throws Exception {
+        mockMvc.perform(options("/oauth2/token")
+                        .header("Origin", "http://192.168.15.80:5500")
+                        .header("Access-Control-Request-Method", "POST"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://192.168.15.80:5500"));
+
+        mockMvc.perform(options("/users/me")
+                        .header("Origin", "http://10.0.0.42:5500")
+                        .header("Access-Control-Request-Method", "GET"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://10.0.0.42:5500"));
+    }
+
     private Role ensureRole(String authority) {
         Role role = roleRepository.findByAuthority(authority);
         if (role != null) return role;

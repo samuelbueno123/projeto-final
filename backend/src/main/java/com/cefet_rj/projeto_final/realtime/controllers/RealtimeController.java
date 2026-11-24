@@ -27,7 +27,7 @@ public class RealtimeController {
     private final AuthenticatedUserService authenticatedUserService;
     private final MembershipRepository membershipRepository;
 
-    @GetMapping(value = "/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @GetMapping(value = {"/events", "/subscribe"}, produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Canal SSE de eventos em tempo real para sincronização da interface com o banco de dados")
     public SseEmitter subscribeToRealtimeEvents() {
